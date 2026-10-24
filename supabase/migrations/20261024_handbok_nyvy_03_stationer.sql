@@ -20,18 +20,18 @@ values
   'handbok', 'utrustning',
   $json$[
     {"type":"intro","roller":["technician"],"var":"Mina ärenden › kontrollbesöket › steget Arbetet","tar":"5 min","behover":"Ett bokat kontrollbesök hos en avtalskund","enhet":"mobil"},
-    {"type":"kortsvar","text":"Öppna kontrollbesöket och tryck [[Jag är framme]]. I steget Arbetet trycker du [[Starta runda|station.runda]] och kontrollerar stationerna i nummerordning. När alla är kontrollerade trycker du på den gröna bocken uppe till höger och sedan [[Ja, klarmarkera]]."},
+    {"type":"kortsvar","text":"Öppna kontrollbesöket och tryck [[Jag är framme]]. I steget Arbetet trycker du [[Starta runda|station.runda]] och kontrollerar stationerna i nummerordning. När alla är kontrollerade trycker du på den gröna bocken uppe till höger, skriver Kommentar från tekniker och trycker [[Ja, klarmarkera]]."},
     {"type":"visning","steg":[
       {"text":"Öppna kontrollbesöket i Mina ärenden. Tryck [[Jag är framme]] när du står hos kunden.","ser":"Steget Arbetet öppnas med rubriken Kontrollera stationerna, kartan med numrerade stationer och listan i nummerordning. Överst står 0 av 6 stationer."},
       {"text":"Tryck [[Starta runda|station.runda]].","ser":"Raden Station 1 av 6 visas och station 1 pulserar på kartan."},
       {"text":"Tryck på station 1 på kartan eller i listan.","ser":"Stationsarket öppnas. Överst står Flytta, Byt typ och Historik, sedan senaste kontrollen och förbrukningen."},
       {"text":"Tryck [[+]] tills förbrukningen stämmer. Varje tryck är 5 gram för betongstationer.","ser":"Rutan blir grön, gul eller röd efter gränserna Varning och Kritisk under rutan."},
       {"text":"Tryck [[Spara|station.ok]].","ser":"Arket stängs, raden blir grön med Kontrollerad nu och nästa station pulserar. Tryck på den och fortsätt."},
-      {"text":"När alla stationer är kontrollerade: tryck på den gröna bocken [[Klarmarkera ärende|station.klar]] uppe till höger.","ser":"Rutan Klarmarkera ärende? visar Alla stationer är inspekterade. och antalen ute och inne."},
-      {"text":"Tryck [[Ja, klarmarkera]].","ser":"Ärendet får status Avslutat och du hamnar i steget Klart med Ärendet är avslutat. Kontrollrapporten finns nu i steget Rapport."}
+      {"text":"När alla stationer är kontrollerade: tryck på den gröna bocken [[Klarmarkera ärende|station.klar]] uppe till höger.","ser":"Rutan Klarmarkera ärende? visar Alla stationer är inspekterade., antalen ute och inne och fältet Kommentar från tekniker."},
+      {"text":"Skriv i Kommentar från tekniker hur det såg ut: aktivitet, åtgärder och vad kunden behöver göra. Tryck sedan [[Ja, klarmarkera]].","ser":"Ärendet får status Avslutat och du hamnar i steget Klart med Ärendet är avslutat. Kontrollrapporten finns nu i steget Rapport."}
     ]},
     {"type":"felsok","items":[
-      {"fraga":"Ja, klarmarkera går inte att trycka på","svar":"Alla stationer måste vara kontrollerade, ute och inne. Rutan visar då Du har inte inspekterat alla stationer ännu. Tryck [[Avbryt]], öppna fliken Inne om kunden har stationer inomhus, och kontrollera de som saknas."},
+      {"fraga":"Ja, klarmarkera går inte att trycka på","svar":"Kommentar från tekniker måste vara skriven, och alla stationer måste vara kontrollerade, ute och inne. Rutan visar då Du har inte inspekterat alla stationer ännu. Tryck [[Avbryt]], öppna fliken Inne om kunden har stationer inomhus, och kontrollera de som saknas."},
       {"fraga":"Jag ser ingen grön bock uppe till höger","svar":"Bocken visas först när minst en station är kontrollerad. Spara en station eller använd bocken på en rad."},
       {"fraga":"En station går inte att nå","svar":"Tryck på pilen Hoppa över station i rundraden. Stationen läggs sist i kön. Besöket kan inte klarmarkeras förrän den är kontrollerad, så skriv en ticket till rollen Koordinator om den inte går att nå alls."},
       {"fraga":"Stationen står på fel plats på kartan","svar":"Öppna stationen och tryck [[Flytta|station.flytta]]. Tryck sedan på rätt plats på kartan. Notisen Station flyttad visas."},
@@ -41,7 +41,7 @@ values
       "Bocken längst till höger på en rad är snabb-OK. Tryck på den och svara [[OK]] på frågan Markera Station 3 som OK? Stationen sparas utan förbrukning, foto och anteckning.",
       "Förbrukningen sätter stationens status. Under Varning är rutan grön, från Varning gul och från Kritisk röd. Väljer du ett preparat kan gränserna följa preparatet.",
       "Avsluta kontrollrunda stoppar bara ordningen. Det du har sparat finns kvar, och du kan trycka Starta runda igen.",
-      "Kommentar om besöket och kameran överst gäller hela besöket. Du kan lägga till högst 10 bilder.",
+      "Kommentar från tekniker och kameran överst gäller hela besöket. Kommentaren krävs för att klarmarkera och står i kontrollrapporten. Du kan lägga till högst 10 bilder.",
       "Besöket ingår i kundens avtal och faktureras inte. Tilläggsstationer sköts i kontrollrundan och faktureras utöver avtalet."
     ]},
     {"type":"interactive","component":"nyvy/StationerForbrukning"},

@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.96.0',
+    date: '2026-10-24',
+    title: 'Rapporten krävs innan ärendet stängs',
+    items: [
+      { kind: 'andring', text: 'Privat- och företagsärenden, avtalsbesök och ronderingar går inte att avsluta förrän rapporten är skriven. Kontroller och etableringar dokumenteras i stationerna och behöver ingen skriven rapport.' },
+      { kind: 'andring', text: 'I nya arbetsvyn krävs Kommentar från tekniker innan kontrollen klarmarkeras. Fältet finns direkt i rutan Klarmarkera ärende?.' },
+      { kind: 'andring', text: 'Kontrollrapporten visar kommentaren under rubriken Kommentar från tekniker.' },
+    ],
+  },
+  {
     version: '3.95.0',
     date: '2026-10-24',
     title: 'Bilder i tillbudsrapporter',

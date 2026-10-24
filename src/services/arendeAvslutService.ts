@@ -1,8 +1,9 @@
 // src/services/arendeAvslutService.ts
 // Gemensam avslutskontroll: samlar spärrarna som ärendemodalerna kör innan ett
-// ärende får klarmarkeras (status Avslutat). Inga nya regler: varje kontroll
-// nedan är en kopia av en befintlig spärr, med källan angiven (fil:rad per
-// 2026-10-22). Ändras en spärr i en modal ska den ändras här också, tills
+// ärende får klarmarkeras (status Avslutat). Varje kontroll nedan är en kopia
+// av en befintlig spärr, med källan angiven (fil:rad per 2026-10-22). Undantag:
+// rapportspärren (2026-10-24) är ny och finns även i modalernas spara (RAPPORT_SAKNAS_FEL).
+// Ändras en spärr i en modal ska den ändras här också, tills
 // modalerna själva anropar kontrolleraAvslut.
 //
 // Kontrollerna läser databasens sparade läge. Osparade ändringar i en öppen
@@ -32,6 +33,9 @@ export interface AvslutsHinder {
 interface ArendeRad {
   start: string | null
   slut: string | null
+  /** Rapportens text: work_report på avtalsärenden, rapport på privat/företag */
+  rapport: string | null
+  serviceType: string | null
 }
 
 async function hamtaArende(caseId: string, kalla: ArendeKalla): Promise<ArendeRad | null> {
@@ -39,17 +43,22 @@ async function hamtaArende(caseId: string, kalla: ArendeKalla): Promise<ArendeRa
     // Avtalsärenden (EditContractCaseModal/RonderingCaseModal) har scheduled_start/scheduled_end
     const { data, error } = await supabase
       .from('cases')
-      .select('scheduled_start, scheduled_end')
+      .select('scheduled_start, scheduled_end, work_report, service_type')
       .eq('id', caseId)
       .maybeSingle()
     if (error) throw new Error(`Kunde inte läsa ärendet: ${error.message}`)
     if (!data) return null
-    return { start: data.scheduled_start ?? null, slut: data.scheduled_end ?? null }
+    return {
+      start: data.scheduled_start ?? null,
+      slut: data.scheduled_end ?? null,
+      rapport: data.work_report ?? null,
+      serviceType: data.service_type ?? null
+    }
   }
   // Privat-/företagsärenden (EditCaseModal) har start_date/due_date
   const { data, error } = await supabase
     .from(kalla)
-    .select('start_date, due_date')
+    .select('start_date, due_date, rapport')
     .eq('id', caseId)
     .maybeSingle()
   if (error) throw new Error(`Kunde inte läsa ärendet: ${error.message}`)
@@ -57,9 +66,26 @@ async function hamtaArende(caseId: string, kalla: ArendeKalla): Promise<ArendeRa
   const rad = data as unknown as Record<string, string | null | undefined>
   return {
     start: rad.start_date ?? null,
-    slut: rad.due_date ?? null
+    slut: rad.due_date ?? null,
+    rapport: rad.rapport ?? null,
+    serviceType: null
   }
 }
+
+/**
+ * Avtalsärenden som dokumenteras någon annanstans och därför avslutas utan
+ * skriven rapport: kontroller (stationerna och Kommentar från tekniker),
+ * etableringar (utplaceringen) och egenkontroller (granskningen).
+ */
+export const UTAN_SKRIVEN_RAPPORT = ['inspection', 'establishment', 'egenkontroll_trafikkontoret']
+
+/** Ärendet kräver en skriven rapport innan det avslutas (2026-10-24) */
+export function kraverRapport(kalla: ArendeKalla, serviceType: string | null | undefined): boolean {
+  if (kalla !== 'cases') return true
+  return !UTAN_SKRIVEN_RAPPORT.includes(serviceType ?? '')
+}
+
+export const RAPPORT_SAKNAS_FEL = 'Skriv rapporten innan ärendet avslutas. Beskriv vad du gjorde.'
 
 /**
  * Stationskontrollen (delsystem A): alla kundens stationer ska vara
@@ -115,6 +141,12 @@ export async function kontrolleraAvslut(args: {
     // Pekar på Framme, där tiden står i Rondering och Egenkontroll. Avtals- och
     // privatmodalen visar tiden i Alla uppgifter och styr dit på hindrets id.
     hinder.push({ id: 'sluttid-fore-start', text: SLUTTID_FORE_START_FEL, steg: 'framme' })
+  }
+
+  // 1b. Rapporten ska vara skriven (inte kontroller, etableringar och egenkontroller).
+  // Ärendets egen tjänstetyp går före den som skickas in.
+  if (kraverRapport(kalla, arende.serviceType ?? serviceType) && !arende.rapport?.trim()) {
+    hinder.push({ id: 'rapport-saknas', text: RAPPORT_SAKNAS_FEL, steg: 'rapport' })
   }
 
   // 2. Stationskontroll: alla stationer kontrollerade (bara avtalsärenden med session)

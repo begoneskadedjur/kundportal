@@ -55,7 +55,7 @@ import { ArendeVerktygArk, type ArendeVerktygGrupp } from '../technician/ny/steg
 import { KlartSteg } from '../technician/ny/steg/KlartSteg'
 import { useStegForArende, grannSteg, formateraKr, type StegId } from '../technician/ny/steg/stegKonfig'
 import { HjalpText } from '../technician/ny/hjalp/HjalpText'
-import { kontrolleraAvslut, type AvslutsHinder } from '../../services/arendeAvslutService'
+import { kontrolleraAvslut, RAPPORT_SAKNAS_FEL, type AvslutsHinder } from '../../services/arendeAvslutService'
 
 registerLocale('sv', sv)
 
@@ -663,6 +663,11 @@ export default function RonderingCaseModal({
     // skrivningar (statusändring, ad-hoc-fakturering, provision).
     // Avtalstilläggsrader räknas inte som rabatt (exkluderas i servicen).
     if (formData.status === 'Avslutat' && originalStatusRef.current !== 'Avslutat') {
+      // SPÄRR: arbetsrapporten ska vara skriven innan ronderingen avslutas
+      if (!formData.work_report?.trim()) {
+        toast.error(RAPPORT_SAKNAS_FEL, { duration: 8000 })
+        return
+      }
       try {
         const unmotivated = await CaseBillingService.getUnmotivatedDiscountItems(caseData.id)
         if (unmotivated.length > 0) {

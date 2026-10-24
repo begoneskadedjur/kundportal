@@ -99,7 +99,7 @@ import { ArendeVerktygArk, type ArendeVerktygGrupp } from '../../technician/ny/s
 import { KlartSteg } from '../../technician/ny/steg/KlartSteg'
 import { useStegForArende, grannSteg, type StegId } from '../../technician/ny/steg/stegKonfig'
 import { HjalpText } from '../../technician/ny/hjalp/HjalpText'
-import { kontrolleraAvslut, type AvslutsHinder } from '../../../services/arendeAvslutService'
+import { kontrolleraAvslut, RAPPORT_SAKNAS_FEL, type AvslutsHinder } from '../../../services/arendeAvslutService'
 
 registerLocale('sv', sv) // Registrera svenskt språk för komponenten
 
@@ -1114,6 +1114,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     // skrivningar (statusändring, fakturering via upsertInvoiceFromCase, provision).
     // Avtalstilläggsrader räknas inte som rabatt (exkluderas i servicen).
     if (formData.status === 'Avslutat' && currentCase.status !== 'Avslutat') {
+      // SPÄRR: saneringsrapporten ska vara skriven innan ärendet avslutas
+      if (!formData.rapport?.trim()) {
+        toast.error(RAPPORT_SAKNAS_FEL, { duration: 8000 });
+        return;
+      }
       try {
         const unmotivated = await CaseBillingService.getUnmotivatedDiscountItems(currentCase.id);
         if (unmotivated.length > 0) {

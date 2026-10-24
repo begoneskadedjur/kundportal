@@ -343,7 +343,7 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
 
   if (session.notes) {
     wsSummary.addRow([])
-    const notesLabelRow = wsSummary.addRow(['ANTECKNINGAR', '', '', ''])
+    const notesLabelRow = wsSummary.addRow(['KOMMENTAR FRÅN TEKNIKER', '', '', ''])
     wsSummary.mergeCells(`A${notesLabelRow.number}:D${notesLabelRow.number}`)
     notesLabelRow.getCell(1).font = { bold: true, size: 9, color: { argb: 'FF' + BG_GREEN } }
     const notesRow = wsSummary.addRow([session.notes, '', '', ''])

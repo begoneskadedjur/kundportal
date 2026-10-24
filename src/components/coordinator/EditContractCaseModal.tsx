@@ -82,7 +82,7 @@ import { ArendeVerktygArk, type ArendeVerktygGrupp } from '../technician/ny/steg
 import { KlartSteg } from '../technician/ny/steg/KlartSteg'
 import { useStegForArende, stegTypForAvtalsarende, grannSteg, arAvtalsbesok, formateraKr, type StegId } from '../technician/ny/steg/stegKonfig'
 import { HjalpText } from '../technician/ny/hjalp/HjalpText'
-import { kontrolleraAvslut, type AvslutsHinder } from '../../services/arendeAvslutService'
+import { kontrolleraAvslut, kraverRapport, RAPPORT_SAKNAS_FEL, type AvslutsHinder } from '../../services/arendeAvslutService'
 const StationInspectionPanel = lazy(() => import('../technician/inspection/StationInspectionPanel'))
 
 // Registrera svensk lokalisering för DatePicker
@@ -1229,6 +1229,11 @@ export default function EditContractCaseModal({
     // skrivningar (statusändring, ad-hoc-fakturering, provision, avtalstillägg).
     // Avtalstilläggsrader räknas inte som rabatt (exkluderas i servicen).
     if (formData.status === 'Avslutat' && localCaseData.status !== 'Avslutat') {
+      // SPÄRR: arbetsrapporten ska vara skriven, utom för kontroller och etableringar
+      if (kraverRapport('cases', localCaseData.service_type) && !formData.work_report?.trim()) {
+        toast.error(RAPPORT_SAKNAS_FEL, { duration: 8000 })
+        return
+      }
       try {
         const unmotivated = await CaseBillingService.getUnmotivatedDiscountItems(localCaseData.id)
         if (unmotivated.length > 0) {

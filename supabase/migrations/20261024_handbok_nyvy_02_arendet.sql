@@ -26,7 +26,7 @@ values
       {"text":"Kontrollera kontakten och adressen. Tryck sedan [[Jag är framme]] längst ner.","ser":"Du kommer till Arbetet. Arbetstiden räknas nu i bakgrunden, den visas inte i stegen."},
       {"text":"Läs Beskrivning och kontrollera Tjänst. Tryck [[Vidare till foton och preparat]].","ser":"Steget visar Använda preparat och Bilder."},
       {"text":"Lägg till bilder och preparat. Tryck sedan [[Vidare till rapport]].","ser":"Bilderna sparas när du går vidare. Steget Rapport visar Saneringsrapport, Specialrapporter och knapparna för rapporten."},
-      {"text":"Skriv vad du gjorde i Saneringsrapport och tryck [[Skicka till Familjen Exempel|kontakt.mejl]]. Knappen visar kundens namn.","ser":"Ärendet sparas först. Det står Rapport skickad till Familjen Exempel! och under knapparna vilken version som är skickad till kund."},
+      {"text":"Skriv vad du gjorde i Saneringsrapport. Rapporten krävs för att stänga ärendet. Tryck sedan [[Skicka till Familjen Exempel|kontakt.mejl]]. Knappen visar kundens namn.","ser":"Ärendet sparas först. Det står Rapport skickad till Familjen Exempel! och under knapparna vilken version som är skickad till kund."},
       {"text":"Tryck [[Vidare till pris och fakturering]].","ser":"Steget visar Tjänster & fakturarader och längst ner Provision. Guiden Sätt rätt pris i ärendet går igenom steget."},
       {"text":"Kontrollera raderna och tryck [[Vidare till klart]].","ser":"Klart kontrollerar ärendet och låter dig välja Hela ärendet eller Bara besöket. Guiden Stäng ärendet eller bara besöket går igenom steget."}
     ]},
@@ -123,6 +123,7 @@ values
     ]},
     {"type":"felsok","items":[
       {"fraga":"Det står 1 sak saknas innan ärendet kan stängas.","svar":"Varje sak har en knapp, Gå till steget och stegets namn. Tryck på den, fyll i och gå tillbaka till Klart. Steg där något saknas har orange ram i stegraden."},
+      {"fraga":"Det står Skriv rapporten innan ärendet avslutas. Beskriv vad du gjorde.","svar":"Rapporten är tom. Tryck [[Gå till steget Rapport]], skriv vad du gjorde och gå tillbaka till Klart. Kontroller och etableringar behöver ingen skriven rapport, de dokumenteras i stationerna."},
       {"fraga":"Det står Motivera rabatten på ... under Tjänster & fakturarader.","svar":"En rad har rabatt. Skriv varför i Motivering till rabatt (krävs vid avslut) under raden i Pris och fakturering."},
       {"fraga":"Det står Sluttid kan inte vara tidigare än starttiden.","svar":"Tryck [[Ändra tiden i Alla uppgifter]]. Rätta Sluttid under Schemaläggning i fliken Ärende och gå tillbaka till stegen."},
       {"fraga":"Det står Välj kundgrupp under Pris och fakturering innan ärendet kan avslutas.","svar":"Gäller företag som inte finns i kundregistret än. Välj en grupp under Kundgrupp (för fakturering) i steget Pris och fakturering."},

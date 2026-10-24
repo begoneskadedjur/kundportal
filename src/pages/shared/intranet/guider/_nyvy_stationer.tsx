@@ -261,7 +261,7 @@ export function KontrollRunda({ r, tryck, markera, nr }: { r: Runda; tryck: (id:
         )}
       </div>
       <div className="flex gap-1">
-        <span className="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[10.5px] text-slate-500"><Icon name="allman.anteckning" size={16} className="h-3.5 w-3.5" />Kommentar om besöket</span>
+        <span className="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[10.5px] text-slate-500"><Icon name="allman.anteckning" size={16} className="h-3.5 w-3.5" />Kommentar från tekniker</span>
         <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-slate-300"><Icon name="allman.foto" size={16} /></span>
         <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-slate-300"><Icon name="station.summa" size={16} /></span>
       </div>
@@ -408,7 +408,7 @@ export function SnabbOk({ stn, tryck, markera, nr }: { stn: number; tryck: (id: 
   )
 }
 
-/** Klarmarkera ärende? med antalen. Ja, klarmarkera går bara när alla är kontrollerade. */
+/** Klarmarkera ärende? med antalen och Kommentar från tekniker. Ja, klarmarkera går bara när alla är kontrollerade och kommentaren är skriven. */
 export function Klarmarkera({ klara, totalt, tryck, markera, nr }: { klara: number; totalt: number; tryck: (id: string) => void; markera?: string; nr: number }) {
   const alla = klara >= totalt
   return (
@@ -425,6 +425,11 @@ export function Klarmarkera({ klara, totalt, tryck, markera, nr }: { klara: numb
       <div className="rounded-lg bg-slate-950/50 p-1.5 text-[10.5px] text-slate-400">
         <p className="flex justify-between"><span>Utomhus:</span><span className={alla ? 'text-green-400' : 'text-amber-400'}>{klara}/{totalt}</span></p>
         <p className="flex justify-between"><span>Inomhus:</span><span className="text-green-400">0/0</span></p>
+      </div>
+      {/* Kommentar från tekniker krävs (2026-10-24). I guiden är den redan skriven. */}
+      <div>
+        <p className="mb-0.5 text-[10.5px] font-medium text-slate-300">Kommentar från tekniker <span className="text-red-400">*</span></p>
+        <p className="rounded-lg border border-slate-700 bg-slate-900 p-1.5 text-[10.5px] text-white">Station 2 har förbrukning, 15 gram. Övriga i ordning.</p>
       </div>
     </Fraga>
   )

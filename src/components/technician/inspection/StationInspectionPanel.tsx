@@ -29,7 +29,6 @@ import {
   ChevronDown,
   Camera,
   Trash2,
-  FileText,
   Navigation,
   AlertTriangle,
   SkipForward,
@@ -1626,6 +1625,10 @@ export default function StationInspectionPanel({
     try {
       setIsSubmitting(true)
 
+      // Kommentaren från tekniker sparas innan rundan stängs, så att den
+      // alltid kommer med i kontrollrapporten (blur hinner inte alltid före)
+      await updateSessionNotes(session.id, sessionNotes.trim())
+
       // Systematisk arbetsrapport (fakturans "Utfört arbete") — kort och
       // beskrivande, skrivs bara om ärendets fält är tomt
       const inspectedCount = progress?.inspectedStations ?? inspectedStationIds.size
@@ -2057,7 +2060,8 @@ export default function StationInspectionPanel({
             </motion.div>
           )}
 
-          {/* Kommentar om besöket: enradsfält som växer, kamera och sammanställning bredvid */}
+          {/* Kommentar från tekniker: enradsfält som växer, kamera och sammanställning bredvid.
+              Krävs innan kontrollen klarmarkeras och står i kontrollrapporten. */}
           <div className="flex gap-2 items-start">
             <label className="flex-1 min-w-0 flex items-start gap-2 min-h-[44px] px-3 py-[11px] bg-slate-900 border border-slate-800 rounded-xl text-slate-500 focus-within:border-[#20c58f] focus-within:ring-1 focus-within:ring-[#20c58f]">
               <Icon name="allman.anteckning" size={16} className="mt-0.5 flex-shrink-0" />
@@ -2068,8 +2072,8 @@ export default function StationInspectionPanel({
                 onChange={e => setSessionNotes(e.target.value)}
                 onBlur={handleSessionNotesBlur}
                 disabled={session.status === 'completed'}
-                placeholder={session.status === 'completed' ? 'Inga kommentarer' : 'Kommentar om besöket'}
-                aria-label="Kommentar om besöket"
+                placeholder={session.status === 'completed' ? 'Ingen kommentar från tekniker' : 'Kommentar från tekniker'}
+                aria-label="Kommentar från tekniker"
                 className="flex-1 min-w-0 bg-transparent border-0 p-0 text-sm leading-5 text-slate-200 placeholder-slate-500 resize-none overflow-hidden focus:outline-none focus:ring-0 disabled:cursor-not-allowed"
               />
             </label>
@@ -2728,14 +2732,6 @@ export default function StationInspectionPanel({
                       {progress.indoorProgress.inspected}/{progress.indoorProgress.total}
                     </span>
                   </div>
-                  {sessionNotes && (
-                    <div className="flex justify-between text-slate-400 mt-1 pt-1 border-t border-slate-800">
-                      <span>Kommentar:</span>
-                      <span className="text-[#20c58f] flex items-center gap-1">
-                        <FileText className="w-3 h-3" /> Ja
-                      </span>
-                    </div>
-                  )}
                   {sessionPhotos.length > 0 && (
                     <div className="flex justify-between text-slate-400 mt-1">
                       <span>Bilder:</span>
@@ -2746,6 +2742,25 @@ export default function StationInspectionPanel({
                   )}
                 </div>
               )}
+
+              {/* Kommentar från tekniker krävs: fältet finns här så att teknikern inte behöver leta */}
+              <div className="mb-4">
+                <label htmlFor="klar-kommentar" className="block text-sm font-medium text-slate-300 mb-1.5">
+                  Kommentar från tekniker <span className="text-red-400" aria-hidden="true">*</span>
+                </label>
+                <textarea
+                  id="klar-kommentar"
+                  rows={3}
+                  value={sessionNotes}
+                  onChange={e => setSessionNotes(e.target.value)}
+                  onBlur={handleSessionNotesBlur}
+                  placeholder="Hur såg det ut? Aktivitet, åtgärder och vad kunden behöver göra."
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 resize-y focus:outline-none focus:border-[#20c58f] focus:ring-1 focus:ring-[#20c58f]"
+                />
+                {!sessionNotes.trim() && (
+                  <p className="mt-1 text-sm text-amber-300">Skriv en kommentar innan kontrollen klarmarkeras. Den står i kontrollrapporten.</p>
+                )}
+              </div>
 
               {/* Värdens avslutskontroll (beforeComplete): det som saknas innan ärendet kan klarmarkeras */}
               {hasBeforeComplete && (checkingBlockers || completeBlockers.length > 0) && (
@@ -2798,6 +2813,10 @@ export default function StationInspectionPanel({
                         return
                       }
                     }
+                    if (!sessionNotes.trim()) {
+                      toast.error('Skriv en kommentar från tekniker innan kontrollen klarmarkeras')
+                      return
+                    }
                     // Värdens avslutskontroll körs om precis före klarmarkeringen
                     if (hasBeforeComplete) {
                       const blockers = await runBeforeComplete()
@@ -2806,7 +2825,7 @@ export default function StationInspectionPanel({
                     setShowCompleteConfirm(false)
                     handleCompleteInspection()
                   }}
-                  disabled={!progress || progress.inspectedStations < progress.totalStations || addonLabourStep.loading || checkingBlockers || completeBlockers.length > 0}
+                  disabled={!progress || progress.inspectedStations < progress.totalStations || !sessionNotes.trim() || addonLabourStep.loading || checkingBlockers || completeBlockers.length > 0}
                   className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-[#fff] rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Ja, klarmarkera
