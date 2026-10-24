@@ -1253,7 +1253,7 @@ export default function CaseDetailsModal({
                       {/* Sessionnotering — saniterad från interna ärendenummer */}
                       {inspectionSession.notes && (
                         <div className="border-t border-slate-700/40 px-4 py-3">
-                          <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Teknikernotering</p>
+                          <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Kommentar från teknikern</p>
                           <p className="text-sm text-slate-300">
                             {inspectionSession.notes.replace(/'BE-\d+'/g, 'ett annat ärende')}
                           </p>

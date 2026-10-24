@@ -51,7 +51,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       { kind: 'andring', text: 'Privat- och företagsärenden, avtalsbesök och ronderingar går inte att avsluta förrän rapporten är skriven. Kontroller och etableringar dokumenteras i stationerna och behöver ingen skriven rapport.' },
       { kind: 'andring', text: 'I nya arbetsvyn krävs Kommentar från tekniker innan kontrollen klarmarkeras. Fältet finns direkt i rutan Klarmarkera ärende?.' },
-      { kind: 'andring', text: 'Kontrollrapporten visar kommentaren under rubriken Kommentar från tekniker.' },
+      { kind: 'andring', text: 'Kommentaren heter Kommentar från teknikern i kontrollrapporten och i kundportalen.' },
     ],
   },
   {

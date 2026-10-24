@@ -163,7 +163,7 @@ export function InspectionHistoryList({
                 {/* Anteckningar */}
                 {session.notes && (
                   <div className="bg-slate-800/50 rounded-lg p-3 mb-4">
-                    <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Anteckningar</p>
+                    <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Kommentar från teknikern</p>
                     <p className="text-slate-300 text-sm whitespace-pre-wrap">{session.notes}</p>
                   </div>
                 )}
