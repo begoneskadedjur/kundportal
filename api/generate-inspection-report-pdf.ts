@@ -850,7 +850,7 @@ async function generateInspectionReportHTML(data: {
 
     ${session?.notes ? `
     <div class="notes-section">
-      <div class="notes-label">Kommentar från teknikern</div>
+      <div class="notes-label">Kommentar från tekniker</div>
       <div class="notes-text">${session.notes}</div>
     </div>
     ` : ''}

@@ -1044,7 +1044,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                 <div className="bg-slate-900/40 border border-slate-700/50 rounded-lg px-3 py-2.5">
                   <p className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1">
                     <FileText className="w-3.5 h-3.5" />
-                    Kommentar från teknikern
+                    Kommentar från tekniker
                   </p>
                   <p className="text-sm text-slate-200 whitespace-pre-wrap">{selectedSessionNotes}</p>
                 </div>

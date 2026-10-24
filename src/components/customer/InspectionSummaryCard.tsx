@@ -194,7 +194,7 @@ export function InspectionSummaryCard({
         {/* Anteckningar om det finns */}
         {session.notes && (
           <div className="bg-slate-900/50 rounded-xl p-4 mb-6">
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Kommentar från teknikern</p>
+            <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Kommentar från tekniker</p>
             <p className="text-slate-300 text-sm whitespace-pre-wrap">{session.notes}</p>
           </div>
         )}
