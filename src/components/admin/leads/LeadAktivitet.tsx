@@ -5,6 +5,7 @@
 
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
+import Button from '../../ui/Button'
 import { Icon, type IconName } from '../../icons/Icon'
 import { LeadService } from '../../../services/leadService'
 import {
@@ -21,7 +22,7 @@ import {
 } from '../../../types/leads'
 import { toLocalISOStringWithOffset } from '../../../utils/dateHelpers'
 import { formatSvTid } from '../webLeads/format'
-import { FALT, KNAPP_PRIMAR, SEKTION, SEKTION_RUBRIK, kr, segment } from './leadLogik'
+import { FALT, SEKTION, SEKTION_RUBRIK, kr, segment } from './leadLogik'
 
 export interface LeadAktivitetRef {
   /** Välj typ och sätt fokus i skrivfältet (Logga samtal i åtgärdsraden) */
@@ -132,7 +133,7 @@ const LeadAktivitet = forwardRef<LeadAktivitetRef, Props>(function LeadAktivitet
   return (
     <div className={SEKTION}>
       <h3 className={SEKTION_RUBRIK}>
-        <Icon name="allman.historik" size={20} className="text-[#20c58f]" /> Aktivitet
+        <Icon name="allman.historik" size={16} className="text-[#20c58f]" /> Aktivitet
       </h3>
       <div className="flex flex-wrap border-b border-slate-700/50 mb-2" role="tablist" aria-label="Typ av aktivitet">
         {MANUELLA_AKTIVITETER.map((k) => (
@@ -141,7 +142,7 @@ const LeadAktivitet = forwardRef<LeadAktivitetRef, Props>(function LeadAktivitet
           </button>
         ))}
       </div>
-      <div className="flex flex-col sm:flex-row gap-2 mb-3">
+      <div className="flex gap-2 mb-3">
         <textarea
           ref={falt}
           value={text}
@@ -154,29 +155,28 @@ const LeadAktivitet = forwardRef<LeadAktivitetRef, Props>(function LeadAktivitet
           placeholder={kind === 'samtal' ? 'Vad sades i samtalet?' : kind === 'mote' ? 'Vad kom ni fram till?' : kind === 'mejl' ? 'Vad skickades eller kom in?' : 'Skriv vad som hände'}
           className={`flex-1 ${FALT}`}
         />
-        <button type="button" className={`${KNAPP_PRIMAR} self-start`} disabled={sparar || !text.trim()} onClick={() => void spara()}>
-          {sparar && <Icon name="allman.laddar" size={20} className="animate-spin" />}
+        <Button variant="primary" size="sm" disabled={sparar || !text.trim()} onClick={() => void spara()}>
           Spara
-        </button>
+        </Button>
       </div>
 
       {laddar && aktiviteter.length === 0 ? (
-        <p className="text-sm text-slate-400">Hämtar historiken...</p>
+        <p className="text-sm text-slate-500">Hämtar historiken...</p>
       ) : aktiviteter.length === 0 ? (
-        <p className="text-sm text-slate-400">Ingen historik än.</p>
+        <p className="text-sm text-slate-500">Ingen historik än.</p>
       ) : (
         <ul className="space-y-2">
           {aktiviteter.map((a) => {
             const manuell = (MANUELLA_AKTIVITETER as string[]).includes(a.kind)
             return (
-              <li key={a.id} className="flex gap-2.5 px-3 py-2 bg-slate-800/20 border border-slate-700/50 rounded-xl text-[15px]">
+              <li key={a.id} className="flex gap-2.5 px-3 py-2 bg-slate-800/20 border border-slate-700/50 rounded-xl text-sm">
                 <Icon name={IKON[a.kind] ?? 'allman.historik'} size={16} className={`flex-none mt-0.5 ${manuell ? 'text-[#20c58f]' : 'text-slate-500'}`} />
                 <div className="min-w-0 flex-1">
                   <p className="text-white whitespace-pre-wrap break-words">
                     {manuell && <span className="font-medium">{AKTIVITET_ETIKETT[a.kind]}: </span>}
                     {aktivitetText(a, namnFor)}
                   </p>
-                  <p className="text-sm text-slate-400 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5">
                     <span className="font-mono">{formatSvTid(a.occurred_at)}</span>
                     {' · '}
                     {a.profile_id ? namnFor(a.profile_id) || 'Okänd' : 'Systemet'}

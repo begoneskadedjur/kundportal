@@ -1,7 +1,7 @@
 // src/pages/shared/intranet/guider/guide-rapportera-tillbud-kontor.tsx
 // Guidemodul: Rapportera ett tillbud, en avvikelse eller en olycka (admin, koordinator
 // och säljare, dator). Omskriven 2026-10-24 efter den nya sidan. Etiketterna kommer från
-// CoordinatorSidebar (gula knappen ReportIncidentButton, Planering › Tillbud och avvikelser)
+// CoordinatorSidebar (gula knappen ReportIncidentButton, Planering › Tillbud & Avvikelser)
 // och IncidentsPage med components/tillbud (flikarna Rapportera, Mina rapporter och
 // Registret, formuläret i fyra steg, Välj den det gäller, Skicka rapport, "Avvikelsen är
 // rapporterad", grupperna Nya och Under utredning, rapporten med Status och Spara).
@@ -25,7 +25,7 @@ interface Tillstand {
 }
 
 const BESKRIVNING = 'Brf Exempelgården ringde. Det bokade besöket i dag 10:00 blev aldrig av och ingen hörde av sig.'
-const MENYPOST = 'Tillbud och avvikelser'
+const MENYPOST = 'Tillbud & Avvikelser'
 
 const NY: ExRapport = { id: 'ny', typ: 'avvikelse', status: 'ny', text: BESKRIVNING, datum: '2026-10-26 09:45', berorda: 'Erik Exempel' }
 const UTREDS: ExRapport = { id: 'utreds', typ: 'tillbud', status: 'under_utredning', text: 'Halkade i trappan vid lagret.', datum: '2026-10-02 07:30', berorda: 'Lisa Exempel' }
@@ -84,6 +84,7 @@ const VISNING: { lage: Tillstand; markera: string }[] = [
   { lage: START, markera: 'gul' },
   { lage: FORM, markera: 'typ:avvikelse' },
   { lage: { ...FORM, typ: 'avvikelse' }, markera: 'vad' },
+  { lage: { ...FORM, typ: 'avvikelse', text: true }, markera: 'bilder' },
   { lage: { ...FORM, typ: 'avvikelse', text: true }, markera: 'berord' },
   { lage: KLAR, markera: 'skicka' },
   { lage: { ...KLAR, vy: 'tack' }, markera: 'flik:register' },
@@ -106,6 +107,7 @@ const TIPS: Record<string, string> = {
   intranat: 'Intranätet har policyerna. Själva rapporten gör du med den gula knappen.',
   uppdateringar: 'Uppdateringar visar nyheter. Tryck på den gula knappen.',
   'mitt-konto': 'Mitt konto är dina uppgifter. Tryck på den gula knappen.',
+  bilder: 'Här lägger du till bilder, högst sex. I övningen behövs inga. Beskriv, lägg till Erik och skicka.',
   'flik:mina': 'Mina rapporter visar det du redan har skickat. Rapportera den nya händelsen i formuläret.',
   'flik:register': 'Registret visar alla rapporter av de typer du tar emot. Rapportera den nya händelsen i formuläret.',
   'sok-arende': 'Kopplingen till ett ärende är valfri. Välj typ, beskriv, lägg till Erik och skicka.',
@@ -123,7 +125,7 @@ function Ovning() {
   const tryck = (id: string) => {
     if (l.vy === 'tack') return
     if (l.vy === 'oversikt') {
-      if (id === 'gul' || id === `post-${MENYPOST}`) { setL({ ...l, vy: 'form' }); tips('Tillbud och avvikelser', 'Sidan öppnas på Rapportera. Ingen skadades och inget var nära att gå illa. Kunden fick inte det vi lovat. Välj rätt typ.') }
+      if (id === 'gul' || id === `post-${MENYPOST}`) { setL({ ...l, vy: 'form' }); tips('Tillbud & Avvikelser', 'Sidan öppnas på Rapportera. Ingen skadades och inget var nära att gå illa. Kunden fick inte det vi lovat. Välj rätt typ.') }
       else if (id.startsWith('post-') || id.startsWith('grupp-')) miss('Det är en annan sida. Tryck på den gula knappen överst i menyn.')
       else miss(TIPS[id] ?? 'Tryck på den gula knappen överst i menyn.')
       return

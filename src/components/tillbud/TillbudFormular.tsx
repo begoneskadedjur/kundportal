@@ -1,6 +1,6 @@
 // src/components/tillbud/TillbudFormular.tsx
 // Rapportera ett tillbud, en olycka eller en avvikelse. Fyra steg: vad hände,
-// beskriv, när och vem, koppla till ärende (valfritt). Formuläret ligger kvar
+// beskriv (med bilder), när och vem, koppla till ärende (valfritt). Formuläret ligger kvar
 // monterat när man byter flik, så det man skrivit finns kvar.
 //
 // Koppla till ärende: teknikern får sina besök i går och i dag som förslag och kan
@@ -24,6 +24,7 @@ import {
   rapporteradText, type Anstalld, type KoppladArende,
 } from './tillbudLogik'
 import { ETIKETT, FALT, StegRubrik, TEXTRUTA, VALFRITT } from './tillbudUi'
+import { BildValjare, laddaUppBilder } from './TillbudBilder'
 
 interface Props {
   anstallda: Anstalld[]
@@ -52,6 +53,7 @@ export default function TillbudFormular({ anstallda, minTeknikerId, rapportor, l
   const [traffar, setTraffar] = useState<KoppladArende[]>([])
   const [soker, setSoker] = useState(false)
   const [forslag, setForslag] = useState<KoppladArende[]>([])
+  const [bilder, setBilder] = useState<File[]>([])
   const [skickar, setSkickar] = useState(false)
   const [skickad, setSkickad] = useState<IncidentType | null>(null)
   const beskrivningRef = useRef<HTMLTextAreaElement>(null)
@@ -144,7 +146,7 @@ export default function TillbudFormular({ anstallda, minTeknikerId, rapportor, l
 
   const tomt = () => {
     setTyp('tillbud'); setBeskrivning(''); setDirekt(''); setTid(nuLokalt())
-    setBerorda(mig ? [mig] : []); setArende(null); setArendeSok(''); setTraffar([])
+    setBerorda(mig ? [mig] : []); setArende(null); setArendeSok(''); setTraffar([]); setBilder([])
   }
 
   const skicka = async () => {
@@ -180,6 +182,12 @@ export default function TillbudFormular({ anstallda, minTeknikerId, rapportor, l
           berorda.map(e => ({ incident_id: ny.id, technician_id: e.id, technician_name: e.name })),
         )
         if (empErr) console.error('Kunde inte spara berörda:', empErr)
+
+        // Bilderna före notisen, så att mottagarna ser dem när de öppnar rapporten
+        if (bilder.length > 0) {
+          const fel = await laddaUppBilder(ny.id, bilder)
+          if (fel > 0) toast.error(`${fel === bilder.length ? 'Bilderna' : `${fel} av ${bilder.length} bilder`} gick inte att ladda upp. Lägg till dem i rapporten under Mina rapporter.`)
+        }
 
         // Notis och mejl till mottagarna av typen. Får inte stoppa rapporten.
         apiFetch('/api/notify-incident', {
@@ -335,6 +343,10 @@ export default function TillbudFormular({ anstallda, minTeknikerId, rapportor, l
               placeholder="Till exempel sanerat platsen, uppsökt vårdcentral eller kontaktat kunden"
               className={TEXTRUTA}
             />
+          </div>
+          <div>
+            <span className={ETIKETT}>Bilder <span className={VALFRITT}>(valfritt)</span></span>
+            <BildValjare filer={bilder} onAndra={setBilder} disabled={skickar} />
           </div>
         </section>
 

@@ -92,6 +92,7 @@ const STEG: { vy: Vy; mal: string }[] = [
   { vy: { sida: 'start', typ: 'tillbud' }, mal: 'tillbud' },
   { vy: FORM, mal: 'typ:tillbud' },
   { vy: FORM, mal: 'vad' },
+  { vy: { ...FORM, text: true }, mal: 'bilder' },
   { vy: { ...FORM, text: true }, mal: 'forslag' },
   { vy: { ...FORM, text: true, koppla: true }, mal: 'skicka' },
   { vy: { sida: 'tack', typ: 'tillbud' }, mal: 'se-mina' },
@@ -132,6 +133,7 @@ function Ovning() {
       if (mal === 'vad') { setVy({ ...vy, text: true }); setFramsteg(2); tips('Beskrivningen är skriven', 'Du står redan som berörd och tiden är satt till nu. Koppla gärna besöket hos Exempel AB, och skicka.') ; return }
       if (mal === 'forslag' || mal === 'sok-arende') { setVy({ ...vy, koppla: true }); tips('Kopplad', 'Besöket hos Exempel AB är kopplat. Kopplingen är valfri. Skicka nu rapporten.'); return }
       if (mal.startsWith('forslag:')) { fel('Fel besök', 'Det hände hos Exempel AB. Välj det besöket, eller skicka utan koppling.'); return }
+      if (mal === 'bilder') { tips('Bilder', 'Här fotar eller väljer du bilder, högst sex. I övningen behövs inga. Skicka när beskrivningen är skriven.'); return }
       if (mal === 'berord') { tips('Berörda anställda', 'Du står redan med. Lägg bara till fler om fler var med. Här var du ensam.'); return }
       if (mal === 'tom') { setVy(FORM); setFramsteg(1); fel('Formuläret tömdes', 'Töm formuläret tar bort allt du skrivit. Skriv i Vad har hänt? igen.'); return }
       if (mal === 'skicka') {

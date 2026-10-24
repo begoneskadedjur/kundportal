@@ -53,7 +53,7 @@ function Mal({ id, mk, tryck, block = true, className = '', children, ...rest }:
 export function TillbudHuvud({ rubrik, attHantera }: { rubrik?: boolean; attHantera?: number }) {
   return (
     <div className="mb-1.5">
-      {rubrik && <p className="text-[15px] font-bold text-white">Tillbud och avvikelser</p>}
+      {rubrik && <p className="text-[15px] font-bold text-white">Tillbud & Avvikelser</p>}
       <p className="text-[11px] text-slate-300">
         {attHantera !== undefined
           ? <strong className={attHantera > 0 ? 'text-amber-500' : 'text-slate-200'}>{attHantera} {attHantera === 1 ? 'ny rapport' : 'nya rapporter'} att hantera</strong>
@@ -150,6 +150,11 @@ export function TillbudForm({ v, dator, mk, tryck, forslag = [] }: { v: FormVy; 
         </Mal>
         <span className={`${ETIKETT} mt-1`}>Vad har ni redan gjort? <span className="font-normal text-slate-500">(valfritt)</span></span>
         <span className={`${FALT} text-slate-500`}>Till exempel sanerat platsen</span>
+        <span className={`${ETIKETT} mt-1`}>Bilder <span className="font-normal text-slate-500">(valfritt)</span></span>
+        <Mal id="bilder" mk={mk} tryck={tryck} className="inline-flex items-center gap-1.5 self-start rounded-lg border border-slate-600 bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-200">
+          <Icon name="allman.foto" size={16} className="h-3.5 w-3.5" />
+          Lägg till bilder
+        </Mal>
       </div>
       <div>
         <Steg nr={3}>När och vem</Steg>

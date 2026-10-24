@@ -264,7 +264,7 @@ export default function IncidentsPage() {
     <div className="max-w-[1500px] mx-auto p-4 lg:p-6 flex flex-col gap-5">
       {visaListan && (
         <header className="flex flex-col gap-1">
-          {!nyAktiv && <h1 className="text-2xl font-bold text-white leading-tight">Tillbud och avvikelser</h1>}
+          {!nyAktiv && <h1 className="text-2xl font-bold text-white leading-tight">Tillbud & Avvikelser</h1>}
           <p className="text-[15px] text-slate-300">
             {harLaddat && arMottagare ? (
               <>

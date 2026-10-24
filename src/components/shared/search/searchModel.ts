@@ -113,7 +113,8 @@ function canPlan(portal: SearchPortal): boolean {
 
 type CaseType = 'private' | 'business' | 'contract'
 
-function caseHref(portal: SearchPortal, id: string, caseType: CaseType) {
+/** Adressen som öppnar ärendet i portalens ärendelista (openCase) */
+export function caseHref(portal: SearchPortal, id: string, caseType: CaseType) {
   const base = portal === 'technician' ? '/technician/cases' : '/koordinator/arenden'
   return `${base}?openCase=${encodeURIComponent(id)}&caseType=${caseType}`
 }

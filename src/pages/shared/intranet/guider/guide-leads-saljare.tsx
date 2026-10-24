@@ -1,27 +1,26 @@
 // src/pages/shared/intranet/guider/guide-leads-saljare.tsx
-// Guidemodul: Arbeta med dina leads (säljare, dator). Efter sidan Leads och tips från 2026-10-24.
+// Guidemodul: Arbeta med dina leads (säljare, dator).
 // Leads (B2B) öppnas på fliken Att göra med grupperna Försenade och I dag (leadLogik).
 // I leaden: rutan Nästa steg (LeadNastaSteg) med Klar, välj nästa och Ändra. Klar-läget har
 // rubriken "Klart. Vad blev gjort och vad händer sedan?", valen Anteckning, Samtal, Mejl och Möte
 // (Samtal förvalt), rutan Vad hände?, valen Nytt nästa steg, Parkera och Förlorad, fälten
 // Nästa steg * och Datum och tid * (förslag nästa vardag 09:00) och knapparna Avbryt och Spara.
-// Saknas texten står felet "Skriv nästa steg och välj datum" i rött i rutan. Ett samtal på en lead som är Ny
+// Saknas texten blir felet "Skriv nästa steg och välj datum". Ett samtal på en lead som är Ny
 // gör den Kontaktad (trigger i databasen). Påhittade kunder, ingenting sparas.
 
 import { useState } from 'react'
-import { Dator, DatorSida, OvningRam, type OvningSvar } from '../skarmkit'
+import { Dator, DatorSida, Notis, OvningRam, type OvningSvar } from '../skarmkit'
 import { Icon } from '../../../../components/icons/Icon'
 import type { LeadStage } from '../../../../types/leads'
 import type { GuideModul } from './registry'
-import { Atgard, LeadBehov, LeadFalt, LeadFonster, LeadHuvud, LeadsLista, Sektion, Segment, ingenMk, mkFor, type ListRad, type Mk } from './_leads'
+import { Atgard, LeadFalt, LeadFonster, LeadHuvud, LeadsLista, Sektion, Segment, mkFor, type ListRad, type Mk } from './_leads'
 
 const MENY = ['Översikt', 'Leads (B2B)', 'Leads (Webb)', 'Befintliga kunder', 'Försäljningspipeline', 'Kundresa']
 const NASTA = 'Ring och presentera oss'
 const VAD = 'Vill ha en offert på råttsäkring av lagret.'
 const NYTT = 'Skicka offert'
-const VAD_GALLER = 'Råttor i lagret. Vill ha fast avtal med kontroller.'
 
-const RAD_A: ListRad = { id: 'a', foretag: 'Exempel AB', under: 'Telefon', stage: 'ny', nasta: NASTA, nar: '2026-10-25 · 1 dag sen', sen: true, agare: 'Sara' }
+const RAD_A: ListRad = { id: 'a', foretag: 'Exempel AB', under: 'Telefon', stage: 'ny', nasta: NASTA, nar: '2026-10-15 · 1 dag sen', sen: true, agare: 'Sara' }
 const RAD_B: ListRad = { id: 'b', foretag: 'Brf Exempelgården', under: 'Rekommendation', stage: 'kontaktad', nasta: 'Skicka offert', nar: 'I dag 14:00', agare: 'Sara' }
 
 type Vy = 'lista' | 'lead' | 'klar' | 'klart'
@@ -50,8 +49,6 @@ function Skarm({ l, tryck, mk }: { l: Lage; tryck: (id: string) => void; mk: Mk 
           sektioner={klart ? [{ grupp: 'idag', rader: [RAD_B] }] : [{ grupp: 'forsenade', rader: [RAD_A] }, { grupp: 'idag', rader: [RAD_B] }]}
           tryck={tryck}
           mk={mk}
-          beskrivning="Företag och föreningar som kan bli avtalskunder."
-          lage={klart ? ['1 att göra', ', 2 öppna'] : ['2 att göra, varav 1 försenad', ', 2 öppna', 'text-red-400']}
         />
       </DatorSida>
       </div>
@@ -79,9 +76,8 @@ function Skarm({ l, tryck, mk }: { l: Lage; tryck: (id: string) => void; mk: Mk 
               <Segment val={['Nytt nästa steg', 'Parkera', 'Förlorad']} aktiv={l.sedan} prefix="sedan" tryck={tryck} mk={mk} />
               <div className="grid gap-2 sm:grid-cols-[1fr_150px]">
                 <LeadFalt id="nasta" etikett="Nästa steg *" varde={l.nytt ? NYTT : 'Till exempel Ring och följ upp offerten'} tom={!l.nytt} tryck={tryck} mk={mk} />
-                <LeadFalt id="datum" etikett="Datum och tid *" varde="2026-10-27 09:00" tryck={tryck} mk={mk} />
+                <LeadFalt id="datum" etikett="Datum och tid *" varde="2026-10-19 09:00" tryck={tryck} mk={mk} />
               </div>
-              {l.fel && <p className="text-[10.5px] text-red-400">{l.fel}</p>}
               <div className="flex justify-end gap-2 border-t border-slate-700/50 pt-2">
                 <button type="button" onClick={() => tryck('avbryt')} className="px-2.5 py-1 text-[12px] text-slate-300">Avbryt</button>
                 <Atgard id="spara" text="Spara" prim tryck={tryck} mk={mk} />
@@ -96,18 +92,16 @@ function Skarm({ l, tryck, mk }: { l: Lage; tryck: (id: string) => void; mk: Mk 
                   </p>
                   <p className="text-white">
                     {klart ? NYTT : NASTA}
-                    <span className={`ml-2 font-mono text-[10.5px] ${klart ? 'text-slate-400' : 'text-red-400'}`}>{klart ? '2026-10-27 09:00' : '2026-10-25 · 1 dag sen (försenat)'}</span>
+                    <span className={`ml-2 font-mono text-[10.5px] ${klart ? 'text-slate-400' : 'text-red-400'}`}>{klart ? '2026-10-19 09:00' : '2026-10-15 · 1 dag sen (försenat)'}</span>
                   </p>
                 </div>
                 <div className="flex gap-1.5">
                   <Atgard id="klar" ikon="allman.bock" text="Klar, välj nästa" prim tryck={tryck} mk={mk} />
-                  <Atgard id="andra" ikon="rapport.penna" text="Ändra" tryck={tryck} mk={mk} />
+                  <Atgard id="andra" text="Ändra" tryck={tryck} mk={mk} />
                 </div>
               </div>
             </Sektion>
           )}
-
-          <LeadBehov text={VAD_GALLER} />
 
           <Sektion titel="Kontakt" ikon="kontakt.telefon">
             <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11.5px]">
@@ -126,6 +120,7 @@ function Skarm({ l, tryck, mk }: { l: Lage; tryck: (id: string) => void; mk: Mk 
           )}
         </LeadFonster>
       )}
+      {l.fel && <Notis fel text={l.fel} />}
     </Dator>
   )
 }
@@ -150,6 +145,7 @@ function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
 // ─── Övning ───
 
 const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du har just ringt Exempel AB. Öppna leaden.' }
+const ingen: Mk = () => undefined
 
 const TIPS: Record<string, string> = {
   'rad:b': 'Brf Exempelgården är dagens. Du ringde Exempel AB, som ligger under Försenade.',
@@ -165,7 +161,7 @@ const TIPS: Record<string, string> = {
   'steg:Kontaktad': 'Det sker av sig själv när du loggar samtalet. Tryck Klar, välj nästa.',
   'steg:Ny': 'Leaden är redan Ny. Tryck Klar, välj nästa.',
   ring: 'Du har redan ringt. Tryck Klar, välj nästa.',
-  datum: 'Tisdag 2026-10-27 09:00 är förvalt. Det passar.',
+  datum: 'Måndag 2026-10-19 09:00 är förvalt. Det passar.',
   'sedan:Parkera': 'Kunden vill ha en offert nu. Välj Nytt nästa steg.',
   'sedan:Förlorad': 'Affären lever. Välj Nytt nästa steg.',
 }
@@ -206,13 +202,13 @@ function Ovning() {
     } else if (id === 'spara') {
       if (l.gjort !== 'Samtal') miss('Du ringde kunden. Välj Samtal innan du sparar.')
       else if (l.sedan !== 'Nytt nästa steg') miss('Kunden vill ha en offert. Välj Nytt nästa steg.')
-      else if (!l.nytt) { setL({ ...l, fel: 'Skriv nästa steg och välj datum' }); miss('Det står Skriv nästa steg och välj datum med röd text i rutan. Fältet Nästa steg är tomt.') }
+      else if (!l.nytt) { setL({ ...l, fel: 'Skriv nästa steg och välj datum' }); miss('Det står Skriv nästa steg och välj datum. Fältet Nästa steg är tomt.') }
       else {
         setL({ ...utanFel, vy: 'klart' })
         setSvar({
           typ: 'ok',
           titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-          text: `Samtalet ligger under Aktivitet och Exempel AB blev Kontaktad av sig själv. Nästa steg är Skicka offert tisdag 2026-10-27 09:00, så leaden försvann ur Att göra.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
+          text: `Samtalet ligger under Aktivitet och Exempel AB blev Kontaktad av sig själv. Nästa steg är Skicka offert måndag 2026-10-19 09:00, så leaden försvann ur Att göra.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
         })
       }
     } else miss(TIPS[id] ?? 'Skriv vad som hände och vad nästa steg är, och spara.')
@@ -221,7 +217,7 @@ function Ovning() {
   const framsteg = l.vy === 'lista' ? 0 : l.vy === 'lead' ? 1 : l.vy === 'klart' ? 5 : 2 + Number(l.vad) + Number(l.nytt)
   return (
     <OvningRam bred framsteg={framsteg} totalt={5} svar={svar} onBorjaOm={() => { setL(BAS); setSvar(BORJA); setFel(0) }}>
-      <Skarm l={l} tryck={tryck} mk={ingenMk} />
+      <Skarm l={l} tryck={tryck} mk={ingen} />
     </OvningRam>
   )
 }

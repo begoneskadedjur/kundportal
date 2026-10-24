@@ -1,32 +1,31 @@
 // src/pages/shared/intranet/guider/guide-leads-kontor.tsx
 // Guidemodul: Leads för koordinator och admin. Uppgiften: fördela ett nytt tips (dator).
-// Efter sidan Leads och tips från 2026-10-24. Fliken Nya tips i Leads.tsx visar leads utan ägare och
-// tips som fortfarande är Ny (arNyttTips), äldst överst. Rader utan ägare har knappen Ta leaden direkt
-// på raden. Ett tips från ett ärende får ingen ägare och nästa steg "Kontakta kunden om tipset" om
-// två dygn (lead_fran_arende); ett tips från Skapa saknar nästa steg. Teknikerns text står i sektionen
-// Vad gäller det? (fältet Beskrivning och behov) direkt under Nästa steg i leaden.
-// Överlåt eller dela (LeadDelning): "Ägare nu: ingen", Ny ägare med "Välj kollega", knappen Överlåt
-// (grå tills någon är vald) och notisen "Leaden är överlåten till <namn>".
+// Fliken Nya tips i Leads.tsx visar leads utan ägare och tips som fortfarande är Ny (arNyttTips),
+// äldst överst. Ett tips från en tekniker får ingen ägare och nästa steg "Kontakta kunden om
+// tipset" om två dygn (lead_fran_arende). Teknikerns text ligger i Beskrivning och behov under
+// Mer uppgifter. Överlåt eller dela (LeadDelning): "Ägare nu: ingen", Ny ägare med "Välj kollega",
+// knappen Överlåt (grå tills någon är vald) och notisen "Leaden är överlåten till <namn>".
 // Fler åtgärder (⋯) har Ta leaden och nödutgångarna. Påhittade kunder och kollegor, inget sparas.
 
 import { useState } from 'react'
 import { Icon } from '../../../../components/icons/Icon'
 import { Dator, DatorSida, Markor, Notis, OvningRam, type OvningSvar } from '../skarmkit'
 import type { GuideModul } from './registry'
-import { Atgard, LeadBehov, LeadFalt, LeadFonster, LeadHuvud, LeadsLista, Sektion, ingenMk, mkFor, type ListRad, type Mk } from './_leads'
+import { Atgard, LeadFalt, LeadFonster, LeadHuvud, LeadsLista, Sektion, mkFor, type ListRad, type Mk } from './_leads'
 
 const MENY = ['Översikt', 'Ärenden', 'Schema & Planering', 'Befintliga kunder', 'Leads (B2B)', 'Leads (Webb)', 'Fakturering']
 const KOLLEGOR = ['Bo Exempel', 'Sara Exempel']
 const BESKRIVNING = 'Från privat engångsärende BE-0001234. Gäller: Bostadsrättsföreningen. Skadedjur i ärendet: Möss. Möss i soprummet, kunden sitter i styrelsen.'
 
-const TIPS_A: ListRad = { id: 'a', foretag: 'Brf Exempelgården', under: 'Tips från Anna, privat engångsärende', stage: 'ny', nasta: 'Kontakta kunden om tipset', nar: 'I dag 10:12', ta: true }
-const TIPS_B: ListRad = { id: 'b', foretag: 'Exempel AB', under: 'Tips från Bo', stage: 'ny', nasta: 'Välj nästa steg', nar: '', ta: true }
+const TIPS_A: ListRad = { id: 'a', foretag: 'Brf Exempelgården', under: 'Tips från Anna · privat engångsärende', stage: 'ny', nasta: 'Kontakta kunden om tipset', nar: 'I dag 10:12' }
+const TIPS_B: ListRad = { id: 'b', foretag: 'Exempel AB', under: 'Tips från Bo · företagsärende', stage: 'ny', nasta: 'Kontakta kunden om tipset', nar: 'I morgon 15:40' }
 const EGEN: ListRad = { id: 'c', foretag: 'Exempel Bygg AB', under: 'Telefon', stage: 'kontaktad', nasta: 'Ring och följ upp offerten', nar: 'I dag 13:00', agare: 'Lena' }
 
 type Vy = 'lista' | 'tips' | 'lead' | 'klart'
 
 interface Lage {
   vy: Vy
+  mer: boolean
   dela: boolean
   lista: boolean
   agare: string | null
@@ -46,15 +45,13 @@ function Skarm({ l, tryck, mk }: { l: Lage; tryck: (id: string) => void; mk: Mk 
           sektioner={nyaTips ? [{ grupp: null, rader: [tipsA, TIPS_B] }] : [{ grupp: 'idag', rader: [EGEN] }]}
           tryck={tryck}
           mk={mk}
-          beskrivning="Företag och föreningar som kan bli avtalskunder."
-          lage={['1 att göra', ', 1 öppna för 36 000 kr i årspremie']}
         />
       </DatorSida>
       </div>
 
       {(l.vy === 'lead' || klart) && (
-        <LeadFonster titel="Brf Exempelgården" under="Tips från Anna, privat engångsärende" onStang={() => tryck('stang')}>
-          <LeadHuvud stage="ny" agare={klart ? 'Sara Exempel' : undefined} tipsare="Anna Exempel" />
+        <LeadFonster titel="Brf Exempelgården" under="Tips från Anna · privat engångsärende" onStang={() => tryck('stang')}>
+          <LeadHuvud stage="ny" agare={l.agare ?? undefined} tipsare="Anna Exempel" />
           <div className="flex flex-wrap items-center gap-1.5">
             <Atgard id="logga" ikon="kontakt.telefon" text="Logga samtal" tryck={tryck} mk={mk} />
             <Atgard id="besok" ikon="allman.kalender" text="Boka besök" tryck={tryck} mk={mk} />
@@ -67,12 +64,12 @@ function Skarm({ l, tryck, mk }: { l: Lage; tryck: (id: string) => void; mk: Mk 
 
           {l.dela && (
             <Sektion titel="Överlåt eller dela" ikon="lead.dela" ram="border-[#20c58f]/50">
-              <p className="text-[11px] text-slate-400">Ägare nu: <span className="text-white">{klart ? 'Sara Exempel' : 'ingen'}</span></p>
+              <p className="text-[11px] text-slate-400">Ägare nu: <span className="text-white">{l.agare ?? 'ingen'}</span></p>
               <div className="grid grid-cols-[1fr_auto] items-end gap-2">
                 <LeadFalt id="ny-agare" etikett="Ny ägare" varde={l.agare && !klart ? l.agare : 'Välj kollega'} tom={!l.agare || klart} tryck={tryck} mk={mk} />
                 <Markor markor={mk('overlat')}>
                   <button type="button" onClick={() => tryck('overlat')} aria-disabled={!l.agare}
-                    className={`inline-flex items-center gap-1 rounded-xl bg-[#20c58f] px-2.5 py-1.5 text-[11.5px] font-semibold text-[#04281c] ${!l.agare || klart ? 'opacity-50' : ''}`}>
+                    className={`inline-flex items-center gap-1 rounded-lg bg-[#20c58f] px-2.5 py-1.5 text-[11.5px] font-semibold text-[#fff] ${!l.agare || klart ? 'opacity-50' : ''}`}>
                     <Icon name="lead.agare" size={16} className="h-3.5 w-3.5" /> Överlåt
                   </button>
                 </Markor>
@@ -99,12 +96,26 @@ function Skarm({ l, tryck, mk }: { l: Lage; tryck: (id: string) => void; mk: Mk 
               </div>
               <div className="flex gap-1.5">
                 <Atgard id="klar" ikon="allman.bock" text="Klar, välj nästa" prim tryck={tryck} mk={mk} />
-                <Atgard id="andra" ikon="rapport.penna" text="Ändra" tryck={tryck} mk={mk} />
+                <Atgard id="andra" text="Ändra" tryck={tryck} mk={mk} />
               </div>
             </div>
           </Sektion>
 
-          <LeadBehov text={BESKRIVNING} />
+          <Sektion>
+            <Markor markor={mk('mer')} block>
+              <button type="button" onClick={() => tryck('mer')} className="flex w-full items-center gap-1.5 text-left text-[12px] font-semibold text-white">
+                <Icon name="allman.chevron" size={16} className={`h-3.5 w-3.5 text-slate-400 ${l.mer ? 'rotate-90' : ''}`} />
+                Mer uppgifter
+                <span className="truncate text-[10.5px] font-normal text-slate-400">org.nr, hemsida, storlek, beskrivning, fler kontakter</span>
+              </button>
+            </Markor>
+            {l.mer && (
+              <div className="grid gap-0.5 pt-1">
+                <span className="text-[11px] text-slate-400">Beskrivning och behov</span>
+                <span className="text-[11.5px] leading-snug text-slate-200">{BESKRIVNING}</span>
+              </div>
+            )}
+          </Sektion>
         </LeadFonster>
       )}
       {klart && <Notis text="Leaden är överlåten till Sara Exempel" />}
@@ -114,15 +125,14 @@ function Skarm({ l, tryck, mk }: { l: Lage; tryck: (id: string) => void; mk: Mk 
 
 // ─── Visning ───
 
-const BAS: Lage = { vy: 'lista', dela: false, lista: false, agare: null }
-const LEAD: Lage = { ...BAS, vy: 'lead' }
+const BAS: Lage = { vy: 'lista', mer: false, dela: false, lista: false, agare: null }
 const VISNING: { lage: Lage; markera: string }[] = [
   { lage: BAS, markera: 'flik:nya-tips' },
   { lage: { ...BAS, vy: 'tips' }, markera: 'rad:a' },
-  { lage: LEAD, markera: 'dela' },
-  { lage: { ...LEAD, dela: true }, markera: 'ny-agare' },
-  { lage: { ...LEAD, dela: true, lista: true }, markera: 'kollega:Sara Exempel' },
-  { lage: { ...LEAD, dela: true, agare: 'Sara Exempel' }, markera: 'overlat' },
+  { lage: { ...BAS, vy: 'lead' }, markera: 'mer' },
+  { lage: { ...BAS, vy: 'lead', mer: true }, markera: 'dela' },
+  { lage: { ...BAS, vy: 'lead', mer: true, dela: true, lista: true }, markera: 'kollega:Sara Exempel' },
+  { lage: { ...BAS, vy: 'lead', mer: true, dela: true, agare: 'Sara Exempel' }, markera: 'overlat' },
 ]
 
 function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
@@ -133,16 +143,15 @@ function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
 // ─── Övning ───
 
 const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du står i Leads (B2B) på fliken Att göra. Leta upp tipsen som väntar på en ägare.' }
+const ingen: Mk = () => undefined
 
 const TIPS: Record<string, string> = {
   'flik:att-gora': 'Att göra visar dina egna steg för i dag. Tipsen som väntar ligger under Nya tips.',
-  'flik:pagaende': 'Pågående visar öppna leads. Tipsen som väntar på ägare ligger under Nya tips.',
+  'flik:pagaende': 'Pågående visar alla öppna leads. Tipsen som väntar på ägare ligger under Nya tips.',
   'flik:alla': 'Alla visar även vunna och förlorade. Tipsen som väntar ligger under Nya tips.',
   'flik:statistik': 'Statistiken visar hur det går. Tipsen som väntar ligger under Nya tips.',
   'rad:c': 'Exempel Bygg AB har redan en ägare. Gå till Nya tips.',
   'rad:b': 'Exempel AB är Bos tips. Uppdraget gäller Annas tips om Brf Exempelgården.',
-  'ta:a': 'Ta leaden gör dig till ägare. Uppdraget var att ge tipset till Sara. Öppna tipset i stället.',
-  'ta:b': 'Ta leaden gör dig till ägare av Bos tips. Uppdraget gäller Annas tips om Brf Exempelgården.',
   ny: 'Ny lead skapar en ny lead. Tipset finns redan.',
   stang: 'Du stängde leaden. Öppna Brf Exempelgården igen.',
   logga: 'Det är säljaren som ska ringa kunden. Ge tipset till Sara.',
@@ -170,12 +179,17 @@ function Ovning() {
       if (id === 'flik:nya-tips') { setL({ ...l, vy: 'tips' }); tips('Nya tips', 'Två tips väntar, äldst överst. Båda saknar ägare.') }
       else miss(TIPS[id] ?? 'Tryck på fliken Nya tips.')
     } else if (l.vy === 'tips') {
-      if (id === 'rad:a') { setL({ ...l, vy: 'lead' }); tips('Annas tips', 'Under Vad gäller det? står vad Anna skrev: möss i soprummet, kunden sitter i styrelsen. Ge nu tipset till Sara.') }
+      if (id === 'rad:a') { setL({ ...l, vy: 'lead' }); tips('Annas tips', 'Läs först vad Anna skrev. Det står längst ned i leaden.') }
       else if (id === 'flik:nya-tips') tips('Du är redan här', 'Öppna Annas tips om Brf Exempelgården.')
       else miss(TIPS[id] ?? 'Öppna Brf Exempelgården.')
     } else if (id === 'stang') { setL({ ...BAS, vy: 'tips' }); miss(TIPS.stang) }
-    else if (id === 'dela') { setL({ ...l, dela: !l.dela, lista: false }); if (!l.dela) tips('Överlåt eller dela', 'Ägare nu: ingen. Tryck Ny ägare och välj Sara.') }
-    else if (id === 'ny-agare') setL({ ...l, lista: !l.lista })
+    else if (id === 'mer') {
+      setL({ ...l, mer: !l.mer })
+      if (!l.mer) tips('Annas text', 'Kunden sitter i styrelsen och föreningen har möss i soprummet. Ge nu tipset till Sara.')
+    } else if (id === 'dela') {
+      if (!l.mer) tips('Läs först', 'Öppna Mer uppgifter och läs vad Anna skrev, så vet du vem som passar.')
+      else { setL({ ...l, dela: !l.dela, lista: false }); if (!l.dela) tips('Överlåt eller dela', 'Ägare nu: ingen. Välj Sara under Ny ägare.') }
+    } else if (id === 'ny-agare') setL({ ...l, lista: !l.lista })
     else if (id.startsWith('kollega:')) {
       const k = id.slice(8)
       setL({ ...l, agare: k, lista: false })
@@ -192,13 +206,13 @@ function Ovning() {
           text: `Sara Exempel äger nu Brf Exempelgården och Anna står kvar som tipsare. Tipset ligger kvar under Nya tips tills Sara har kontaktat föreningen.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
         })
       }
-    } else miss(TIPS[id] ?? 'Tryck Överlåt eller dela och välj Sara under Ny ägare.')
+    } else miss(TIPS[id] ?? 'Öppna Mer uppgifter, sedan Överlåt eller dela.')
   }
 
-  const framsteg = l.vy === 'lista' ? 0 : l.vy === 'tips' ? 1 : l.vy === 'klart' ? 5 : 2 + Number(l.dela) + Number(l.agare === 'Sara Exempel')
+  const framsteg = l.vy === 'lista' ? 0 : l.vy === 'tips' ? 1 : l.vy === 'klart' ? 6 : 2 + Number(l.mer) + Number(l.dela) + Number(l.agare === 'Sara Exempel')
   return (
-    <OvningRam bred framsteg={framsteg} totalt={5} svar={svar} onBorjaOm={() => { setL(BAS); setSvar(BORJA); setFel(0) }}>
-      <Skarm l={l} tryck={tryck} mk={ingenMk} />
+    <OvningRam bred framsteg={framsteg} totalt={6} svar={svar} onBorjaOm={() => { setL(BAS); setSvar(BORJA); setFel(0) }}>
+      <Skarm l={l} tryck={tryck} mk={ingen} />
     </OvningRam>
   )
 }

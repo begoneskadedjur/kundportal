@@ -5,12 +5,13 @@
 
 import { useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { X } from 'lucide-react'
+import Button from '../../ui/Button'
 import Select from '../../ui/Select'
 import { Icon } from '../../icons/Icon'
 import { LeadService } from '../../../services/leadService'
 import type { Lead } from '../../../types/database'
 import type { LeadMedlem, LeadPerson } from '../../../types/leads'
-import { ATGARD, ATGARD_PRIMAR, IKONKNAPP } from './leadLogik'
 
 interface Props {
   lead: Lead
@@ -51,37 +52,37 @@ export default function LeadDelning({ lead, medlemmar, personal, minProfilId, ka
   return (
     <div className="p-3 bg-slate-800/30 border border-[#20c58f]/50 rounded-xl space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[15px] font-semibold text-white flex items-center gap-2">
-          <Icon name="lead.dela" size={20} className="text-[#20c58f]" /> Överlåt eller dela
+        <p className="text-sm font-semibold text-white flex items-center gap-1.5">
+          <Icon name="lead.dela" size={16} className="text-[#20c58f]" /> Överlåt eller dela
         </p>
-        <button type="button" onClick={onStang} className={`${IKONKNAPP} -my-2 -mr-2`} aria-label="Stäng">
-          <Icon name="allman.stang" size={20} />
+        <button type="button" onClick={onStang} className="p-1 text-slate-400 hover:text-white rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]" aria-label="Stäng">
+          <X className="w-4 h-4" />
         </button>
       </div>
 
       {kanOverlata && (
         <div className="space-y-2">
-          <p className="text-sm text-slate-400">
+          <p className="text-xs text-slate-400">
             Ägare nu: <span className="text-white">{namnFor(lead.owner_profile_id) || 'ingen'}</span>
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
             <Select label="Ny ägare" value={nyAgare} onChange={setNyAgare} options={agarVal} placeholder="Välj kollega" />
-            <button
-              type="button"
-              className={ATGARD_PRIMAR}
+            <Button
+              variant="primary"
+              size="sm"
               disabled={!nyAgare || arbetar}
               onClick={() => void kor(() => LeadService.overlat(lead.id, nyAgare, behall && !!lead.owner_profile_id), `Leaden är överlåten till ${namnFor(nyAgare)}`)}
             >
-              <Icon name="lead.agare" size={20} /> Överlåt
-            </button>
+              <Icon name="lead.agare" size={16} className="mr-1.5" /> Överlåt
+            </Button>
           </div>
           {lead.owner_profile_id && (
-            <label className="min-h-[44px] flex items-center gap-3 text-[15px] text-slate-200 cursor-pointer select-none">
+            <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={behall}
                 onChange={(e) => setBehall(e.target.checked)}
-                className="w-5 h-5 rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f] focus:ring-offset-0"
+                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f] focus:ring-offset-0"
               />
               {lead.owner_profile_id === minProfilId ? 'Behåll mig som delad så att jag fortsatt ser leaden' : `Behåll ${namnFor(lead.owner_profile_id)} som delad`}
             </label>
@@ -90,7 +91,7 @@ export default function LeadDelning({ lead, medlemmar, personal, minProfilId, ka
       )}
 
       <div className={`space-y-2 ${kanOverlata ? 'pt-3 border-t border-slate-700/50' : ''}`}>
-        <p className="text-sm font-medium text-slate-400">Delad med</p>
+        <p className="text-xs font-medium text-slate-400">Delad med</p>
         {medlemmar.length === 0 ? (
           <p className="text-sm text-slate-500">Ingen än.</p>
         ) : (
@@ -103,7 +104,7 @@ export default function LeadDelning({ lead, medlemmar, personal, minProfilId, ka
                     type="button"
                     disabled={arbetar}
                     onClick={() => void kor(() => LeadService.slutaDela(lead.id, m.profile_id), m.profile_id === minProfilId ? 'Du har lämnat delningen' : 'Delningen är borttagen')}
-                    className="min-h-[44px] px-2 text-sm text-slate-400 hover:text-red-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded-lg"
+                    className="text-xs text-slate-400 hover:text-red-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded"
                   >
                     {m.profile_id === minProfilId ? 'Lämna' : 'Ta bort'}
                   </button>
@@ -115,14 +116,14 @@ export default function LeadDelning({ lead, medlemmar, personal, minProfilId, ka
         {kanOverlata && (
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
             <Select label="Dela med" value={dela} onChange={setDela} options={delaVal} placeholder="Välj kollega" />
-            <button
-              type="button"
-              className={ATGARD}
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={!dela || arbetar}
               onClick={() => void kor(async () => { await LeadService.dela(lead.id, [dela]); setDela('') }, `Leaden är delad med ${namnFor(dela)}`)}
             >
-              <Icon name="lead.dela" size={20} /> Dela
-            </button>
+              <Icon name="lead.dela" size={16} className="mr-1.5" /> Dela
+            </Button>
           </div>
         )}
       </div>

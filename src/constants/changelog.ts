@@ -45,22 +45,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '3.94.0',
+    version: '3.95.0',
     date: '2026-10-24',
-    title: 'Leads och tips i ny form',
+    title: 'Bilder i tillbudsrapporter',
     items: [
-      { kind: 'andring', text: 'Leads och tips är omgjord för telefon och dator: grupper med en förklaring, sök med / och filter bakom en knapp i telefonen. Läget står i en mening överst, inga sifferkort.' },
-      { kind: 'nyhet', text: 'Tips om ny kund har fyra frågor: Vem gäller det?, Vad gäller det?, Hur når vi dem? och Vem tar det vidare? Teknikerns tips går till koordinatorn om du inte väljer att ta det själv.' },
-      { kind: 'andring', text: 'I leaden står Vad gäller det? direkt under Nästa steg, och fel visas som text vid fältet.' },
-      { kind: 'buggfix', text: 'Knappen för nytt tips i telefonen ligger ovanför bottenmenyn. Menyerna heter Tillbud och avvikelser.' },
+      { kind: 'nyhet', text: 'Du kan lägga till upp till sex bilder när du rapporterar ett tillbud, en olycka eller en avvikelse, och fler i efterhand under Mina rapporter.' },
+      { kind: 'nyhet', text: 'Är rapporten kopplad till ett ärende öppnar du ärendet direkt från rapporten.' },
+      { kind: 'andring', text: 'Leads ser ut och fungerar som innan. Menyerna heter Tillbud & Avvikelser igen.' },
     ],
   },
   {
     version: '3.93.0',
     date: '2026-10-24',
-    title: 'Tillbud och avvikelser i ny form',
+    title: 'Tillbud & Avvikelser i ny form',
     items: [
-      { kind: 'andring', text: 'Sidan Tillbud och avvikelser öppnas med formuläret direkt och fungerar lika bra i telefonen som på datorn. Formuläret har fyra steg och visar vad som saknas innan du kan skicka.' },
+      { kind: 'andring', text: 'Sidan Tillbud & Avvikelser öppnas med formuläret direkt och fungerar lika bra i telefonen som på datorn. Formuläret har fyra steg och visar vad som saknas innan du kan skicka.' },
       { kind: 'nyhet', text: 'Under Mina rapporter ser du rapporter du har skickat eller står som berörd i, och hur långt de har kommit. Tryck på en rapport för att se åtgärd och uppföljning.' },
       { kind: 'nyhet', text: 'Koppla till ärende visar dina besök i går och i dag och hittar nu även avtalsärenden.' },
       { kind: 'andring', text: 'Den som tar emot rapporter utreder dem under Registret, grupperat efter status, med filter och export. Länken i mejlet öppnar rapporten direkt.' },

@@ -1,17 +1,17 @@
 // src/components/admin/leads/LeadFaltSektion.tsx
 // En sektion i leadens detaljvy med redigering på plats (WebLeadUppgifter-mönstret): visningsläge med
-// etikett och värde, Redigera växlar till fält, Spara skickar bara de fält som ändrats. Fel skrivs
-// som text under fältet.
+// etikett och värde, Redigera växlar till fält, Spara skickar bara de fält som ändrats.
 
 import { useState, type ReactNode } from 'react'
 import toast from 'react-hot-toast'
+import Button from '../../ui/Button'
 import Select from '../../ui/Select'
 import DateField from '../../ui/DateField'
 import { Icon, type IconName } from '../../icons/Icon'
 import type { Lead, LeadUpdate } from '../../../types/database'
 import { toLocalISOStringWithOffset } from '../../../utils/dateHelpers'
 import { svDatum } from '../webLeads/format'
-import { DATUMFALT, ETIKETT, FALT, FELTEXT, KNAPP_PRIMAR, KNAPP_TEXT, SEKTION, SEKTION_RUBRIK, faltFel } from './leadLogik'
+import { DATUMFALT, ETIKETT, FALT, SEKTION, SEKTION_RUBRIK } from './leadLogik'
 
 type Nyckel = keyof LeadUpdate & keyof Lead
 
@@ -59,13 +59,11 @@ export default function LeadFaltSektion({ titel, ikon, lead, falt, kanRedigera, 
   const [redigerar, setRedigerar] = useState(false)
   const [varden, setVarden] = useState<Record<string, string>>({})
   const [sparar, setSparar] = useState(false)
-  const [fel, setFel] = useState<Record<string, string>>({})
 
   const borja = () => {
     const v: Record<string, string> = {}
     for (const f of falt) v[f.nyckel] = tillText(lead, f)
     setVarden(v)
-    setFel({})
     setRedigerar(true)
   }
 
@@ -78,7 +76,7 @@ export default function LeadFaltSektion({ titel, ikon, lead, falt, kanRedigera, 
       else if (f.typ === 'number') {
         const n = Number(ny.replace(/\s/g, '').replace(',', '.'))
         if (Number.isNaN(n)) {
-          setFel({ [f.nyckel]: 'Skriv ett tal, till exempel 48 000.' })
+          toast.error(`${f.etikett}: ange ett tal`)
           return
         }
         andring[f.nyckel] = Math.round(n)
@@ -111,13 +109,7 @@ export default function LeadFaltSektion({ titel, ikon, lead, falt, kanRedigera, 
           <Icon name={ikon} size={16} className="text-[#20c58f]" /> {titel}
         </h3>
         {kanRedigera && !redigerar && (
-          <button
-            type="button"
-            onClick={borja}
-            aria-label={`Redigera ${titel}`}
-            className="min-h-[44px] -my-2 -mr-2 px-2 inline-flex items-center gap-1.5 text-sm font-medium text-[#20c58f] hover:bg-slate-800 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
-          >
-            <Icon name="rapport.penna" size={16} />
+          <button type="button" onClick={borja} className="text-xs text-[#20c58f] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded">
             Redigera
           </button>
         )}
@@ -138,7 +130,7 @@ export default function LeadFaltSektion({ titel, ikon, lead, falt, kanRedigera, 
                     <>
                       <label className={ETIKETT} htmlFor={id}>{f.etikett}</label>
                       {f.typ === 'textarea' ? (
-                        <textarea id={id} rows={4} className={FALT} value={varde} onChange={(e) => satt(e.target.value)} />
+                        <textarea id={id} rows={3} className={FALT} value={varde} onChange={(e) => satt(e.target.value)} />
                       ) : f.typ === 'datum' ? (
                         <DateField id={id} value={varde} onChange={satt} clearable className={DATUMFALT} />
                       ) : (
@@ -146,13 +138,11 @@ export default function LeadFaltSektion({ titel, ikon, lead, falt, kanRedigera, 
                           id={id}
                           type={f.typ === 'tel' ? 'tel' : f.typ === 'email' ? 'email' : 'text'}
                           inputMode={f.typ === 'number' ? 'numeric' : undefined}
-                          className={`${faltFel(!!fel[f.nyckel])} ${f.mono ? 'font-mono' : ''}`}
+                          className={`${FALT} ${f.mono ? 'font-mono' : ''}`}
                           value={varde}
                           onChange={(e) => satt(e.target.value)}
-                          aria-invalid={!!fel[f.nyckel]}
                         />
                       )}
-                      {fel[f.nyckel] && <p className={FELTEXT}>{fel[f.nyckel]}</p>}
                     </>
                   )}
                 </div>
@@ -160,19 +150,16 @@ export default function LeadFaltSektion({ titel, ikon, lead, falt, kanRedigera, 
             })}
           </div>
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-700/50">
-            <button type="button" className={KNAPP_TEXT} onClick={() => setRedigerar(false)} disabled={sparar}>Avbryt</button>
-            <button type="button" className={KNAPP_PRIMAR} onClick={() => void spara()} disabled={sparar}>
-              {sparar && <Icon name="allman.laddar" size={20} className="animate-spin" />}
-              Spara
-            </button>
+            <Button variant="ghost" size="sm" onClick={() => setRedigerar(false)} disabled={sparar}>Avbryt</Button>
+            <Button variant="primary" size="sm" onClick={() => void spara()} loading={sparar}>Spara</Button>
           </div>
         </div>
       ) : (
         <>
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2 text-[15px]">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
             {visning.map(({ f, text }) => (
               <div key={f.nyckel} className={f.bred || f.typ === 'textarea' ? 'sm:col-span-2' : ''}>
-                <dt className="text-sm text-slate-400">{f.etikett}</dt>
+                <dt className="text-xs text-slate-400">{f.etikett}</dt>
                 <dd className={`text-white break-words ${f.mono ? 'font-mono' : ''} ${f.typ === 'textarea' ? 'whitespace-pre-wrap' : ''}`}>
                   {f.visa ? f.visa(lead) : text ? (f.val?.find((o) => o.value === text)?.label ?? text) : <span className="text-slate-500">Saknas</span>}
                 </dd>

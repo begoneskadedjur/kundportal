@@ -57,7 +57,7 @@ export const navGroups: NavGroup[] = [
     icon: Sparkles,
     items: [
       { label: 'AI Assistent', icon: Sparkles, path: '/saljare/ai-assistent' },
-      { label: 'Tillbud och avvikelser', icon: AlertTriangle, path: '/saljare/tillbud-avvikelser', badgeKey: 'incidents' },
+      { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/saljare/tillbud-avvikelser', badgeKey: 'incidents' },
     ],
   },
 ]
@@ -92,7 +92,7 @@ export const breadcrumbMap: Record<string, string> = {
 
   // Verktyg
   '/saljare/ai-assistent': 'AI Assistent',
-  '/saljare/tillbud-avvikelser': 'Tillbud och avvikelser',
+  '/saljare/tillbud-avvikelser': 'Tillbud & Avvikelser',
   '/saljare/intranat': 'Intranät',
   '/saljare/larosate': 'Lärosäte',
   '/saljare/mitt-konto': 'Mitt konto',

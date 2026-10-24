@@ -3,6 +3,7 @@
 // (incident_recipients, is_incident_recipient_of i RLS) utreder här enligt ISO-flödet:
 // status, klassificering, orsaksanalys, beslutad åtgärd med ansvarig och datum,
 // uppföljning och avslut, samt radering. Övriga ser rapporten och hur långt den kommit.
+// Bilderna (TillbudBilder) och det kopplade ärendet, som öppnas i ärendelistan (openCase).
 // Telefon: hela ytan med Tillbaka. Dator: panelen till höger om listan.
 
 import { useEffect, useState, type ReactNode } from 'react'
@@ -19,6 +20,10 @@ import {
   nuTidsstampel, type Anstalld,
 } from './tillbudLogik'
 import { ETIKETT, FALT, StatusPunkt, TEXTRUTA, TypRund, VALFRITT } from './tillbudUi'
+import { RapportensBilder, raderaRapportensBilder } from './TillbudBilder'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
+import { caseHref } from '../shared/search/searchModel'
 
 interface Props {
   incident: CaseIncident
@@ -33,33 +38,35 @@ interface Props {
 
 const ARENDE_TYP_TEXT = { private: 'Privatärende', business: 'Företagsärende', contract: 'Avtalsärende' } as const
 
-/** Kopplat ärende som text, om RLS låter oss läsa det */
-function useArendeText(caseId: string | null, caseType: CaseIncident['case_type']): string | null {
-  const [text, setText] = useState<string | null>(null)
+/** Kopplat ärende som text. lasbart = RLS lät oss läsa ärendet, så att det går att öppna. */
+function useArendeText(caseId: string | null, caseType: CaseIncident['case_type']): { text: string; lasbart: boolean } | null {
+  const [svar, setSvar] = useState<{ text: string; lasbart: boolean } | null>(null)
   useEffect(() => {
-    setText(null)
+    setSvar(null)
     if (!caseId || !caseType) return
     let avbruten = false
     ;(async () => {
       const typText = ARENDE_TYP_TEXT[caseType]
       try {
+        let data: { title?: string | null; case_number?: string | null; company_name?: string | null } | null = null
         if (caseType === 'contract') {
-          const { data } = await supabase.from('cases').select('title, case_number').eq('id', caseId).maybeSingle()
-          if (!avbruten) setText(data ? [data.case_number, data.title].filter(Boolean).join(' ') || typText : typText)
+          data = (await supabase.from('cases').select('title, case_number').eq('id', caseId).maybeSingle()).data
         } else if (caseType === 'business') {
-          const { data } = await supabase.from('business_cases').select('title, case_number, company_name').eq('id', caseId).maybeSingle()
-          if (!avbruten) setText(data ? [data.case_number, data.company_name || data.title].filter(Boolean).join(' ') || typText : typText)
+          data = (await supabase.from('business_cases').select('title, case_number, company_name').eq('id', caseId).maybeSingle()).data
         } else {
-          const { data } = await supabase.from('private_cases').select('title, case_number').eq('id', caseId).maybeSingle()
-          if (!avbruten) setText(data ? [data.case_number, data.title].filter(Boolean).join(' ') || typText : typText)
+          data = (await supabase.from('private_cases').select('title, case_number').eq('id', caseId).maybeSingle()).data
         }
+        if (avbruten) return
+        setSvar(data
+          ? { text: [data.case_number, data.company_name || data.title].filter(Boolean).join(' ') || typText, lasbart: true }
+          : { text: typText, lasbart: false })
       } catch {
-        if (!avbruten) setText(typText)
+        if (!avbruten) setSvar({ text: typText, lasbart: false })
       }
     })()
     return () => { avbruten = true }
   }, [caseId, caseType])
-  return text
+  return svar
 }
 
 function Fakta({ etikett, children }: { etikett: string; children: ReactNode }) {
@@ -82,8 +89,14 @@ function Sektion({ rubrik, children }: { rubrik: string; children: ReactNode }) 
 
 export default function TillbudDetalj({ incident, kanHantera, hanterare, anstallda, onTillbaka, onAndrad, onRaderad }: Props) {
   const typ = INCIDENT_TYPE_CONFIG[incident.type]
-  const arendeText = useArendeText(incident.case_id, incident.case_type)
+  const { user, activeView } = useAuth()
+  const arende = useArendeText(incident.case_id, incident.case_type)
+  // Säljaren har ingen ärendelista att öppna ärendet i
+  const arendeLank = arende?.lasbart && incident.case_id && incident.case_type && activeView !== 'säljare'
+    ? caseHref(activeView, incident.case_id, incident.case_type)
+    : null
   const berorda = berordaNamn(incident)
+  const kanLaggaBild = kanHantera || (!!user?.id && incident.reported_by_id === user.id)
 
   const [status, setStatus] = useState<IncidentStatus>(incident.status || 'ny')
   const [kategori, setKategori] = useState<IncidentCategory | ''>(incident.category || '')
@@ -144,6 +157,7 @@ export default function TillbudDetalj({ incident, kanHantera, hanterare, anstall
   const radera = async () => {
     setRaderar(true)
     try {
+      await raderaRapportensBilder(incident.id)
       await supabase.from('incident_employees').delete().eq('incident_id', incident.id)
       const { error, count } = await supabase.from('case_incidents').delete({ count: 'exact' }).eq('id', incident.id)
       if (error) throw error
@@ -187,6 +201,8 @@ export default function TillbudDetalj({ incident, kanHantera, hanterare, anstall
           <p className="text-[15px] leading-relaxed text-white whitespace-pre-wrap break-words">{incident.description}</p>
         </section>
 
+        <RapportensBilder incidentId={incident.id} kanLagga={kanLaggaBild} minUserId={user?.id ?? null} kanTaBortAlla={kanHantera} />
+
         {!kanHantera && incident.immediate_action && (
           <section className="flex flex-col gap-2">
             <h3 className="text-sm font-medium text-slate-400">Vad har ni redan gjort?</h3>
@@ -198,7 +214,16 @@ export default function TillbudDetalj({ incident, kanHantera, hanterare, anstall
           <Fakta etikett="Inträffade">{datumTid(incident.occurred_at)}</Fakta>
           <Fakta etikett="Rapportör">{incident.reported_by_name}</Fakta>
           {berorda && <Fakta etikett="Berörda">{berorda}</Fakta>}
-          {incident.case_id && <Fakta etikett="Ärende">{arendeText || '...'}</Fakta>}
+          {incident.case_id && (
+            <Fakta etikett="Ärende">
+              {arendeLank ? (
+                <Link to={arendeLank} className="inline-flex items-center gap-1.5 font-medium text-[#20c58f] hover:underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded">
+                  {arende?.text}
+                  <Icon name="rapport.oppna" size={16} />
+                </Link>
+              ) : (arende?.text || '...')}
+            </Fakta>
+          )}
           {incident.category && <Fakta etikett="Kategori">{kategoriText(incident.category)}</Fakta>}
         </dl>
 

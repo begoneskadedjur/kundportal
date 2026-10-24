@@ -4,7 +4,7 @@
 // rapporteringen alltid är ett klick bort.
 
 import { Link } from 'react-router-dom'
-import { AlertTriangle } from 'lucide-react'
+import { Icon } from '../icons/Icon'
 
 const INCIDENT_PATHS: Record<'admin' | 'koordinator' | 'technician' | 'säljare', string> = {
   admin: '/admin/tillbud-avvikelser',
@@ -32,7 +32,7 @@ export function ReportIncidentButton({ role, collapsed = false, onNavigate }: Re
         title="Rapportera tillbud, avvikelse eller olycka"
         className="w-full flex items-center justify-center p-2.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-xl transition-colors"
       >
-        <AlertTriangle className="w-5 h-5 text-amber-400" />
+        <Icon name="rapport.avvikelse" size={20} className="text-amber-400" />
       </Link>
     )
   }
@@ -43,7 +43,7 @@ export function ReportIncidentButton({ role, collapsed = false, onNavigate }: Re
       onClick={onNavigate}
       className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-medium rounded-xl transition-colors text-sm text-center leading-snug"
     >
-      <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+      <Icon name="rapport.avvikelse" size={20} className="flex-shrink-0" />
       Rapportera tillbud, avvikelse eller olycka
     </Link>
   )

@@ -55,7 +55,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'AI Assistent', icon: Sparkles, path: '/technician/team-chat' },
       { label: 'Provisioner', icon: DollarSign, path: '/technician/commissions' },
-      { label: 'Tillbud och avvikelser', icon: AlertTriangle, path: '/technician/tillbud-avvikelser', badgeKey: 'incidents' },
+      { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/technician/tillbud-avvikelser', badgeKey: 'incidents' },
     ],
   },
 ]
@@ -80,7 +80,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/technician/dokumentsignering': 'Dokumentsignering',
   '/technician/min-kundresa': 'Min Kundresa',
   '/technician/team-chat': 'AI Assistent',
-  '/technician/tillbud-avvikelser': 'Tillbud och avvikelser',
+  '/technician/tillbud-avvikelser': 'Tillbud & Avvikelser',
   '/technician/tickets': 'Tickets',
   '/technician/intranat': 'Intranät',
   '/technician/mitt-konto': 'Mitt konto',
