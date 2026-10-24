@@ -121,7 +121,7 @@ values
     {"type":"felsok","items":[
       {"fraga":"Det står GPS-position krävs. Tryck på Hämta GPS.","svar":"Tryck [[Hämta GPS]], eller [[Välj på karta]] och tryck på platsen på kartan."},
       {"fraga":"Noggrannheten är dålig","svar":"Gå ut i det fria en bit från husväggen, eller använd Välj på karta och markera platsen själv."},
-      {"fraga":"Jag tryckte på krysset eller Avbryt i formuläret","svar":"Krysset heter Stäng och avsluta placeringen. Det och Avbryt går vidare till avslutet av etableringen, precis som Färdig med etablering. Har inga stationer placerats frågar portalen först. Har ärendet stängts för tidigt: skriv en ticket till rollen Koordinator."},
+      {"fraga":"Jag tryckte på krysset eller Avbryt i formuläret","svar":"Krysset och Avbryt stänger bara rutan. Stationerna du har placerat är sparade och etableringen är fortfarande öppen. Fortsätt eller avsluta den med Färdig med etablering i rutan Pågående etablering överst på Stationer."},
       {"fraga":"Etableringen tar mer än en dag","svar":"Lämna ärendet öppet. Nästa dag står det under Pågående etablering på sidan Stationer och på kundens sida, med till exempel 4 av 6 stationer placerade och knappen Placera station."},
       {"fraga":"Kunden har ingen planritning när jag väljer Inomhus","svar":"Portalen visar Inga planritningar. Ladda upp en bild på planritningen i samma ruta och placera sedan stationerna på den."}
     ]},

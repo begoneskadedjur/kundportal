@@ -25,7 +25,8 @@
 // i toasterna är borttagna, window.confirm-texten i avslutsspärren är oförändrad,
 // och två ref-spärrar (avslutPagar, bekraftarPagar) hindrar att Färdig med
 // etablering eller Stäng och fakturera körs två gånger parallellt (nya sidan har
-// fler ingångar till avslutet än gamla).
+// fler ingångar till avslutet än gamla). Krysset och Avbryt i Placera station stänger
+// bara rutan (handleCloseSheet, 2026-10-24); gamla sidan avslutar etableringen där.
 // Ändras gamla sidans fakturalogik ska den här filen ändras likadant.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -834,6 +835,31 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
     await finishEstablishment(customerId, name || customerName(customerId))
   }
 
+  // Krysset och Avbryt i Placera station: stänger bara rutan (2026-10-24).
+  // Etableringsärendet stängs aldrig här, bara med Färdig med etablering.
+  const handleCloseSheet = () => {
+    const placerade = batchCount
+    nollstallPlacering()
+    if (placerade > 0) {
+      toast('Etableringen är fortfarande öppen. Avsluta den med Färdig med etablering i rutan Pågående etablering när du är klar.')
+    }
+  }
+
+  const nollstallPlacering = () => {
+    setShowSuccessState(false)
+    setIsFormOpen(false)
+    setEditingEquipment(null)
+    setPreviewPosition(null)
+    setWizardCustomerId(null)
+    setBatchCount(0)
+    setBatchCustomerName('')
+    setLastEquipmentType(null)
+    setLastUsedMap(false)
+    setLastPreparation(null)
+    setLastIsAddon(false)
+    setLastArticleId(null)
+  }
+
   // Batch-placering: klar, stäng allt
   const handleFinishBatch = async () => {
     const finishedCustomerId = wizardCustomerId
@@ -905,7 +931,7 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
     isFormOpen, editingEquipment, isSubmitting, showSuccessState, formResetKey, batchCount, batchCustomerName,
     lastEquipmentType, lastUsedMap, lastPreparation, lastIsAddon, lastAddonModel, lastArticleId,
     addonPrices, addonPricesLoading, customerExistingStations, otherCustomerStations, previewPosition,
-    handleFormSubmit, handleLocationCapture, handlePlaceAnother, handleGoIndoor, handleFinishBatch,
+    handleFormSubmit, handleLocationCapture, handlePlaceAnother, handleGoIndoor, handleFinishBatch, handleCloseSheet,
     // avslut
     establishmentSummary, setEstablishmentSummary, finishingEstablishment, addonLabourStep,
     confirmFinishEstablishment, cancelEstablishmentSummary, finishEstablishmentFor,

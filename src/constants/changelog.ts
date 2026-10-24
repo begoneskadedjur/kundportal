@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.96.1',
+    date: '2026-10-24',
+    title: 'Krysset i Placera station stänger bara rutan',
+    items: [
+      { kind: 'buggfix', text: 'Krysset och Avbryt i Placera station stänger bara rutan i nya arbetsvyn. Etableringen är kvar öppen tills du trycker Färdig med etablering, till exempel i rutan Pågående etablering.' },
+    ],
+  },
+  {
     version: '3.96.0',
     date: '2026-10-24',
     title: 'Rapporten krävs innan ärendet stängs',

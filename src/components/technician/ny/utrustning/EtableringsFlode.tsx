@@ -116,8 +116,8 @@ export function EtableringsFlode({ flode: f, allCustomers, onIndoorFinished, onT
                     </div>
                     <button
                       type="button"
-                      onClick={f.handleFinishBatch}
-                      aria-label="Stäng och avsluta placeringen"
+                      onClick={f.handleCloseSheet}
+                      aria-label="Stäng rutan"
                       className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
                     >
                       <Icon name="allman.stang" size={20} />
@@ -142,7 +142,7 @@ export function EtableringsFlode({ flode: f, allCustomers, onIndoorFinished, onT
                       inspections={[]}
                       onTypeChanged={onTypeChanged}
                       onSubmit={f.handleFormSubmit}
-                      onCancel={f.handleFinishBatch}
+                      onCancel={f.handleCloseSheet}
                       onLocationCapture={f.handleLocationCapture}
                       isSubmitting={f.isSubmitting}
                       customers={f.customers}
