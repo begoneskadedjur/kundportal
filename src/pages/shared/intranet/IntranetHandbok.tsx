@@ -21,6 +21,7 @@ import {
   type IntranetDocumentWithStatus,
 } from '../../../types/intranet'
 import { HANDBOK_SEKTIONER, ROLL_NAMN, type HandbokSektion } from './handbokSektioner'
+import { GUIDE_MODULER } from './guider/registry'
 
 type Intro = Extract<IntranetBlock, { type: 'intro' }>
 
@@ -59,7 +60,7 @@ function GuideRad({ g, nr, basePath, visaRoll }: { g: IntranetDocumentWithStatus
             {intro && (
               <span className="inline-flex items-center gap-1">
                 <Icon name={intro.enhet === 'dator' ? 'guide.dator' : 'guide.mobil'} size={16} className="h-3.5 w-3.5" />
-                {intro.tar}, {intro.enhet === 'dator' ? 'på datorn' : 'i telefonen'}
+                {intro.tar}, {(GUIDE_MODULER[g.slug]?.enheter?.length ?? 0) > 1 ? 'i telefonen eller på datorn' : intro.enhet === 'dator' ? 'på datorn' : 'i telefonen'}
               </span>
             )}
             {visaRoll && <span>För: {forVem(g)}</span>}
