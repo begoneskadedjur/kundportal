@@ -18,7 +18,7 @@ values (
       {"text":"Tryck [[Karta|falt.karta]].","ser":"Kartan visar dagens stopp med siffror i den ordning du kör. Byt mellan Idag och Imorgon under kartan."},
       {"text":"Tryck [[Ärenden|arende.arende]]. På datorn heter det Mina ärenden.","ser":"Mina ärenden visar veckans besök och det som väntar på dig, till exempel passerade besök som ska avslutas."},
       {"text":"Tryck [[Skapa|allman.plus]].","ser":"Rutan Vad vill du göra? öppnas: avtal eller offert, specialrapport, ny station, tips om ny kund, ticket till en kollega och AI-assistenten."},
-      {"text":"I telefonen: tryck [[Mer|allman.meny]]. På datorn står allt redan i sidomenyn.","ser":"Under Mer ligger resten i samma grupper som på datorn: Min dag, Hos kunden, Sälja och Hjälp, och längst ner Mitt konto och visning."},
+      {"text":"I telefonen: tryck [[Mer|allman.meny]]. På datorn står allt redan i sidomenyn.","ser":"Under Mer ligger resten i samma grupper som på datorn: Min dag, Hos kunden, Sälja och Hjälp, och längst ner Mitt konto."},
       {"text":"Tryck på klockan uppe till höger.","ser":"Tickets öppnas. Siffran på klockan är antalet trådar som väntar på dig."},
       {"text":"Tryck på frågetecknet uppe till höger.","ser":"Visa mig hur går igenom sidan du står på, steg för steg. Frågetecknet finns på varje sida."}
     ]},
@@ -31,7 +31,7 @@ values (
     {"type":"bra","items":[
       "Den gula varningsknappen uppe till höger är för tillbud, avvikelser och olyckor. Den finns på varje sida.",
       "Förstoringsglaset uppe till höger söker kund, adress eller ärende. På datorn kan du också trycka Ctrl+K.",
-      "Under Mer, Mitt konto och visning, stänger du av hjälptexterna och genomgångarna när du kan sidorna.",
+      "Under Mer, Mitt konto, stänger du av hjälptexterna och genomgångarna när du kan sidorna.",
       "Lägg portalen på hemskärmen, så öppnas den som en app. Mitt konto visar hur du gör i din telefon."
     ]},
     {"type":"ovning","uppdrag":"Kollegan Anna Exempel har frågat dig något. Öppna sidan där frågan ligger, och gå sedan till Stationer."},
