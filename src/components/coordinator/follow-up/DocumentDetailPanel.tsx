@@ -12,6 +12,8 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
 import { OfferFollowUpService } from '../../../services/offerFollowUpService'
 import { OneflowDraftService } from '../../../services/oneflowDraftService'
+import { DokumentRabattRuta } from '../../shared/DokumentRabatt'
+import { useDokumentRabatt } from '../../../hooks/useDokumentRabatt'
 import Modal from '../../ui/Modal'
 import OneflowPdfFrame from '../../shared/OneflowPdfFrame'
 import type { FollowUpOffer } from '../../../services/offerFollowUpService'
@@ -82,6 +84,8 @@ export default function DocumentDetailPanel({
   // Utkast: Oneflows PDF i en modal + skicka för signering härifrån
   const [showPdf, setShowPdf] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  // Rabatt på utkastet: kan inte skickas förrän den är godkänd (api/oneflow/draft.ts spärrar också)
+  const rabatt = useDokumentRabatt(offer?.status === 'draft' ? offer.id : null)
   const conversationEndRef = useRef<HTMLDivElement>(null)
 
   // Intern chatt (realtid via befintlig hook)
@@ -232,6 +236,10 @@ export default function DocumentDetailPanel({
   const handlePublishDraft = useCallback(async () => {
     if (!offer || publishing) return
     const vad = offer.type === 'offer' ? 'offerten' : 'avtalet'
+    if (rabatt.blocked) {
+      toast.error(`Rabatten väntar på godkännande. ${offer.type === 'offer' ? 'Offerten' : 'Avtalet'} kan inte skickas än.`)
+      return
+    }
     if (!window.confirm(`Skicka ${vad} till ${offer.contact_email || 'kunden'} från info@begone.se?`)) return
     setPublishing(true)
     try {
@@ -244,7 +252,7 @@ export default function DocumentDetailPanel({
     } finally {
       setPublishing(false)
     }
-  }, [offer, publishing, onChanged])
+  }, [offer, publishing, onChanged, rabatt.blocked])
 
   if (!offer) {
     return (
@@ -538,13 +546,20 @@ export default function DocumentDetailPanel({
         </div>
       )}
 
+      {isDraft && rabatt.lines.length > 0 && (
+        <div className="px-3 py-2 border-t border-slate-800">
+          <DokumentRabattRuta contractId={offer.id} documentType={offer.type} lage={rabatt} onChanged={onChanged} />
+        </div>
+      )}
+
       {/* ── Åtgärdsfot ── */}
       <div className="flex items-center gap-2 px-3 py-2 border-t border-slate-800 bg-slate-900/60 relative">
         {isDraft ? (
           <>
             <button
               onClick={handlePublishDraft}
-              disabled={publishing}
+              disabled={publishing || rabatt.blocked}
+              title={rabatt.blocked ? 'Rabatten väntar på godkännande' : undefined}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#20c58f] hover:bg-[#1aaa7a] text-[#fff] rounded-lg transition-colors disabled:opacity-50"
             >
               {publishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
@@ -674,9 +689,15 @@ export default function DocumentDetailPanel({
               >
                 Stäng
               </button>
+              {rabatt.blocked && (
+                <span className="mr-auto flex items-center gap-1.5 text-xs text-slate-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  Rabatten väntar på godkännande
+                </span>
+              )}
               <button
                 onClick={handlePublishDraft}
-                disabled={publishing}
+                disabled={publishing || rabatt.blocked}
                 className="min-h-[44px] flex items-center gap-2 px-4 text-sm font-semibold bg-[#20c58f] hover:bg-[#1aaa7a] text-[#fff] rounded-lg transition-colors disabled:opacity-50"
               >
                 {publishing && <Loader2 className="w-4 h-4 animate-spin" />}

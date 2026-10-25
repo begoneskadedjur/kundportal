@@ -53,6 +53,16 @@ describe('fakturarader för en avtalsperiod', () => {
     expect(invoiceTotals(rows)).toEqual({ subtotal: 6000, vat: 1500, total: 7500 })
   })
 
+  it('rabatt på avtalsraden dras inte en gång till på årspremien', () => {
+    // Premien 6 000 kr är redan priset efter rabatt (Oneflow-beloppet är netto)
+    const rows = buildContractInvoiceRows(
+      'c1',
+      { premiumItems: [item('r1', { is_premium_carrier: true, unit_price: 6666.67, discount_percent: 10 })], equipment: [], additionNotes: [], label: 'Mekaniska fällor', diaryNumber: null },
+      period
+    )
+    expect(rows[0]).toMatchObject({ unit_price: 6000, total_price: 6000, discount_percent: 0 })
+  })
+
   it('andel 0 blir textrad som ingår', () => {
     const rows = buildContractInvoiceRows(
       'c1',

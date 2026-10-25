@@ -543,6 +543,11 @@ const KOPIERA_INTE = new Set([
   'billing_start_date', 'covered_by_contract', 'is_addon_station_line', 'is_addon_prorata_line',
   'is_addon_labour_line', 'addon_labour_hours', 'addon_labour_hours_before', 'addon_annual_unit_price', 'addon_model',
   'station_type_id',
+  // Rabattens godkännande ägs av triggern trg_cbi_discount_approval: den nya
+  // raden ärver godkännandet via discount_source_item_id när källan är
+  // godkänd med samma procent, annars väntar rabatten på godkännande igen
+  'requires_approval', 'discount_approved_by', 'discount_approved_by_name', 'discount_approved_at',
+  'discount_rejected_reason', 'discount_rejected_by_name', 'discount_rejected_at', 'discount_source_item_id',
   // Relationer om raden lästs med join
   'article', 'service',
 ])
@@ -587,6 +592,8 @@ export async function flyttaOffertRader(
     ny.status = 'pending'
     ny.customer_id = nytt.tabell === 'cases' ? nytt.customerId : (str(r.rad.customer_id) ?? null)
     ny.notes = str(r.rad.notes)
+    // Rabatten följer med, liksom dess godkännande (se KOPIERA_INTE)
+    if (Number(r.rad.discount_percent ?? 0) > 0) ny.discount_source_item_id = r.id
     if (r.itemType === 'article') {
       const m = str(r.rad.mapped_service_id)
       ny.mapped_service_id = m ? idMap.get(m) ?? null : null

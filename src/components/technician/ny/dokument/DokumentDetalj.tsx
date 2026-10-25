@@ -21,6 +21,8 @@ import Modal from '../../../ui/Modal'
 import OneflowPdfFrame from '../../../shared/OneflowPdfFrame'
 import { OfferFollowUpService, type FollowUpOffer } from '../../../../services/offerFollowUpService'
 import { OneflowDraftService } from '../../../../services/oneflowDraftService'
+import { DokumentRabattRuta } from '../../../shared/DokumentRabatt'
+import { useDokumentRabatt } from '../../../../hooks/useDokumentRabatt'
 import { useCaseComments } from '../../../../hooks/useCaseComments'
 import type { ArendeRef } from '../OppnaArende'
 import {
@@ -86,6 +88,8 @@ export const DokumentDetalj = forwardRef<DokumentDetaljRef, Props>(function Doku
   const [visaPdf, setVisaPdf] = useState(false)
   const [publicerar, setPublicerar] = useState(false)
   const [stationer, setStationer] = useState(false)
+  // Rabatt på utkastet: kan inte skickas förrän den är godkänd (api/oneflow/draft.ts spärrar också)
+  const rabatt = useDokumentRabatt(o.status === 'draft' ? o.id : null)
   const menyRef = useRef<HTMLDivElement>(null)
 
   const { comments: interna, addComment, isLoading: internaLaddar } = useCaseComments({
@@ -208,6 +212,10 @@ export const DokumentDetalj = forwardRef<DokumentDetaljRef, Props>(function Doku
   const publicera = useCallback(async () => {
     if (publicerar) return
     const vad = o.type === 'offer' ? 'offerten' : 'avtalet'
+    if (rabatt.blocked) {
+      toast.error(`Rabatten väntar på godkännande. ${o.type === 'offer' ? 'Offerten' : 'Avtalet'} kan inte skickas än.`)
+      return
+    }
     if (!window.confirm(`Skicka ${vad} till ${o.contact_email || 'kunden'} från info@begone.se?`)) return
     setPublicerar(true)
     try {
@@ -220,7 +228,7 @@ export const DokumentDetalj = forwardRef<DokumentDetaljRef, Props>(function Doku
     } finally {
       setPublicerar(false)
     }
-  }, [o, publicerar, onAndrat])
+  }, [o, publicerar, onAndrat, rabatt.blocked])
 
   // ─── Härledda värden ───
   const namn = o.company_name || o.contact_person || 'Namnlös'
@@ -377,6 +385,9 @@ export const DokumentDetalj = forwardRef<DokumentDetaljRef, Props>(function Doku
         )}
         {!arDator && samtalRad && <p className="text-sm text-slate-400">{samtalRad}</p>}
       </div>
+      {utkastDok && rabatt.lines.length > 0 && (
+        <DokumentRabattRuta contractId={o.id} documentType={o.type} lage={rabatt} onChanged={onAndrat} />
+      )}
       {panel === 'forlang' && (
         <ForlangPaminn offer={o} userId={userId} userName={userName} onStang={() => setPanel(null)} onKlart={() => { setPanel(null); onAndrat() }} />
       )}
@@ -535,9 +546,15 @@ export const DokumentDetalj = forwardRef<DokumentDetaljRef, Props>(function Doku
           size="xl"
           mobilHelskarm
           footer={
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {rabatt.blocked && (
+                <span className="mr-auto flex items-center gap-1.5 text-sm text-slate-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  Rabatten väntar på godkännande
+                </span>
+              )}
               <button type="button" onClick={() => setVisaPdf(false)} className={`${KNAPP_SEKUNDAR} h-11`}>Stäng</button>
-              <button type="button" onClick={publicera} disabled={publicerar} className={`${KNAPP_PRIMAR} h-11 disabled:opacity-60`}>
+              <button type="button" onClick={publicera} disabled={publicerar || rabatt.blocked} className={`${KNAPP_PRIMAR} h-11 disabled:opacity-60`}>
                 {publicerar ? <Icon name="allman.laddar" size={20} className="animate-spin" /> : <Icon name="rapport.skicka" size={20} />}
                 {o.type === 'offer' ? 'Skicka offerten' : 'Skicka för signering'}
               </button>

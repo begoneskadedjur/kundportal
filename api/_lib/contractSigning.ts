@@ -448,6 +448,7 @@ export async function processSignedContract(
         total_price: num(r.total_price),
         is_premium_carrier: !!r.is_premium_carrier,
         premium_share: num(r.premium_share),
+        discount_percent: num(r.discount_percent),
       })) as PremiumRow[],
       annualNow
     )

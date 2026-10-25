@@ -125,6 +125,19 @@ export interface CaseBillingItem {
    * fakturan lägger raden direkt efter tjänsteraden. Null = vanlig rad.
    */
   labor_for_item_id?: string | null
+  /**
+   * Rabattgodkännande (3.97.0). Sätts bara av RPC:erna approve_billing_discounts /
+   * reject_billing_discounts; triggern trg_cbi_discount_approval äger
+   * requires_approval och nollar fälten när discount_percent ändras.
+   */
+  discount_approved_by?: string | null
+  discount_approved_by_name?: string | null
+  discount_approved_at?: string | null
+  discount_rejected_reason?: string | null
+  discount_rejected_by_name?: string | null
+  discount_rejected_at?: string | null
+  /** Raden rabatten kopierades från: godkännandet ärvs om källan är godkänd med samma procent */
+  discount_source_item_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -186,6 +199,8 @@ export interface AddCaseServiceInput {
   labor_for_item_id?: string | null
   rot_rut_type?: RotRutType | null
   fastighetsbeteckning?: string | null
+  /** Motivering till rabatten (krävs när discount_percent > 0) */
+  discount_motivation?: string | null
 }
 
 /**
@@ -328,10 +343,62 @@ export const formatPriceSource = (source: PriceSource): string => {
 }
 
 /**
- * Avgör om en item kräver godkännande
+ * Avgör om en item kräver godkännande. OBS: i databasen äger triggern
+ * trg_cbi_discount_approval requires_approval; värdet klienten skickar
+ * ignoreras. Funktionen används för utkast som ännu inte sparats.
  */
 export const itemRequiresApproval = (discountPercent: number): boolean => {
   return discountPercent > 0
+}
+
+/**
+ * Tjänsterad som kan få rabatt i prisguiden. Avtalstillägg är aldrig rabatt,
+ * tilläggsstationsrader styrs av stationerna och ROT/RUT-arbetsrader följer
+ * sin tjänsterads procent.
+ */
+export function isDiscountableServiceRow(item: Pick<CaseBillingItem,
+  'item_type' | 'contract_addition_annual' | 'is_addon_station_line' | 'labor_for_item_id' | 'covered_by_contract'
+>): boolean {
+  return item.item_type === 'service'
+    && item.contract_addition_annual == null
+    && !item.is_addon_station_line
+    && !item.labor_for_item_id
+    && !item.covered_by_contract
+}
+
+/** Rabattens läge på en rad, för statusraden i prisguiden och raden */
+export type DiscountApprovalState =
+  | { kind: 'none' }
+  | { kind: 'pending' }
+  | { kind: 'approved'; byName: string | null; at: string | null }
+  | { kind: 'rejected'; reason: string; byName: string | null }
+
+export function discountApprovalState(item: Pick<CaseBillingItem,
+  'discount_percent' | 'contract_addition_annual' | 'requires_approval' |
+  'discount_approved_by_name' | 'discount_approved_at' | 'discount_rejected_reason' | 'discount_rejected_by_name'
+>): DiscountApprovalState {
+  if (!(Number(item.discount_percent) > 0) || item.contract_addition_annual != null) return { kind: 'none' }
+  if (!item.requires_approval) {
+    return { kind: 'approved', byName: item.discount_approved_by_name ?? null, at: item.discount_approved_at ?? null }
+  }
+  if (item.discount_rejected_reason) {
+    return { kind: 'rejected', reason: item.discount_rejected_reason, byName: item.discount_rejected_by_name ?? null }
+  }
+  return { kind: 'pending' }
+}
+
+/** Text till statusraden: Väntar på godkännande / Godkänd av N, ÅÅÅÅ-MM-DD / Avslagen: anledning */
+export function discountApprovalText(state: DiscountApprovalState): string {
+  switch (state.kind) {
+    case 'pending': return 'Väntar på godkännande'
+    case 'approved': {
+      const datum = state.at ? new Date(state.at).toLocaleDateString('sv-SE') : null
+      if (!state.byName) return datum ? `Godkänd ${datum}` : 'Godkänd'
+      return datum ? `Godkänd av ${state.byName}, ${datum}` : `Godkänd av ${state.byName}`
+    }
+    case 'rejected': return `Avslagen: ${state.reason}`
+    default: return ''
+  }
 }
 
 /**

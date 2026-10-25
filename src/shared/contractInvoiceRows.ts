@@ -143,7 +143,11 @@ export function buildContractInvoiceRows(contractId: string, sources: ContractRo
         unit_price: unit,
         total_price: total,
         vat_rate: it.vat_rate,
-        discount_percent: it.discount_percent,
+        // Premien ur § 6 är redan priset efter avtalets rabatt (Oneflow-beloppet
+        // är netto, contracts.annual_value). À-priset ovan är alltså nettot och
+        // raden får ingen rabatt till: med radens procent här drog Fortnox
+        // (Price × antal × (1 − Discount)) rabatten en gång till varje år.
+        discount_percent: 0,
         rot_rut_type: it.rot_rut_type,
         fastighetsbeteckning: it.fastighetsbeteckning,
       })

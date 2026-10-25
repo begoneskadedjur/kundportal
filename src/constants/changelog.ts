@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.97.0',
+    date: '2026-10-25',
+    title: 'Rabatt i prisguiden med godkännande',
+    items: [
+      { kind: 'nyhet', text: 'Rabatt ges i procent per tjänst i prisguiden, direkt under Totalt på denna rad. Du ser listpris, rabatt i kronor och pris efter rabatt, och en motivering krävs innan priserna kan appliceras.' },
+      { kind: 'nyhet', text: 'Varje rabatt godkänns av en rabattansvarig, som får en notis med länk. En offert eller ett avtal med rabatt kan inte skickas till kunden förrän rabatten är godkänd. Kunden ser listpris, rabatt i procent och pris efter rabatt i Oneflow, och på ett avtal gäller rabatten varje årspremie.' },
+      { kind: 'andring', text: 'Prisrutan på tjänsteraden varnar när priset sätts under listpriset: ge rabatten i prisguiden i stället så att den godkänns. Godkännanden har fått fliken Offerter och avtal.' },
+      { kind: 'buggfix', text: 'En godkänd rabatt behöver inte godkännas igen när fakturan skapas om, och rabatten dras inte två gånger på avtalets årspremiefaktura.' },
+    ],
+  },
+  {
     version: '3.96.1',
     date: '2026-10-24',
     title: 'Krysset i Placera station stänger bara rutan',

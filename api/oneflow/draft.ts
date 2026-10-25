@@ -6,6 +6,7 @@
 //
 //   GET  ?oneflowContractId=…                 → utkastets PDF (application/pdf, inline)
 //   POST { action: 'publish', oneflowContractId } → skicka för signering, contracts.status = 'pending'
+//        409 'Rabatten väntar på godkännande' när en rabattrad inte är godkänd
 //   POST { action: 'delete',  oneflowContractId } → ta bort utkastet i Oneflow + contracts-raden
 //
 // Alla Oneflow-anrop görs som info@begone.se (en licens). Endast utkast (state
@@ -143,6 +144,24 @@ async function skickaPdf(oneflowContractId: string, res: VercelResponse) {
   return res.status(200).send(buffer)
 }
 
+/** Väntar någon rabatt på dokumentet på godkännande? Avtalstillägg är aldrig rabatt. */
+async function rabattVantar(contractId: string): Promise<{ vantar: boolean; fel: boolean }> {
+  const { count, error } = await supabaseAdmin()
+    .from('case_billing_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('case_id', contractId)
+    .eq('case_type', 'contract')
+    .eq('requires_approval', true)
+    .gt('discount_percent', 0)
+    .is('contract_addition_annual', null)
+    .neq('status', 'cancelled')
+  if (error) {
+    console.error('[oneflow/draft] Rabattkontrollen misslyckades:', error.code, error.message)
+    return { vantar: false, fel: true }
+  }
+  return { vantar: (count ?? 0) > 0, fel: false }
+}
+
 /**
  * Skickar utkastet för signering. Samma publish-anrop och meddelande som
  * create-contract gör när ett dokument skickas direkt. Webhooken contract:publish
@@ -151,6 +170,16 @@ async function skickaPdf(oneflowContractId: string, res: VercelResponse) {
 async function publicera(row: ContractRow, res: VercelResponse) {
   if (row.status !== 'draft') {
     return res.status(409).json({ message: 'Dokumentet är redan skickat' })
+  }
+
+  // Rabattspärren (3.97.0): en offert eller ett avtal med rabatt skickas inte
+  // till kunden förrän rabattansvarig har godkänt den. Raderna som
+  // create-contract sparade har case_type 'contract' och case_id = contracts.id;
+  // triggern trg_cbi_discount_approval håller requires_approval.
+  const sparr = await rabattVantar(row.id)
+  if (sparr.fel) return res.status(500).json({ message: 'Kunde inte kontrollera rabatten' })
+  if (sparr.vantar) {
+    return res.status(409).json({ message: 'Rabatten väntar på godkännande', code: 'discount_pending' })
   }
 
   const kontrakt = await hamtaOneflowKontrakt(row.oneflow_contract_id)

@@ -80,8 +80,17 @@ interface ContractRequestBody {
     rot_rut_type?: 'ROT' | 'RUT' | null
     fastighetsbeteckning?: string | null
     mapped_service_id?: string | null
+    /** Motivering till rabatten (krävs när discount_percent > 0) */
+    discount_motivation?: string | null
+    /** Ärendets rad rabatten kommer från: godkännandet ärvs om den är godkänd med samma procent */
+    discount_source_item_id?: string | null
   }>
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const kronor = (n: number) => `${Math.round(n).toLocaleString('sv-SE')} kr`
+const procentText = (n: number) => n.toLocaleString('sv-SE', { maximumFractionDigits: 2 })
 
 // FÄLTMAPPNING FÖR OLIKA DOKUMENTTYPER
 const FIELD_MAPPING = {
@@ -160,20 +169,31 @@ function buildDataFieldsForDocument(
 
 
 // KONVERTERA PRODUKTER TILL ONEFLOW-FORMAT
+//
+// Rabatt (3.97.0): base_amount är listpriset per enhet och rabatten skickas som
+// discount_percent (sträng, högst tre decimaler). Oneflow räknar själv
+// amount = base_amount × (1 − discount_percent / 100) och visar listpris och
+// rabatt i produkttabellen. discount_percent och discount_amount är ömsesidigt
+// uteslutande i API:t, så discount_amount skickas inte när procenten används.
+// Källa: https://developer.oneflow.com/docs/product (Price: base_amount,
+// discount_percent, discount_amount, amount) och verifierat med GET
+// /v1/contracts/{id} där product_groups[].products[].price_1 har just de fälten.
+// Beskrivningen får dessutom "Listpris X kr, rabatt Y %, pris efter rabatt Z kr"
+// så att kunden ser det i PDF:en oavsett hur mallen visar kolumnerna.
+type OneflowPrice = {
+  base_amount: { amount: string }
+  discount_amount?: { amount: string }
+  discount_percent?: string
+}
+
 function convertProductsToOneflow(
   selectedProducts: ContractRequestBody['selectedProducts'],
   partyType: 'company' | 'individual'
 ): Array<{
   name: string
   description: string
-  price_1: {
-    base_amount: { amount: string }
-    discount_amount: { amount: string }
-  } | null
-  price_2: {
-    base_amount: { amount: string }
-    discount_amount: { amount: string }
-  } | null
+  price_1: OneflowPrice | null
+  price_2: OneflowPrice | null
   quantity: {
     type: string
     amount: number
@@ -220,32 +240,31 @@ function convertProductsToOneflow(
         pricing = product.pricing[partyType]
       }
       
-      let basePrice = customPrice || pricing?.basePrice || 0
-      let discountAmount = 0
-      
-      const originalPrice = basePrice
+      // Listpris per enhet (exkl. moms). Avrundat till hela kronor som tidigare:
+      // mallarna har price_precision 0.
+      const listPrice = Math.round(customPrice || pricing?.basePrice || 0)
+      const rawPercent = !customPrice ? Number(pricing?.discountPercent ?? 0) : 0
+      const discountPercent = Number.isFinite(rawPercent) && rawPercent > 0
+        ? Math.min(100, Math.round(rawPercent * 1000) / 1000)
+        : 0
 
-      // Beräkna rabatt om tillgänglig
-      if (pricing?.discountPercent && !customPrice) {
-        discountAmount = basePrice * (pricing.discountPercent / 100)
-        basePrice = basePrice - discountAmount
+      const price: OneflowPrice = discountPercent > 0
+        ? { base_amount: { amount: listPrice.toString() }, discount_percent: discountPercent.toString() }
+        : { base_amount: { amount: listPrice.toString() }, discount_amount: { amount: '0' } }
+
+      let description: string = product.description
+      if (discountPercent > 0) {
+        const qty = Number(quantity) > 0 ? Number(quantity) : 1
+        const efter = listPrice * qty * (1 - discountPercent / 100)
+        const rad = `Listpris ${kronor(listPrice * qty)}, rabatt ${procentText(discountPercent)} %, pris efter rabatt ${kronor(efter)}`
+        description = description ? `${description}. ${rad}` : rad
       }
-
-      const basePriceString = Math.round(originalPrice).toString()
-      const finalPriceString = Math.round(basePrice).toString()
-      const discountAmountString = discountAmount > 0 ? Math.round(discountAmount).toString() : "0"
 
       return {
         name: product.name,
-        description: product.description,
-        price_1: {
-          base_amount: { amount: basePriceString },
-          discount_amount: { amount: discountAmountString }
-        },
-        price_2: {
-          base_amount: { amount: basePriceString },
-          discount_amount: { amount: discountAmountString }
-        },
+        description,
+        price_1: price,
+        price_2: { ...price },
         quantity: {
           type: oneflowQuantityType,
           amount: quantity
@@ -331,7 +350,7 @@ export default async function handler(
   } = req.body as ContractRequestBody
 
   // Validera användaren
-  let validatedUser
+  let validatedUser: Awaited<ReturnType<typeof validateUserPermissions>> | undefined
   try {
     if (senderEmail) {
       validatedUser = await validateUserPermissions(senderEmail)
@@ -342,6 +361,38 @@ export default async function handler(
       error: 'Obehörig', 
       message: validationError.message 
     })
+  }
+
+  // Rabattspärren (3.97.0): ett dokument med rabatt får inte skickas till kunden
+  // förrän rabatten är godkänd. Wizarden skapar alltid utkast (sendForSigning
+  // false) och publicerar via api/oneflow/draft.ts, som spärrar på contracts-
+  // radernas requires_approval. Skickas dokumentet direkt måste varje rabattrad
+  // komma från en redan godkänd rad (discount_source_item_id, samma procent).
+  if (sendForSigning && Array.isArray(draftItems)) {
+    const rabattRader = draftItems.filter(i => i && i.item_type === 'service' && Number(i.discount_percent ?? 0) > 0)
+    if (rabattRader.length > 0) {
+      const kallor = rabattRader
+        .map(i => i.discount_source_item_id)
+        .filter((id): id is string => typeof id === 'string' && UUID_RE.test(id))
+      const godkanda = new Map<string, number>()
+      if (kallor.length > 0) {
+        const adminDb = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!)
+        const { data: kallRader } = await adminDb
+          .from('case_billing_items')
+          .select('id, discount_percent, requires_approval, discount_approved_at')
+          .in('id', kallor)
+        for (const r of kallRader ?? []) {
+          if (r.requires_approval === false && r.discount_approved_at) godkanda.set(String(r.id), Number(r.discount_percent))
+        }
+      }
+      const ejGodkand = rabattRader.some(i => {
+        const kalla = i.discount_source_item_id ? godkanda.get(i.discount_source_item_id) : undefined
+        return kalla === undefined || kalla !== Number(i.discount_percent)
+      })
+      if (ejGodkand) {
+        return res.status(409).json({ message: 'Rabatten väntar på godkännande', code: 'discount_pending' })
+      }
+    }
   }
 
   const giltigtLeadId = typeof leadId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId) ? leadId : null
@@ -699,7 +750,14 @@ export default async function handler(
           price_source: item.price_source || 'standard',
           customer_unit_price: item.item_type === 'article' ? (item.customer_unit_price ?? null) : null,
           status: 'pending',
-          requires_approval: false,
+          // requires_approval sätts av triggern trg_cbi_discount_approval: rabattrad
+          // = väntar, utom när discount_source_item_id pekar på en godkänd rad
+          // med samma procent (offert ur ett ärende med godkänd rabatt)
+          discount_motivation: Number(item.discount_percent ?? 0) > 0 ? (item.discount_motivation?.trim() || null) : null,
+          discount_source_item_id:
+            typeof item.discount_source_item_id === 'string' && UUID_RE.test(item.discount_source_item_id)
+              ? item.discount_source_item_id
+              : null,
           notes: item.notes || null,
           rot_rut_type: item.rot_rut_type || null,
           fastighetsbeteckning: item.fastighetsbeteckning || null,
@@ -724,7 +782,7 @@ export default async function handler(
           const { data: insertedServices, error: servicesError } = await supabase
             .from('case_billing_items')
             .insert(serviceRows)
-            .select('id, service_code, service_name')
+            .select('id, service_code, service_name, discount_percent, requires_approval')
 
           if (servicesError) {
             console.error('[persist] Insert av services misslyckades:', servicesError)
@@ -747,6 +805,42 @@ export default async function handler(
           }
 
           console.log(`[persist] Sparade ${serviceRows.length} tjänster`)
+
+          // Rabatt som väntar: notis till rabattansvariga med länk till dokumentet
+          // (case_type null + rubrikprefix, src/shared/dokumentNotis.ts)
+          const vantande = (insertedServices ?? []).filter(r => r.requires_approval && Number(r.discount_percent) > 0)
+          if (vantande.length > 0) {
+            try {
+              const { data: ansvariga } = await supabase
+                .from('profiles')
+                .select('user_id')
+                .eq('can_approve_discounts', true)
+              const mottagare = (ansvariga ?? []).map(p => p.user_id as string | null).filter((id): id is string => !!id)
+              if (mottagare.length > 0) {
+                const dokument = documentType === 'offer' ? 'offert' : 'avtal'
+                const kund = recipient.company_name || recipient.name || 'kunden'
+                const rader = vantande
+                  .map(r => `${r.service_name || 'Tjänst'} ${procentText(Number(r.discount_percent))} %`)
+                  .join(', ')
+                const { error: notisError } = await supabase.from('notifications').insert(
+                  mottagare.map(recipient_id => ({
+                    recipient_id,
+                    case_id: contractRow.id,
+                    case_type: null,
+                    title: `Rabatt att godkänna: ${dokument}, ${kund}`,
+                    preview: `${creatorName} har gett rabatt på ${rader}. ${documentType === 'offer' ? 'Offerten' : 'Avtalet'} kan inte skickas förrän rabatten är godkänd.`,
+                    case_title: kund,
+                    sender_id: validatedUser?.profile?.id ?? null,
+                    sender_name: creatorName,
+                    is_read: false,
+                  }))
+                )
+                if (notisError) console.error('[persist] Rabattnotisen kunde inte skapas:', notisError.code, notisError.message)
+              }
+            } catch (notisErr) {
+              console.error('[persist] Rabattnotisen kunde inte skapas:', notisErr)
+            }
+          }
         }
 
         // Steg 2: insert artiklar med mappad mapped_service_id

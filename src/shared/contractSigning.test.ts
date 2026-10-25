@@ -53,6 +53,16 @@ describe('rättning av premierader', () => {
     expect(r.before).toBe(6000)
     expect(r.updates).toEqual([{ id: 'a', total_price: 7500, unit_price: 7500 }])
   })
+  it('rabatterad rad: summan efter rabatt är premien, ingen rättning', () => {
+    // Listpris 10 000 kr, 10 % rabatt: Oneflow-beloppet (netto) är 9 000 kr
+    const r = correctPremiumRows([{ id: 'a', quantity: 1, unit_price: 10000, total_price: 9000, discount_percent: 10, is_premium_carrier: true }], 9000)
+    expect(r.deviated).toBe(false)
+    expect(r.updates).toEqual([])
+  })
+  it('rabatterad rad som avviker: à-priset blir listpris så att rabatten inte dras två gånger', () => {
+    const r = correctPremiumRows([{ id: 'a', quantity: 1, unit_price: 10000, total_price: 9000, discount_percent: 10, is_premium_carrier: true }], 9900)
+    expect(r.updates).toEqual([{ id: 'a', total_price: 9900, unit_price: 11000 }])
+  })
   it('flera rader skalas proportionellt och övriga får andel', () => {
     const r = correctPremiumRows(
       [

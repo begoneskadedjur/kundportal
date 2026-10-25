@@ -16,6 +16,9 @@ export interface PrefillService {
   vat_rate?: number
   rot_rut_type?: 'ROT' | 'RUT' | null
   fastighetsbeteckning?: string | null
+  /** Rabatt i procent på listpriset (unit_price); total_price är priset efter rabatt */
+  discount_percent?: number | null
+  discount_motivation?: string | null
   service?: {
     rot_rate_percent?: number | null
     rut_rate_percent?: number | null
@@ -40,6 +43,8 @@ export function mapBillingItemsToPrefillServices(
       vat_rate: item.vat_rate,
       rot_rut_type: item.rot_rut_type,
       fastighetsbeteckning: item.fastighetsbeteckning ?? null,
+      discount_percent: Number(item.discount_percent || 0),
+      discount_motivation: item.discount_motivation ?? null,
       service: item.service
         ? {
             rot_rate_percent: item.service.rot_rate_percent ?? null,

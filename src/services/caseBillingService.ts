@@ -363,7 +363,8 @@ export class CaseBillingService {
         discount_percent: discountPercent,
         discounted_price: discountedPrice,
         total_price: totalPrice,
-        requires_approval: itemRequiresApproval(discountPercent),
+        // requires_approval sätts inte här: triggern trg_cbi_discount_approval
+        // äger den och börjar om godkännandet bara när procenten ändras
         notes: input.notes !== undefined ? input.notes : existing.notes,
         rot_rut_type: input.rot_rut_type !== undefined ? input.rot_rut_type : existing.rot_rut_type,
         fastighetsbeteckning: input.fastighetsbeteckning !== undefined ? input.fastighetsbeteckning : existing.fastighetsbeteckning,
@@ -459,6 +460,7 @@ export class CaseBillingService {
         labor_for_item_id: input.labor_for_item_id ?? null,
         rot_rut_type: input.rot_rut_type ?? null,
         fastighetsbeteckning: input.fastighetsbeteckning ?? null,
+        discount_motivation: discountPercent > 0 ? (input.discount_motivation?.trim() || null) : null,
       })
       .select()
       .single()
@@ -853,22 +855,28 @@ export class CaseBillingService {
   }
 
   /**
-   * Godkänn rabatt för en item
+   * Godkänn rabatterna på raderna (kräver can_approve_discounts). Går via
+   * RPC:n approve_billing_discounts: triggern släpper aldrig requires_approval
+   * för en vanlig update. ROT/RUT-arbetsrader med samma procent följer med.
    */
-  static async approveDiscount(id: string): Promise<CaseBillingItem> {
-    const { data, error } = await supabase
-      .from('case_billing_items')
-      .update({
-        requires_approval: false,
-        status: 'approved',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select()
-      .single()
+  static async approveDiscounts(ids: string[]): Promise<number> {
+    if (ids.length === 0) return 0
+    const { data, error } = await supabase.rpc('approve_billing_discounts', { p_item_ids: ids })
+    if (error) throw new Error(error.message)
+    return Number(data ?? 0)
+  }
 
-    if (error) throw new Error(`Databasfel: ${error.message}`)
-    return data
+  /** Avslå rabatterna med anledning. Raderna väntar kvar tills rabatten ändras. */
+  static async rejectDiscounts(ids: string[], reason: string): Promise<number> {
+    if (ids.length === 0) return 0
+    const { data, error } = await supabase.rpc('reject_billing_discounts', { p_item_ids: ids, p_reason: reason })
+    if (error) throw new Error(error.message)
+    return Number(data ?? 0)
+  }
+
+  /** Godkänn rabatt för en item */
+  static async approveDiscount(id: string): Promise<void> {
+    await this.approveDiscounts([id])
   }
 
   /**

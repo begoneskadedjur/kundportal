@@ -7,8 +7,83 @@
 
 import { supabase } from '../lib/supabase'
 import { InvoiceService } from './invoiceService'
+import { CaseBillingService } from './caseBillingService'
 import { DiscountNotificationService } from './discountNotificationService'
 import type { Invoice } from '../types/invoice'
+import type { DiscountApprovalState } from '../types/caseBilling'
+import { discountApprovalState } from '../types/caseBilling'
+
+/** Rabattrad på en offert eller ett avtal (case_billing_items, case_type 'contract', case_id = contracts.id) */
+export interface DocumentDiscountLine {
+  id: string
+  name: string
+  quantity: number
+  /** Listpris per enhet exkl. moms */
+  unitPrice: number
+  discountPercent: number
+  /** Pris efter rabatt för raden exkl. moms */
+  totalPrice: number
+  motivation: string | null
+  state: DiscountApprovalState
+}
+
+/** Utkast (offert eller avtal) med rabatt som väntar på godkännande */
+export interface DocumentApprovalItem {
+  contractId: string
+  oneflowContractId: string | null
+  type: 'offer' | 'contract'
+  status: string | null
+  customerName: string | null
+  createdByName: string | null
+  createdByEmail: string | null
+  createdAt: string | null
+  lines: DocumentDiscountLine[]
+}
+
+type DocumentRow = {
+  id: string
+  oneflow_contract_id: string | null
+  type: string | null
+  status: string | null
+  company_name: string | null
+  contact_person: string | null
+  created_by_name: string | null
+  created_by_email: string | null
+  begone_employee_name: string | null
+  begone_employee_email: string | null
+  created_at: string | null
+}
+
+const DOCUMENT_LINE_FIELDS = 'id, case_id, item_type, service_name, article_name, quantity, unit_price, discount_percent, total_price, discount_motivation, contract_addition_annual, requires_approval, discount_approved_by_name, discount_approved_at, discount_rejected_reason, discount_rejected_by_name, labor_for_item_id, status'
+
+function toDocumentLine(r: Record<string, unknown>): DocumentDiscountLine {
+  return {
+    id: String(r.id),
+    name: String(r.service_name || r.article_name || 'Tjänst'),
+    quantity: Number(r.quantity ?? 1),
+    unitPrice: Number(r.unit_price ?? 0),
+    discountPercent: Number(r.discount_percent ?? 0),
+    totalPrice: Number(r.total_price ?? 0),
+    motivation: (r.discount_motivation as string | null) ?? null,
+    state: discountApprovalState(r as never),
+  }
+}
+
+function toDocumentItem(c: DocumentRow, lines: DocumentDiscountLine[]): DocumentApprovalItem {
+  return {
+    contractId: c.id,
+    oneflowContractId: c.oneflow_contract_id,
+    type: c.type === 'offer' ? 'offer' : 'contract',
+    status: c.status,
+    customerName: c.company_name || c.contact_person || null,
+    createdByName: c.begone_employee_name || c.created_by_name || null,
+    createdByEmail: c.begone_employee_email || c.created_by_email || null,
+    createdAt: c.created_at,
+    lines,
+  }
+}
+
+const DOCUMENT_FIELDS = 'id, oneflow_contract_id, type, status, company_name, contact_person, created_by_name, created_by_email, begone_employee_name, begone_employee_email, created_at'
 
 export interface DiscountLine {
   caseBillingItemId: string
@@ -181,6 +256,88 @@ export class DiscountApprovalService {
       .filter(item => item.discountLines.length > 0 || item.additions.length > 0)
   }
 
+  // === Offerter och avtal ===
+
+  /**
+   * Dokumentets rabattrader (tjänsterader med rabatt, avtalstillägg undantagna,
+   * ROT/RUT-arbetsrader följer sin tjänsterad och visas inte separat).
+   * Används av spärren vid Skicka och av Godkännanden.
+   */
+  static async getDocumentDiscountLines(contractId: string): Promise<DocumentDiscountLine[]> {
+    const { data, error } = await supabase
+      .from('case_billing_items')
+      .select(DOCUMENT_LINE_FIELDS)
+      .eq('case_id', contractId)
+      .eq('case_type', 'contract')
+      .eq('item_type', 'service')
+      .gt('discount_percent', 0)
+      .is('contract_addition_annual', null)
+      .neq('status', 'cancelled')
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    return (data || [])
+      .filter(r => !r.labor_for_item_id)
+      .map(r => toDocumentLine(r as Record<string, unknown>))
+  }
+
+  /** Utkast i contracts med minst en rabattrad som väntar på godkännande */
+  static async getPendingDocumentApprovals(): Promise<DocumentApprovalItem[]> {
+    const { data: rows, error } = await supabase
+      .from('case_billing_items')
+      .select(DOCUMENT_LINE_FIELDS)
+      .eq('case_type', 'contract')
+      .eq('item_type', 'service')
+      .eq('requires_approval', true)
+      .gt('discount_percent', 0)
+      .is('contract_addition_annual', null)
+      .neq('status', 'cancelled')
+    if (error) throw error
+    const pending = (rows || []).filter(r => !r.labor_for_item_id)
+    if (pending.length === 0) return []
+    const ids = [...new Set(pending.map(r => String(r.case_id)))]
+    const { data: docs, error: docError } = await supabase
+      .from('contracts')
+      .select(DOCUMENT_FIELDS)
+      .in('id', ids)
+      .eq('status', 'draft')
+      .order('created_at', { ascending: false })
+    if (docError) throw docError
+    return ((docs || []) as DocumentRow[]).map(c => toDocumentItem(
+      c,
+      pending.filter(r => r.case_id === c.id).map(r => toDocumentLine(r as Record<string, unknown>))
+    ))
+  }
+
+  /** Godkänn dokumentets väntande rabatter; den som skapade dokumentet notifieras */
+  static async approveDocument(contractId: string, approvedBy: string): Promise<void> {
+    const lines = await this.getDocumentDiscountLines(contractId)
+    const ids = lines.filter(l => l.state.kind !== 'approved').map(l => l.id)
+    await CaseBillingService.approveDiscounts(ids)
+    await this.notifyDocumentCreator(contractId, approvedBy, true)
+  }
+
+  /** Avslå dokumentets rabatter med anledning; dokumentet kan inte skickas förrän rabatten ändrats och godkänts */
+  static async rejectDocument(contractId: string, rejectedBy: string, reason: string): Promise<void> {
+    const lines = await this.getDocumentDiscountLines(contractId)
+    await CaseBillingService.rejectDiscounts(lines.map(l => l.id), reason)
+    await this.notifyDocumentCreator(contractId, rejectedBy, false, reason)
+  }
+
+  private static async notifyDocumentCreator(contractId: string, decidedBy: string, approved: boolean, reason?: string) {
+    const { data } = await supabase.from('contracts').select(DOCUMENT_FIELDS).eq('id', contractId).maybeSingle()
+    if (!data) return
+    const doc = toDocumentItem(data as DocumentRow, [])
+    await DiscountNotificationService.notifyDocumentDiscountDecision({
+      contractId,
+      creatorEmail: doc.createdByEmail,
+      documentLabel: doc.type === 'offer' ? 'Offerten' : 'Avtalet',
+      customerName: doc.customerName,
+      decidedBy,
+      approved,
+      reason: reason ?? null,
+    })
+  }
+
   /** Godkänn: faktura → ready (via approveInvoice så approved_by loggas),
    *  tekniker med rabattrader notifieras */
   static async approve(item: ApprovalItem, approvedById: string, approvedBy: string): Promise<void> {
@@ -202,6 +359,10 @@ export class DiscountApprovalService {
    * makulera osv.) och teknikern notifieras med anledningen.
    */
   static async reject(item: ApprovalItem, rejectedBy: string, reason: string): Promise<void> {
+    // Raderna får avslaget (statusraden visar "Avslagen: anledning")
+    if (item.discountLines.length > 0) {
+      await CaseBillingService.rejectDiscounts(item.discountLines.map(l => l.caseBillingItemId), reason)
+    }
     const caseType = (item.invoice.invoice_type === 'adhoc' ? 'contract' : item.invoice.case_type) || 'contract'
     for (const line of item.discountLines) {
       await DiscountNotificationService.notifyDiscountRejected({

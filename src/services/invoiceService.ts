@@ -746,6 +746,11 @@ export class InvoiceService {
     // Ingen faktura godkänns utan bekräftad fakturaväg (src/shared/invoiceDelivery.ts).
     // Kastar InvoiceDeliveryError med text till användaren.
     await InvoiceDeliveryService.assertInvoiceDeliverable(id)
+    // Fakturans rabatter godkänns på raderna först (kräver rabattansvarig när
+    // det finns väntande rabatt, annars inget). Utan detta stod raderna kvar
+    // med requires_approval och en omgenererad faktura blev pending igen.
+    const { error: discountError } = await supabase.rpc('approve_invoice_discounts', { p_invoice_id: id })
+    if (discountError) throw new Error(discountError.message)
     return this.updateInvoiceStatus(id, 'ready', {
       approved_by: approverId,
       approved_by_name: approverName

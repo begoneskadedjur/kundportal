@@ -24,6 +24,8 @@ import Modal from '../../ui/Modal'
 import OneflowPdfFrame from '../../shared/OneflowPdfFrame'
 import { OfferFollowUpService, type FollowUpOffer } from '../../../services/offerFollowUpService'
 import { OneflowDraftService } from '../../../services/oneflowDraftService'
+import { DokumentRabattRuta } from '../../shared/DokumentRabatt'
+import { useDokumentRabatt } from '../../../hooks/useDokumentRabatt'
 import { useCaseComments } from '../../../hooks/useCaseComments'
 import type { ArendeRef } from '../../technician/ny/OppnaArende'
 import { kr, svDatum, type Behorighet, type Bokning } from '../../technician/ny/dokument/dokumentData'
@@ -96,6 +98,8 @@ export const KontorDetalj = forwardRef<KontorDetaljRef, Props>(function KontorDe
   const [visaPdf, setVisaPdf] = useState(false)
   const [publicerar, setPublicerar] = useState(false)
   const menyRef = useRef<HTMLDivElement>(null)
+  // Rabatt på utkastet: kan inte skickas förrän den är godkänd (api/oneflow/draft.ts spärrar också)
+  const rabatt = useDokumentRabatt(o.status === 'draft' ? o.id : null)
 
   const { comments: interna, addComment, isLoading: internaLaddar, refresh: laddaOmInterna } = useCaseComments({
     caseId: o.id,
@@ -218,6 +222,10 @@ export const KontorDetalj = forwardRef<KontorDetaljRef, Props>(function KontorDe
   const publicera = useCallback(async () => {
     if (publicerar) return
     const vad = o.type === 'offer' ? 'offerten' : 'avtalet'
+    if (rabatt.blocked) {
+      toast.error(`Rabatten väntar på godkännande. ${o.type === 'offer' ? 'Offerten' : 'Avtalet'} kan inte skickas än.`)
+      return
+    }
     if (!window.confirm(`Skicka ${vad} till ${o.contact_email || 'kunden'} från info@begone.se?`)) return
     setPublicerar(true)
     try {
@@ -230,7 +238,7 @@ export const KontorDetalj = forwardRef<KontorDetaljRef, Props>(function KontorDe
     } finally {
       setPublicerar(false)
     }
-  }, [o, publicerar, onAndrat])
+  }, [o, publicerar, onAndrat, rabatt.blocked])
 
   /** Mejl och sms loggas som anteckning på dokumentet, samma text som schemats låda */
   const loggaAnnanKanal = useCallback(async (k: 'mejl' | 'sms', anteckning: string | null, ringAter: string | null) => {
@@ -432,6 +440,9 @@ export const KontorDetalj = forwardRef<KontorDetaljRef, Props>(function KontorDe
           <p className="text-[15px] leading-relaxed text-white"><strong className="font-semibold">Nästa steg:</strong> {steg.text}</p>
         )}
       </div>
+      {utkastDok && rabatt.lines.length > 0 && (
+        <DokumentRabattRuta contractId={o.id} documentType={o.type} lage={rabatt} onChanged={onAndrat} />
+      )}
       {arDator && primarKnapp && !(panel !== null && panel === steg.primar) && <div className="flex flex-wrap items-center gap-2">{primarKnapp}</div>}
       {panel === 'paminn' && (
         <PaminnTekniker offer={o} userId={userId} userName={userName} onStang={() => setPanel(null)} onKlart={() => { setPanel(null); laddaOmInterna(); onAndrat() }} />
@@ -554,12 +565,17 @@ export const KontorDetalj = forwardRef<KontorDetaljRef, Props>(function KontorDe
           size="xl"
           mobilHelskarm
           footer={
+            <div className="flex flex-col gap-2">
+              {rabatt.lines.length > 0 && (
+                <DokumentRabattRuta contractId={o.id} documentType={o.type} lage={rabatt} compact onChanged={onAndrat} />
+              )}
             <div className="flex items-center justify-end gap-2">
               <button type="button" onClick={() => setVisaPdf(false)} className={`${KNAPP_SEKUNDAR} h-11`}>Stäng</button>
-              <button type="button" onClick={publicera} disabled={publicerar} className={`${KNAPP_PRIMAR} h-11 disabled:opacity-60`}>
+              <button type="button" onClick={publicera} disabled={publicerar || rabatt.blocked} className={`${KNAPP_PRIMAR} h-11 disabled:opacity-60`}>
                 {publicerar ? <Icon name="allman.laddar" size={20} className="animate-spin" /> : <Icon name="rapport.skicka" size={20} />}
                 {o.type === 'offer' ? 'Skicka offerten' : 'Skicka för signering'}
               </button>
+            </div>
             </div>
           }
         >

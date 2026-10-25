@@ -132,6 +132,8 @@ export function convertServicesToOneflowProducts(
     quantity: number
     vat_rate?: number | null
     rot_rut_type?: 'ROT' | 'RUT' | null
+    /** Rabatt i procent ovanpå listpriset (unit_price). Oneflow visar listpris och rabatt. */
+    discount_percent?: number | null
     service?: { rot_rate_percent?: number | null; rut_rate_percent?: number | null } | null
   }>,
   _partyType: CustomerType
@@ -142,6 +144,9 @@ export function convertServicesToOneflowProducts(
     const description = s.description || name
     const taxDeduction: 'rot' | 'rut' | undefined =
       s.rot_rut_type === 'ROT' ? 'rot' : s.rot_rut_type === 'RUT' ? 'rut' : undefined
+    // unit_price är listpriset; rabatten skickas som procent (create-contract
+    // gör den till price_1.discount_percent i Oneflow)
+    const discountPercent = Number(s.discount_percent ?? 0) > 0 ? Number(s.discount_percent) : undefined
 
     return {
       product: {
@@ -152,12 +157,14 @@ export function convertServicesToOneflowProducts(
         pricing: {
           company: {
             basePrice: s.unit_price,
-            vatRate
+            vatRate,
+            discountPercent
           },
           // Priset i Oneflow är alltid exkl. moms, även för privatpersoner (2026-10-19)
           individual: {
             basePrice: s.unit_price,
-            taxDeduction
+            taxDeduction,
+            discountPercent
           }
         },
         quantityType: 'quantity' as const,

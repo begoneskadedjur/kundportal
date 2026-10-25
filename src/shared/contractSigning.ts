@@ -74,6 +74,8 @@ export interface PremiumRow {
   total_price: number | string | null
   is_premium_carrier?: boolean | null
   premium_share?: number | string | null
+  /** Radens rabatt: unit_price är listpriset, total_price priset efter rabatt */
+  discount_percent?: number | string | null
 }
 
 export interface PremiumRowUpdate {
@@ -137,8 +139,13 @@ export function correctPremiumRows(rows: PremiumRow[], premium: number): Premium
     const update: PremiumRowUpdate = { id: r.id }
     if (deviated && Math.abs(newTotals[i] - totals[i]) >= 0.005) {
       const qty = Number(r.quantity ?? 1) > 0 ? Number(r.quantity ?? 1) : 1
+      // Rabatten ligger kvar: total_price är premien efter rabatt (Oneflow-
+      // beloppet är netto), så à-priset räknas tillbaka till listpris.
+      // Annars drogs rabatten två gånger (à-pris netto × (1 − rabatt)).
+      const pct = Number(r.discount_percent ?? 0)
+      const factor = pct > 0 && pct < 100 ? 1 - pct / 100 : 1
       update.total_price = newTotals[i]
-      update.unit_price = round2(newTotals[i] / qty)
+      update.unit_price = round2(newTotals[i] / qty / factor)
     }
     // Andel på icke-bärande rader med pris men utan uttalad andel
     if (hasCarrier && !r.is_premium_carrier && newTotals[i] > 0 && !(Number(r.premium_share ?? 0) > 0)) {

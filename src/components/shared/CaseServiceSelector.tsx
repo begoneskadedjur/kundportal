@@ -28,8 +28,12 @@ import type {
 import {
   calculateDiscountedPrice,
   calculateTotalPrice,
-  itemRequiresApproval
+  discountApprovalState,
+  discountApprovalText,
+  isDiscountableServiceRow,
 } from '../../types/caseBilling'
+import { useAuth } from '../../contexts/AuthContext'
+import { DiscountNotificationService } from '../../services/discountNotificationService'
 import { getEffectiveRotPercent, getEffectiveRutPercent, calculateRotRutSummary } from '../../utils/rotRutConstants'
 import ContractAdditionModal from './ContractAdditionModal'
 import AddonBillingTimeline from './AddonBillingTimeline'
@@ -52,7 +56,7 @@ import { ARTICLE_CATEGORY_CONFIG } from '../../types/articles'
  * annars slår tier-priset för matchande min_qty.
  */
 type CustomerArticlePrice = { custom_price: number; quantity_tiers: QuantityTier[] | null }
-import PriceCalculatorPanel from './PriceCalculatorPanel'
+import PriceCalculatorPanel, { type PriceGuideDiscount } from './PriceCalculatorPanel'
 
 interface CaseServiceSelectorProps {
   caseId?: string
@@ -124,6 +128,7 @@ export default function CaseServiceSelector({
   initialPriceAssignments,
   initialPriceMarkups,
 }: CaseServiceSelectorProps) {
+  const { profile } = useAuth()
   // All data
   const [allItems, setAllItems] = useState<CaseBillingItemWithRelations[]>(
     () => (draftMode && initialDraftItems ? initialDraftItems : [])
@@ -175,6 +180,8 @@ export default function CaseServiceSelector({
   const [splitError, setSplitError] = useState<string | null>(null)
   // Fel vid en tjänsterads prisruta (t.ex. totalpris lägre än arbetskostnaden)
   const [rowPriceError, setRowPriceError] = useState<Record<string, string>>({})
+  // Varning vid prisrutan: priset sattes under listpriset (rabatt ska ges i prisguiden)
+  const [rowPriceWarning, setRowPriceWarning] = useState<Record<string, string>>({})
 
   // Inline price editing (service item id → input string)
   const [editingPrice, setEditingPrice] = useState<Record<string, string>>({})
@@ -461,6 +468,29 @@ export default function CaseServiceSelector({
       ))
       .map(si => si.id)
   )
+
+  /**
+   * Radens listpris totalt (exkl. moms) så som prisguiden räknar det: kundpris
+   * på mappade artiklar med avtalspris, inköp + påslag på övriga. Utan mappade
+   * artiklar: kundens fasta tjänstepris eller katalogens grundpris × antal.
+   * null = inget att jämföra mot.
+   */
+  const guideListTotal = (item: CaseBillingItemWithRelations): number | null => {
+    const mapped = articleItems.filter(a => (priceAssignments[a.id] || a.mapped_service_id) === item.id)
+    if (mapped.length > 0) {
+      const markup = priceMarkups[item.id] ?? pricingSettings.recommended_markup_percent
+      return mapped.reduce((sum, a) => {
+        if (a.customer_unit_price != null) return sum + a.customer_unit_price * a.quantity
+        const cost = (a.article?.default_price ?? a.unit_price) * a.quantity
+        return sum + cost * (1 + markup / 100)
+      }, 0)
+    }
+    if (!item.service_id) return null
+    const fixed = customerServicePrices[item.service_id]
+    if (fixed !== undefined) return fixed * item.quantity
+    const base = (item.service ?? addonServices.find(s => s.id === item.service_id))?.base_price
+    return base != null && base > 0 ? base * item.quantity : null
+  }
 
   const getMarginColor = () => {
     if (marginPercent === null) return 'text-slate-400'
@@ -781,6 +811,24 @@ export default function CaseServiceSelector({
       newPrice = unitForRowTotal(item, parsedExkl - laborTotal)
     }
     setRowPriceError(prev => { if (!(id in prev)) return prev; const n = { ...prev }; delete n[id]; return n })
+    // Priset får sättas fritt, men under listpriset är det en rabatt som ska
+    // ges i prisguiden (procent + motivering) så att den godkänns. Raden
+    // varnar, sätter inte requires_approval (triggern äger den).
+    const guideTotal = guideListTotal(item)
+    // Uppdelad rad: rutan bär totalen efter rabatt, räkna tillbaka till listpris
+    const discFactor = 1 - (item.discount_percent || 0) / 100
+    const enteredListTotal = laborChild
+      ? (discFactor > 0 ? parsedExkl / discFactor : parsedExkl)
+      : parsedExkl * item.quantity
+    setRowPriceWarning(prev => {
+      const n = { ...prev }
+      if (guideTotal != null && enteredListTotal + 0.5 < guideTotal) {
+        n[id] = 'Priset är under listpriset. Ge rabatt i prisguiden så att den godkänns.'
+      } else {
+        delete n[id]
+      }
+      return n
+    })
     const discounted = calculateDiscountedPrice(newPrice, item.discount_percent)
     const total = calculateTotalPrice(discounted, item.quantity)
     if (draftMode && !caseId) {
@@ -797,7 +845,6 @@ export default function CaseServiceSelector({
           unit_price: newPrice,
           discounted_price: discounted,
           total_price: total,
-          requires_approval: itemRequiresApproval(item.discount_percent),
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
@@ -852,10 +899,15 @@ export default function CaseServiceSelector({
    * inkl. moms på 3 h) blir summan à-pris × timmar och kan skilja någon öre
    * från inmatningen. Öret hamnar då på tjänstens materialdel, så totalen mot
    * kund är oförändrad, och Fortnox (antal × à-pris) får samma summa som vi.
+   *
+   * Rabatt (3.97.0): arbetsraden har samma procent som sin tjänsterad.
+   * laborExkl är arbetskostnaden kunden betalar (efter rabatt); à-priset är
+   * listpriset så att Fortnox räknar à-pris × antal × (1 − rabatt).
    */
-  const buildLaborLine = (laborExkl: number, hours: number) => {
-    const unit = Math.round((laborExkl / hours) * 100) / 100
-    const discounted = calculateDiscountedPrice(unit, 0)
+  const buildLaborLine = (laborExkl: number, hours: number, discountPercent = 0) => {
+    const factor = 1 - discountPercent / 100
+    const unit = Math.round((factor > 0 ? laborExkl / factor / hours : 0) * 100) / 100
+    const discounted = calculateDiscountedPrice(unit, discountPercent)
     const total = Math.round(calculateTotalPrice(discounted, hours) * 100) / 100
     return { unit, discounted, total }
   }
@@ -893,7 +945,9 @@ export default function CaseServiceSelector({
     if (laborService && hours > 0) {
       const hourPrice = customerServicePrices[laborService.id] ?? laborService.base_price
       if (hourPrice != null && hourPrice > 0) {
-        const suggestedTotal = Math.min(hours * hourPrice, item.total_price) * priceMultiplier
+        // Arbetskostnaden kunden betalar: timpris efter radens rabatt
+        const discFactor = 1 - Number(item.discount_percent || 0) / 100
+        const suggestedTotal = Math.min(hours * hourPrice * discFactor, item.total_price) * priceMultiplier
         suggested = String(Math.round(suggestedTotal))
       }
     }
@@ -949,7 +1003,9 @@ export default function CaseServiceSelector({
       return
     }
 
-    const labor = buildLaborLine(laborExkl, hours)
+    const parentDiscount = Number(item.discount_percent || 0)
+    const parentMotivation = parentDiscount > 0 ? (item.discount_motivation ?? null) : null
+    const labor = buildLaborLine(laborExkl, hours, parentDiscount)
     // Tjänsteraden får resten (materialdelen), kompenserat för rabatt och antal
     const newMainUnit = unitForRowTotal(item, totalExkl - labor.total)
     const mainDiscounted = calculateDiscountedPrice(newMainUnit, item.discount_percent)
@@ -967,8 +1023,11 @@ export default function CaseServiceSelector({
             ...i,
             quantity: hours,
             unit_price: labor.unit,
+            discount_percent: parentDiscount,
             discounted_price: labor.discounted,
             total_price: labor.total,
+            requires_approval: parentDiscount > 0 ? item.requires_approval : false,
+            discount_motivation: parentMotivation,
             rot_rut_type: splitType,
             fastighetsbeteckning: fastighet,
             updated_at: nowIso,
@@ -991,7 +1050,7 @@ export default function CaseServiceSelector({
           item_type: 'service',
           quantity: hours,
           unit_price: labor.unit,
-          discount_percent: 0,
+          discount_percent: parentDiscount,
           discounted_price: labor.discounted,
           total_price: labor.total,
           vat_rate: 25,
@@ -999,7 +1058,8 @@ export default function CaseServiceSelector({
           added_by_technician_id: technicianId ?? null,
           added_by_technician_name: technicianName ?? null,
           status: 'pending',
-          requires_approval: false,
+          requires_approval: parentDiscount > 0 ? item.requires_approval : false,
+          discount_motivation: parentMotivation,
           notes: null,
           rot_rut_type: splitType,
           fastighetsbeteckning: fastighet,
@@ -1028,10 +1088,12 @@ export default function CaseServiceSelector({
           .update({
             quantity: hours,
             unit_price: labor.unit,
-            discount_percent: 0,
+            // Samma procent och motivering som tjänsteraden; triggern ärver
+            // tjänsteradens godkännande via labor_for_item_id
+            discount_percent: parentDiscount,
             discounted_price: labor.discounted,
             total_price: labor.total,
-            requires_approval: false,
+            discount_motivation: parentMotivation,
             rot_rut_type: splitType,
             fastighetsbeteckning: fastighet,
             updated_at: nowIso,
@@ -1048,6 +1110,8 @@ export default function CaseServiceSelector({
           service_name: laborService.name,
           quantity: hours,
           unit_price: labor.unit,
+          discount_percent: parentDiscount,
+          discount_motivation: parentMotivation,
           vat_rate: 25,
           added_by_technician_id: technicianId || undefined,
           added_by_technician_name: technicianName || undefined,
@@ -1111,7 +1175,6 @@ export default function CaseServiceSelector({
           unit_price: newMainUnit,
           discounted_price: mainDiscounted,
           total_price: mainTotal,
-          requires_approval: itemRequiresApproval(item.discount_percent),
           updated_at: new Date().toISOString(),
         })
         .eq('id', item.id)
@@ -1252,33 +1315,75 @@ export default function CaseServiceSelector({
   // ──────────────────────────────────────────────────────────────
   // Prisguide: applicera priser per fakturarad
   // ──────────────────────────────────────────────────────────────
-  const handleApplyPrices = async (prices: Record<string, number>) => {
+  const handleApplyPrices = async (
+    prices: Record<string, number>,
+    discounts: Record<string, PriceGuideDiscount> = {}
+  ) => {
     if (!caseId && !draftMode) return
-    // Filtrera bort fast-prissatta tjänster — deras pris styrs av kundens prislista
-    const filteredPrices: Record<string, number> = {}
-    Object.entries(prices).forEach(([itemId, price]) => {
-      const it = allItems.find(i => i.id === itemId)
+    // Rader som ändras: nytt listpris från prisguiden och/eller ny rabatt.
+    // unit_price är alltid listpriset; rabatten ligger ovanpå (discount_percent,
+    // discounted_price, total_price). En uppdelad tjänsts ROT/RUT-arbetsrad får
+    // samma procent och motivering som tjänsteraden.
+    type RowPatch = {
+      unit_price: number
+      discount_percent: number
+      discounted_price: number
+      total_price: number
+      discount_motivation: string | null
+    }
+    const patches = new Map<string, RowPatch>()
+    // Rader där rabatten är ny eller ändrad: rabattansvariga notifieras
+    const newDiscounts: Array<{ name: string; percent: number }> = []
+    for (const it of listedServiceItems) {
       // Tilläggsrader styrs av stationerna och RPC:n, aldrig av prisguiden
-      if (addonLineIds.has(itemId)) return
-      if (it?.service_id && customerServicePrices[it.service_id] !== undefined) return
-      // ROT/RUT-arbetsrader styrs av uppdelningen, aldrig av prisguiden
-      if (nestedLaborIds.has(itemId)) return
-      // Uppdelad tjänst: prisguidens à-pris gäller hela tjänsten (material +
-      // arbete). Tjänsteraden får resten efter arbetsraden så totalen blir rätt.
-      const child = it ? laborChildByParent.get(itemId) : undefined
-      if (it && child) {
-        const targetTotal = calculateTotalPrice(calculateDiscountedPrice(price, it.discount_percent), it.quantity)
-        const laborTotal = Number(child.total_price || 0)
-        if (targetTotal + 0.005 < laborTotal) {
-          toast.error(`${it.service_name || 'Tjänsten'}: priset från prisguiden är lägre än arbetskostnaden ${formatPrice(laborTotal * priceMultiplier)}. Ändra arbetskostnaden först.`)
-          return
+      if (addonLineIds.has(it.id)) continue
+      // Fast pris i kundens prislista: priset rörs inte, rabatt går att ge
+      const fixedByList = !!it.service_id && customerServicePrices[it.service_id] !== undefined
+      const newListUnit = !fixedByList && prices[it.id] !== undefined ? prices[it.id] : null
+      const disc = discounts[it.id]
+      if (newListUnit === null && !disc) continue
+      const pct = disc ? disc.percent : Number(it.discount_percent || 0)
+      const motivation = pct > 0 ? (disc ? disc.motivation : (it.discount_motivation ?? null)) : null
+      const child = laborChildByParent.get(it.id) ?? null
+
+      let mainUnit = Number(it.unit_price)
+      if (newListUnit !== null) {
+        if (child) {
+          // Uppdelad tjänst: prisguidens à-pris gäller hela tjänsten (material +
+          // arbete). Tjänsteraden får listpriset efter arbetsradens listpris.
+          const childList = Number(child.unit_price || 0) * Number(child.quantity || 0)
+          const mainList = newListUnit * it.quantity - childList
+          if (mainList + 0.005 < 0) {
+            toast.error(`${it.service_name || 'Tjänsten'}: priset från prisguiden är lägre än arbetskostnaden ${formatPrice(Number(child.total_price || 0) * priceMultiplier)}. Ändra arbetskostnaden först.`)
+            continue
+          }
+          mainUnit = it.quantity > 0 ? Math.round((Math.max(0, mainList) / it.quantity) * 100) / 100 : 0
+        } else {
+          mainUnit = newListUnit
         }
-        filteredPrices[itemId] = unitForRowTotal(it, targetTotal - laborTotal)
-        return
       }
-      filteredPrices[itemId] = price
-    })
-    prices = filteredPrices
+      const discounted = calculateDiscountedPrice(mainUnit, pct)
+      patches.set(it.id, {
+        unit_price: mainUnit,
+        discount_percent: pct,
+        discounted_price: discounted,
+        total_price: calculateTotalPrice(discounted, it.quantity),
+        discount_motivation: motivation,
+      })
+      if (pct > 0 && pct !== Number(it.discount_percent || 0)) {
+        newDiscounts.push({ name: it.service_name || it.article_name || 'Tjänst', percent: pct })
+      }
+      if (child) {
+        const childDiscounted = calculateDiscountedPrice(Number(child.unit_price || 0), pct)
+        patches.set(child.id, {
+          unit_price: Number(child.unit_price || 0),
+          discount_percent: pct,
+          discounted_price: childDiscounted,
+          total_price: Math.round(calculateTotalPrice(childDiscounted, Number(child.quantity || 0)) * 100) / 100,
+          discount_motivation: motivation,
+        })
+      }
+    }
     // Bygg mappning-payload: artikel-id → service-id (eller null om ej tilldelad)
     const articleIds = allItems.filter(i => i.item_type === 'article').map(i => i.id)
     const mappingPayload: Record<string, string | null> = {}
@@ -1295,14 +1400,11 @@ export default function CaseServiceSelector({
       .map(i => i.id)
 
     if (draftMode && !caseId) {
-      let updated = [...allItems]
-      Object.entries(prices).forEach(([itemId, price]) => {
-        updated = updated.map(i => {
-          if (i.id !== itemId) return i
-          const discounted = calculateDiscountedPrice(price, i.discount_percent)
-          const total = calculateTotalPrice(discounted, i.quantity)
-          return { ...i, unit_price: price, discounted_price: discounted, total_price: total }
-        })
+      let updated = allItems.map(i => {
+        const patch = patches.get(i.id)
+        if (!patch) return i
+        // Utkast: visas som väntande tills dokumentet skapats, då äger triggern spärren
+        return { ...i, ...patch, requires_approval: patch.discount_percent > 0 }
       })
       // Applicera mappning även i draft
       updated = updated.map(i => {
@@ -1327,23 +1429,18 @@ export default function CaseServiceSelector({
     }
     setSaving(true)
     try {
-      await Promise.all(
-        Object.entries(prices).map(async ([itemId, price]) => {
-          const item = allItems.find(i => i.id === itemId)
-          if (!item) return
-          const discounted = calculateDiscountedPrice(price, item.discount_percent)
-          const total = calculateTotalPrice(discounted, item.quantity)
-          await supabase
+      const results = await Promise.all(
+        Array.from(patches.entries()).map(([itemId, patch]) =>
+          supabase
             .from('case_billing_items')
-            .update({
-              unit_price: price,
-              discounted_price: discounted,
-              total_price: total,
-              updated_at: new Date().toISOString()
-            })
+            // requires_approval skrivs inte: triggern trg_cbi_discount_approval
+            // börjar om godkännandet när procenten ändras
+            .update({ ...patch, updated_at: new Date().toISOString() })
             .eq('id', itemId)
-        })
+        )
       )
+      const failed = results.find(r => r.error)
+      if (failed?.error) throw new Error(`Databasfel: ${failed.error.message}`)
       // Persistera mappning för samtliga artikelrader i samma operation
       await CaseBillingService.updateArticleMappings(mappingPayload)
       // Persistera ROT/RUT-val per tjänsterad
@@ -1364,7 +1461,19 @@ export default function CaseServiceSelector({
         })
       )
       await reloadItems()
-      toast.success('Priser uppdaterade')
+      // Rabattansvariga får en notis per ny rabatt, med länk till ärendet
+      if (caseId) {
+        for (const d of newDiscounts) {
+          void DiscountNotificationService.notifyApproversOfDiscountRequest({
+            caseId,
+            caseType,
+            articleName: d.name,
+            discountPercent: d.percent,
+            senderName: profile?.display_name || technicianName || null,
+          })
+        }
+      }
+      toast.success(newDiscounts.length > 0 ? 'Priser uppdaterade, rabatten väntar på godkännande' : 'Priser uppdaterade')
     } catch (err: any) {
       toast.error(err.message)
     } finally {
@@ -1645,6 +1754,12 @@ export default function CaseServiceSelector({
                     <p role="alert" className="mt-1 flex items-start gap-1.5 text-xs text-red-400">
                       <Icon name="rapport.avvikelse" className="w-3.5 h-3.5 shrink-0 mt-px" />
                       {rowPriceError[item.id]}
+                    </p>
+                  )}
+                  {rowPriceWarning[item.id] && !rowPriceError[item.id] && (
+                    <p className="mt-1 flex items-start gap-1.5 text-xs text-amber-400">
+                      <Icon name="rapport.avvikelse" className="w-3.5 h-3.5 shrink-0 mt-px" />
+                      {rowPriceWarning[item.id]}
                     </p>
                   )}
 
@@ -1944,14 +2059,28 @@ export default function CaseServiceSelector({
                     </p>
                   )}
 
-                  {/* Rabattmotivering - krävs vid avslut (avtalstilläggsrader undantagna) */}
+                  {/* Rabatt: listpris, procent, pris efter rabatt, godkännande och motivering
+                      (avtalstilläggsrader undantagna, de är aldrig rabatt) */}
                   {item.discount_percent > 0 && item.contract_addition_annual == null && (() => {
                     const motivationValue = editingMotivation[item.id] ?? item.discount_motivation ?? ''
                     const isEmpty = String(motivationValue).trim() === ''
+                    const listExkl = Number(item.unit_price || 0) * Number(item.quantity || 0)
+                      + (laborChild ? Number(laborChild.unit_price || 0) * Number(laborChild.quantity || 0) : 0)
+                    const afterExkl = Number(item.total_price || 0) + (laborChild ? Number(laborChild.total_price || 0) : 0)
+                    const state = discountApprovalState(item)
+                    const dot = state.kind === 'approved' ? 'bg-[#20c58f]' : state.kind === 'rejected' ? 'bg-red-400' : 'bg-amber-400'
                     return (
-                      <div className="mt-2">
+                      <div className="mt-2 space-y-1">
+                        <p className="text-xs text-slate-400">
+                          Listpris {formatPrice(listExkl * priceMultiplier)} · Rabatt {Number(item.discount_percent).toLocaleString('sv-SE', { maximumFractionDigits: 2 })} % · Pris efter rabatt{' '}
+                          <span className="text-white font-medium">{formatPrice(afterExkl * priceMultiplier)}</span>
+                        </p>
+                        <p className="flex items-center gap-1.5 text-xs text-slate-300">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
+                          {discountApprovalText(state)}
+                        </p>
                         <label className="block text-xs font-medium text-slate-400 mb-1">
-                          Motivering till rabatt (krävs vid avslut)
+                          Motivering till rabatten (krävs)
                         </label>
                         <textarea
                           rows={2}
@@ -2506,6 +2635,9 @@ export default function CaseServiceSelector({
             rut_eligible: !!svc?.rut_eligible,
             rot_rate_percent: svc?.rot_rate_percent ?? null,
             rut_rate_percent: svc?.rut_rate_percent ?? null,
+            discountable: !readOnly && isDiscountableServiceRow(i),
+            discount_motivation: i.discount_motivation ?? null,
+            approval_state: discountApprovalState(i),
           }
         })}
         fixedPricedItemIds={new Set(

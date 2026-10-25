@@ -1,5 +1,7 @@
 // src/components/shared/PriceCalculatorPanel.tsx
 // Prisguide 2.0: tilldela interna kostnader till fakturarader, sätt påslag per rad, applicera
+// Rabatt (3.97.0): procent per tjänsterad ovanpå listpriset, motivering krävs och
+// rabattansvarig godkänner (triggern trg_cbi_discount_approval äger spärren).
 
 import { useEffect } from 'react'
 import { X, Calculator, TrendingUp, AlertTriangle, CheckCircle, Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react'
@@ -9,7 +11,9 @@ import Button from '../ui/Button'
 import { PricingSettingsService } from '../../services/pricingSettingsService'
 import type { PricingSettings } from '../../types/pricingSettings'
 import { DEFAULT_PRICING_SETTINGS } from '../../types/pricingSettings'
-import { calculateSuggestedPrice, calculateMarginPercent } from '../../types/caseBilling'
+import { calculateSuggestedPrice, calculateMarginPercent, discountApprovalText } from '../../types/caseBilling'
+import type { DiscountApprovalState } from '../../types/caseBilling'
+import { Icon } from '../icons/Icon'
 import type { QuantityTier } from '../../types/articles'
 import { resolveTieredPrice } from '../../types/articles'
 import { getEffectiveRotPercent, getEffectiveRutPercent } from '../../utils/rotRutConstants'
@@ -47,6 +51,18 @@ interface ServiceItem {
   rut_eligible?: boolean
   rot_rate_percent?: number | null
   rut_rate_percent?: number | null
+  /** Raden kan få rabatt (inte avtalstillägg, tilläggsstationsrad eller ROT/RUT-arbetsrad) */
+  discountable?: boolean
+  /** Sparad motivering till rabatten */
+  discount_motivation?: string | null
+  /** Sparat godkännandeläge för radens nuvarande procent */
+  approval_state?: DiscountApprovalState
+}
+
+/** Rabatt per tjänsterad som prisguiden skriver när priserna appliceras */
+export interface PriceGuideDiscount {
+  percent: number
+  motivation: string | null
 }
 
 interface PriceCalculatorPanelProps {
@@ -59,7 +75,11 @@ interface PriceCalculatorPanelProps {
   markups: Record<string, number>
   onAssignmentsChange: (a: Record<string, string>) => void
   onMarkupsChange: (m: Record<string, number>) => void
-  onApplyPrices: (prices: Record<string, number>) => Promise<void>
+  /**
+   * prices: nytt listpris (à-pris exkl. moms) per rad som prisguiden räknat fram.
+   * discounts: rabatt i procent + motivering för varje rad som kan få rabatt.
+   */
+  onApplyPrices: (prices: Record<string, number>, discounts: Record<string, PriceGuideDiscount>) => Promise<void>
   /**
    * Service-item IDs (fakturarader) vars pris styrs av kundens prislista.
    * För dessa rader:
@@ -90,6 +110,17 @@ interface PriceCalculatorPanelProps {
 
 const VAT_RATE = 0.25
 
+/** "12,5" → 12.5. null = ogiltigt. Tomt = 0. */
+const parsePercent = (raw: string | undefined): number | null => {
+  const t = (raw ?? '').replace(/\s/g, '').replace('%', '').replace(',', '.')
+  if (t === '') return 0
+  const n = Number(t)
+  if (!Number.isFinite(n) || n < 0 || n > 100) return null
+  return Math.round(n * 100) / 100
+}
+
+const fmtPercent = (n: number) => n.toLocaleString('sv-SE', { maximumFractionDigits: 2 })
+
 const fmt = (n: number) =>
   new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
 
@@ -117,6 +148,21 @@ export default function PriceCalculatorPanel({
   const [loadingSettings, setLoadingSettings] = useState(true)
   const [applying, setApplying] = useState(false)
   const [showPricing, setShowPricing] = useState(false)
+  // Rabatt per tjänsterad: inmatning som text (komma som decimal) + motivering
+  const [discountInputs, setDiscountInputs] = useState<Record<string, string>>({})
+  const [motivationInputs, setMotivationInputs] = useState<Record<string, string>>({})
+
+  // Rabattfälten utgår från det som är sparat varje gång prisguiden öppnas
+  useEffect(() => {
+    if (!isOpen) return
+    setDiscountInputs(Object.fromEntries(
+      serviceItems.filter(si => si.discountable).map(si => [si.id, si.discount_percent > 0 ? fmtPercent(si.discount_percent) : ''])
+    ))
+    setMotivationInputs(Object.fromEntries(
+      serviceItems.filter(si => si.discountable).map(si => [si.id, si.discount_motivation ?? ''])
+    ))
+    if (serviceItems.some(si => si.discountable && si.discount_percent > 0)) setShowPricing(true)
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ladda inställningar vid första öppning; initiera markup för nya servicerader
   useEffect(() => {
@@ -262,7 +308,21 @@ export default function PriceCalculatorPanel({
       ? <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
       : <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
 
+  const discountPercentFor = (si: ServiceItem): number | null =>
+    si.discountable ? parsePercent(discountInputs[si.id]) : (si.discount_percent || 0)
+  const motivationFor = (si: ServiceItem) => (motivationInputs[si.id] ?? '').trim()
+  const discountRows = serviceItems.filter(si => si.discountable)
+  const invalidDiscount = discountRows.some(si => discountPercentFor(si) === null)
+  const missingMotivation = discountRows.some(si => (discountPercentFor(si) ?? 0) > 0 && !motivationFor(si))
+  const discountsChanged = discountRows.some(si => {
+    const pct = discountPercentFor(si)
+    if (pct === null) return false
+    return pct !== (si.discount_percent || 0)
+      || (pct > 0 && motivationFor(si) !== (si.discount_motivation ?? '').trim())
+  })
+
   const handleApply = async () => {
+    if (invalidDiscount || missingMotivation) return
     setApplying(true)
     try {
       const rec = settings.recommended_markup_percent
@@ -300,7 +360,13 @@ export default function PriceCalculatorPanel({
       const prices: Record<string, number> = {}
       rawPrices.forEach(e => { prices[e.id] = Math.round(e.price) })
 
-      await onApplyPrices(prices)
+      const discounts: Record<string, PriceGuideDiscount> = {}
+      discountRows.forEach(si => {
+        const pct = discountPercentFor(si) ?? 0
+        discounts[si.id] = { percent: pct, motivation: pct > 0 ? motivationFor(si) : null }
+      })
+
+      await onApplyPrices(prices, discounts)
       onClose()
     } finally {
       setApplying(false)
@@ -308,6 +374,8 @@ export default function PriceCalculatorPanel({
   }
 
   const anyAssigned = Object.values(assignments).some(v => v !== '')
+  // Rabatt kan ges även utan tilldelade artiklar (fast pris, eget pris)
+  const showRowSection = anyAssigned || discountRows.length > 0
 
   return (
     <AnimatePresence>
@@ -396,14 +464,14 @@ export default function PriceCalculatorPanel({
                   </div>
 
                   {/* ── Steg 2: Påslag per rad (expanderbar) ── */}
-                  {anyAssigned && (
+                  {showRowSection && (
                     <div className="border border-slate-700 rounded-xl overflow-hidden">
                       <button
                         type="button"
                         onClick={() => setShowPricing(!showPricing)}
                         className="flex items-center justify-between w-full px-3 py-2.5 bg-slate-800/30 text-sm font-semibold text-slate-300 hover:text-white transition-colors"
                       >
-                        <span>Justera påslag & marginal</span>
+                        <span>{discountRows.length > 0 ? 'Påslag, marginal och rabatt' : 'Justera påslag & marginal'}</span>
                         {showPricing ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
 
@@ -424,8 +492,14 @@ export default function PriceCalculatorPanel({
                             const fixed = isFixed(si.id)
                             const fixedPriceExkl = si.unit_price * si.quantity
                             const fixedPriceDisplay = Math.round(fixedPriceExkl * priceMultiplier)
+                            // Listpris för raden: fast pris, prisguidens förslag eller nuvarande pris
+                            const listExkl = fixed ? fixedPriceExkl : hasArticles ? suggestedPriceExkl : si.unit_price * si.quantity
+                            const pctInput = discountPercentFor(si)
+                            const pct = pctInput ?? 0
+                            const afterDiscountExkl = listExkl * (1 - pct / 100)
                             // Marginal räknas ALLTID på exkl.-basen — momsen är aldrig bolagets intäkt.
-                            const priceExklForMargin = fixed ? fixedPriceExkl : suggestedPriceExkl
+                            // Efter rabatt: det är det kunden faktiskt betalar.
+                            const priceExklForMargin = afterDiscountExkl
                             const margin = priceExklForMargin > 0 && cost > 0 ? calculateMarginPercent(priceExklForMargin, cost) : 0
 
                             return (
@@ -455,7 +529,7 @@ export default function PriceCalculatorPanel({
                                   {hasArticles && (
                                     <div className={`flex items-center gap-1 text-xs font-medium mt-0.5 ${getMarginColor(margin)}`}>
                                       {getMarginIcon(margin)}
-                                      {margin.toFixed(1)}% marginal
+                                      {margin.toFixed(1)}% marginal{pct > 0 ? ' efter rabatt' : ''}
                                     </div>
                                   )}
                                 </div>
@@ -613,17 +687,78 @@ export default function PriceCalculatorPanel({
                                   </>
                                 ) : (
                                   <p className="text-xs text-slate-500">
-                                    Nuvarande pris: {fmt(si.unit_price * si.quantity * priceMultiplier)} {priceLabel.toLowerCase()} – berörs ej
+                                    Nuvarande pris: {fmt(si.unit_price * si.quantity * priceMultiplier)} {priceLabel.toLowerCase()}. Inga artiklar tilldelade, påslaget berör inte raden.
                                   </p>
                                 )}
+
+                                {/* ── Rabatt: direkt under radens totalpris, före ROT/RUT ── */}
+                                {si.discountable && (() => {
+                                  const listDisplay = Math.round(listExkl * priceMultiplier)
+                                  const discountKr = Math.round(listExkl * (pct / 100) * priceMultiplier)
+                                  const afterDisplay = listDisplay - discountKr
+                                  const motivation = motivationInputs[si.id] ?? ''
+                                  // Statusraden visar det sparade läget så länge procenten är oförändrad
+                                  const state = pct === (si.discount_percent || 0) ? si.approval_state : undefined
+                                  const statusText = state && state.kind !== 'none'
+                                    ? discountApprovalText(state)
+                                    : 'Väntar på godkännande'
+                                  const dot = state?.kind === 'approved' ? 'bg-[#20c58f]' : state?.kind === 'rejected' ? 'bg-red-400' : 'bg-amber-400'
+                                  return (
+                                    <div className="mt-2 pt-2 border-t border-slate-700/40 space-y-1.5">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <label htmlFor={`pg-rabatt-${si.id}`} className="text-xs font-medium text-slate-300">
+                                          Rabatt %
+                                        </label>
+                                        <input
+                                          id={`pg-rabatt-${si.id}`}
+                                          type="text"
+                                          inputMode="decimal"
+                                          value={discountInputs[si.id] ?? ''}
+                                          onChange={e => setDiscountInputs({ ...discountInputs, [si.id]: e.target.value })}
+                                          placeholder="0"
+                                          className={`w-20 px-2 py-1 text-sm text-right bg-slate-800 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f] ${pctInput === null ? 'border-red-500' : 'border-slate-600'}`}
+                                        />
+                                      </div>
+                                      {pctInput === null && (
+                                        <p className="text-xs text-red-400">Ange en procent mellan 0 och 100.</p>
+                                      )}
+                                      {pct > 0 && (
+                                        <>
+                                          <p className="text-xs text-slate-400 leading-relaxed">
+                                            Listpris {fmt(listDisplay)} · Rabatt −{fmt(discountKr)} · Pris efter rabatt{' '}
+                                            <span className="text-white font-semibold">{fmt(afterDisplay)}</span>
+                                            <span className="text-[10px] text-slate-500 ml-1">{priceLabel}</span>
+                                          </p>
+                                          <div>
+                                            <label htmlFor={`pg-motivering-${si.id}`} className="block text-xs font-medium text-slate-400 mb-1">
+                                              Motivering till rabatten (krävs)
+                                            </label>
+                                            <textarea
+                                              id={`pg-motivering-${si.id}`}
+                                              rows={2}
+                                              value={motivation}
+                                              onChange={e => setMotivationInputs({ ...motivationInputs, [si.id]: e.target.value })}
+                                              placeholder="Varför ges rabatten? Visas för rabattansvarig."
+                                              className={`w-full px-3 py-1.5 text-xs bg-slate-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f] resize-none ${motivation.trim() ? 'border-slate-700' : 'border-amber-500/60'}`}
+                                            />
+                                          </div>
+                                          <p className="flex items-center gap-1.5 text-xs text-slate-300">
+                                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} />
+                                            {statusText}
+                                          </p>
+                                        </>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
 
                                 {/* ── ROT/RUT-val (privatärenden, om någon mappad artikel/tjänsten är berättigad) ── */}
                                 {isPrivate && (() => {
                                   const { canRot, canRut } = rotRutAvailability(si.id)
                                   if (!canRot && !canRut) return null
                                   const selection = rotRutSelections?.[si.id] ?? null
-                                  // Slutpris att räkna avdrag på: fast pris om sådant finns, annars suggested
-                                  const totalInkl = fixed ? fixedPriceDisplay : (hasArticles ? suggestedPriceDisplay : Math.round(si.unit_price * si.quantity * priceMultiplier))
+                                  // Slutpris att räkna avdrag på: priset efter rabatt (det kunden betalar)
+                                  const totalInkl = Math.round(afterDiscountExkl * priceMultiplier)
                                   const rotPct = getEffectiveRotPercent(si)
                                   const rutPct = getEffectiveRutPercent(si)
                                   const pct = selection === 'ROT' ? rotPct : selection === 'RUT' ? rutPct : 0
@@ -723,7 +858,13 @@ export default function PriceCalculatorPanel({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end gap-2 px-4 py-3 border-t border-slate-700/50 shrink-0">
+            <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-t border-slate-700/50 shrink-0">
+              {missingMotivation && !loadingSettings && (
+                <p className="flex items-center gap-1.5 mr-auto text-xs text-amber-400">
+                  <Icon name="rapport.avvikelse" size={16} className="shrink-0" />
+                  Skriv en motivering till rabatten
+                </p>
+              )}
               <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={applying}>
                 Avbryt
               </Button>
@@ -731,7 +872,7 @@ export default function PriceCalculatorPanel({
                 type="button"
                 variant="primary"
                 size="sm"
-                disabled={loadingSettings || applying || !anyAssigned}
+                disabled={loadingSettings || applying || (!anyAssigned && !discountsChanged) || missingMotivation || invalidDiscount}
                 onClick={handleApply}
               >
                 {applying

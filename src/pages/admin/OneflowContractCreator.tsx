@@ -34,6 +34,8 @@ import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES, type OneflowTemplate } from '../../constants/oneflowTemplates'
 import { OneflowTemplateService } from '../../services/oneflowTemplateService'
 import { OneflowDraftService } from '../../services/oneflowDraftService'
+import { DokumentRabattRuta } from '../../components/shared/DokumentRabatt'
+import { useDokumentRabatt } from '../../hooks/useDokumentRabatt'
 import { WebInquiryService } from '../../services/webInquiryService'
 import { CustomerGroupService } from '../../services/customerGroupService'
 import { CustomerGroup } from '../../types/customerGroups'
@@ -109,6 +111,9 @@ interface WizardData {
     vat_rate?: number
     rot_rut_type?: 'ROT' | 'RUT' | null
     fastighetsbeteckning?: string | null
+    /** Rabatt i procent på listpriset (unit_price), total_price är efter rabatt */
+    discount_percent?: number | null
+    discount_motivation?: string | null
     service?: {
       rot_rate_percent?: number | null
       rut_rate_percent?: number | null
@@ -479,6 +484,21 @@ export default function OneflowContractCreator() {
   /** Utkastet i Oneflow som visas som PDF (steg 10). */
   const [draftContract, setDraftContract] = useState<{ id: number | string; warning?: string } | null>(null)
   const [draftAction, setDraftAction] = useState<'send' | 'remove' | null>(null)
+  // Utkastets rad i contracts: rabattraderna ligger på case_id = contracts.id
+  const [draftContractRowId, setDraftContractRowId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!draftContract) { setDraftContractRowId(null); return }
+    let aktiv = true
+    supabase
+      .from('contracts')
+      .select('id')
+      .eq('oneflow_contract_id', String(draftContract.id))
+      .maybeSingle()
+      .then(({ data }) => { if (aktiv) setDraftContractRowId((data?.id as string | undefined) ?? null) })
+    return () => { aktiv = false }
+  }, [draftContract])
+  // Rabatt på utkastet: kan inte skickas förrän den är godkänd (api/oneflow/draft.ts spärrar också)
+  const draftRabatt = useDokumentRabatt(draftContractRowId)
   /** Skickat dokument — visar bekräftelsen. */
   const [createdContract, setCreatedContract] = useState<any>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -846,6 +866,16 @@ export default function OneflowContractCreator() {
   const isValidEmail = (email: string): boolean =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 
+  // Rabatt i tjänsterna: kräver motivering, och dokumentet skickas först när
+  // rabattansvarig godkänt. Avtalstillägg är aldrig rabatt.
+  const tjanstRader: Array<{ discount_percent?: number | null; discount_motivation?: string | null; contract_addition_annual?: number | null; labor_for_item_id?: string | null }> =
+    wizardData.case_id && wizardData.prefillServices && wizardData.prefillServices.length > 0
+      ? wizardData.prefillServices
+      : wizardData.draftItems.filter(i => i.item_type === 'service')
+  const rabattRader = tjanstRader.filter(r => Number(r.discount_percent ?? 0) > 0 && r.contract_addition_annual == null)
+  const harRabatt = rabattRader.length > 0
+  const rabattUtanMotivering = rabattRader.some(r => !r.labor_for_item_id && !(r.discount_motivation ?? '').trim())
+
   const canProceed = () => {
     // Steg 1-3 är samma för alla
     if (currentStep === 1) return wizardData.documentType !== ''
@@ -873,6 +903,7 @@ export default function OneflowContractCreator() {
     // Produkter – om ärendet är källan, kräv minst en tjänst i prefillServices.
     // Manuellt läge: kräv minst en tjänst (item_type='service') i draftItems
     if (currentStep === productsStep) {
+      if (rabattUtanMotivering) return false
       if (wizardData.case_id) {
         return !!(wizardData.prefillServices && wizardData.prefillServices.length > 0)
       }
@@ -905,6 +936,7 @@ export default function OneflowContractCreator() {
       return ''
     }
     if (currentStep === productsStep) {
+      if (rabattUtanMotivering) return 'Skriv en motivering till rabatten i prisguiden'
       if (wizardData.case_id) {
         if (!wizardData.prefillServices || wizardData.prefillServices.length === 0) return 'Lägg till minst en tjänst på ärendet'
         return validateRotRutRows(wizardData.prefillServices)
@@ -1065,6 +1097,8 @@ export default function OneflowContractCreator() {
           quantity: i.quantity,
           vat_rate: i.vat_rate,
           rot_rut_type: i.rot_rut_type,
+          // Listpris + rabatt i procent: kunden ser båda i Oneflow
+          discount_percent: i.contract_addition_annual == null ? i.discount_percent : 0,
           service: i.service,
         }))
       convertedProducts = convertServicesToOneflowProducts(services, partyType)
@@ -1168,8 +1202,12 @@ export default function OneflowContractCreator() {
                 article_name: s.service_name ?? null,
                 quantity: s.quantity,
                 unit_price: s.unit_price,
-                discount_percent: null,
-                discounted_price: null,
+                // Ärendets rabatt följer med. Godkänd rabatt på ärendet ärvs via
+                // discount_source_item_id (triggern trg_cbi_discount_approval)
+                discount_percent: Number(s.discount_percent ?? 0),
+                discounted_price: s.unit_price * (1 - Number(s.discount_percent ?? 0) / 100),
+                discount_motivation: s.discount_motivation ?? null,
+                discount_source_item_id: s.id,
                 total_price: s.total_price,
                 vat_rate: s.vat_rate ?? 25,
                 price_source: null,
@@ -1191,6 +1229,7 @@ export default function OneflowContractCreator() {
                 unit_price: i.unit_price,
                 discount_percent: i.discount_percent,
                 discounted_price: i.discounted_price,
+                discount_motivation: i.discount_motivation ?? null,
                 total_price: i.total_price,
                 vat_rate: i.vat_rate,
                 price_source: i.price_source,
@@ -1298,6 +1337,10 @@ export default function OneflowContractCreator() {
 
   const handleSendDraft = async () => {
     if (!draftContract) return
+    if (draftRabatt.blocked) {
+      toast.error(`Rabatten väntar på godkännande. ${isContract ? 'Avtalet' : 'Offerten'} kan inte skickas än.`)
+      return
+    }
     setDraftAction('send')
     try {
       const sent = await OneflowDraftService.publish(draftContract.id)
@@ -2103,6 +2146,13 @@ export default function OneflowContractCreator() {
             <span className="text-sm text-slate-400 leading-relaxed">
               {isContract ? 'Avtalet' : 'Offerten'} skapas som utkast i Oneflow. Inget skickas till kunden förrän du godkänt PDF:en.
             </span>
+            {harRabatt && (
+              <span className="flex gap-2.5 items-start text-[15px] text-white">
+                <span className="w-2 h-2 rounded-full mt-[7px] shrink-0 bg-amber-400" />
+                {isContract ? 'Avtalet' : 'Offerten'} har rabatt. {isContract ? 'Det' : 'Den'} kan inte skickas till kunden förrän rabatten är godkänd av rabattansvarig.
+                {isContract ? ' Rabatten gäller varje årspremie under hela avtalstiden.' : ''}
+              </span>
+            )}
             {submitError && !isCreating && (
               <div className="flex gap-2.5 items-start text-[15px]">
                 <span className="w-2 h-2 rounded-full mt-[7px] shrink-0 bg-red-500" />
@@ -2156,11 +2206,14 @@ export default function OneflowContractCreator() {
           <div className="flex-[1_1_320px] min-w-[280px] flex flex-col gap-4">
             <div className={`${CARD_CLASS} p-5 flex flex-col gap-4`}>
               <span className="text-base font-bold text-white">Ser allt rätt ut?</span>
+              {draftContractRowId && draftRabatt.lines.length > 0 && (
+                <DokumentRabattRuta contractId={draftContractRowId} documentType={isContract ? 'contract' : 'offer'} lage={draftRabatt} />
+              )}
               <div className="flex flex-col gap-2">
                 <button
                   type="button"
                   onClick={handleSendDraft}
-                  disabled={busy || !!draftContract.warning}
+                  disabled={busy || !!draftContract.warning || draftRabatt.blocked}
                   className={`${PRIMARY_BUTTON_STOR} flex items-center justify-center gap-2`}
                 >
                   {draftAction === 'send' && <Loader2 className="w-4 h-4 animate-spin" />}

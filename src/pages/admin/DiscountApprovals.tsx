@@ -3,6 +3,8 @@
 // granskar fakturor i pending_approval, ser teknikerns motivering och
 // godkänner (→ ready) eller avslår (tekniker notifieras, fakturan ligger kvar).
 // Avtalstillägg är pro rata och visas med förklaring - de är INTE rabatter.
+// Fliken Offerter och avtal (3.97.0): utkast med rabatt som inte får skickas
+// till kunden förrän rabatten är godkänd (api/oneflow/draft.ts spärrar).
 
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
@@ -29,8 +31,11 @@ import { useAuth } from '../../contexts/AuthContext'
 import {
   DiscountApprovalService,
   type ApprovalItem,
+  type DocumentApprovalItem,
   type PremiumApprovalItem,
 } from '../../services/discountApprovalService'
+import { DokumentRabattRuta } from '../../components/shared/DokumentRabatt'
+import { useDokumentRabatt } from '../../hooks/useDokumentRabatt'
 import { InvoiceService } from '../../services/invoiceService'
 import { InvoiceDeliveryError } from '../../services/invoiceDeliveryService'
 import { formatInvoiceAmount, type InvoiceType } from '../../types/invoice'
@@ -85,7 +90,11 @@ export default function DiscountApprovals() {
   const [openInvoiceId, setOpenInvoiceId] = useState<string | null>(null)
 
   // Flikar: rabatter/avtalstillägg respektive årspremiefakturor
-  const [activeTab, setActiveTab] = useState<'discounts' | 'premiums'>('discounts')
+  const [activeTab, setActiveTab] = useState<'discounts' | 'premiums' | 'documents'>('discounts')
+
+  // Offerter och avtal med rabatt som väntar
+  const [docItems, setDocItems] = useState<DocumentApprovalItem[]>([])
+  const [docLoading, setDocLoading] = useState(true)
 
   // Årspremier-fliken
   const [premiumItems, setPremiumItems] = useState<PremiumApprovalItem[]>([])
@@ -129,12 +138,25 @@ export default function DiscountApprovals() {
     }
   }, [])
 
+  const fetchDocs = useCallback(async () => {
+    try {
+      setDocLoading(true)
+      setDocItems(await DiscountApprovalService.getPendingDocumentApprovals())
+    } catch (error) {
+      console.error('Error fetching document discounts:', error)
+      toast.error('Kunde inte hämta offerter och avtal med rabatt')
+    } finally {
+      setDocLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (canApprove) {
       fetchItems()
       fetchPremiums()
+      fetchDocs()
     }
-  }, [canApprove, fetchItems, fetchPremiums])
+  }, [canApprove, fetchItems, fetchPremiums, fetchDocs])
 
   const handleApprove = async (item: ApprovalItem) => {
     if (approvingId || !user) return
@@ -353,7 +375,41 @@ export default function DiscountApprovals() {
             {premiumItems.length}
           </span>
         </button>
+        <button
+          onClick={() => setActiveTab('documents')}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#20c58f] ${
+            activeTab === 'documents'
+              ? 'bg-[#20c58f]/15 text-[#20c58f] border border-[#20c58f]/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          Offerter och avtal
+          <span className="text-xs font-semibold text-slate-300">{docItems.length}</span>
+        </button>
       </div>
+
+      {/* Offerter och avtal: utkast med rabatt som väntar */}
+      {activeTab === 'documents' && (
+        <div className="space-y-4">
+          <p className="text-sm text-slate-400">
+            Offerter och avtal med rabatt kan inte skickas till kunden förrän rabatten är godkänd.
+            En rabatt på ett avtal gäller varje årspremie under hela avtalstiden.
+          </p>
+          {docLoading ? (
+            <div className="flex items-center justify-center min-h-[200px]">
+              <LoadingSpinner />
+            </div>
+          ) : docItems.length === 0 ? (
+            <div className="bg-slate-800/30 border border-slate-700 rounded-xl py-12 text-center">
+              <h3 className="text-base font-semibold text-white mb-1">Inga offerter eller avtal väntar på rabattgodkännande</h3>
+              <p className="text-sm text-slate-400">Nya dyker upp här när någon ger rabatt i prisguiden och skapar utkastet.</p>
+            </div>
+          ) : (
+            docItems.map(item => <DokumentKort key={item.contractId} item={item} onChanged={fetchDocs} />)
+          )}
+        </div>
+      )}
 
       {activeTab === 'discounts' && (loading ? (
         <div className="flex items-center justify-center min-h-[300px]">
@@ -835,6 +891,38 @@ export default function DiscountApprovals() {
           fetchItems()
           fetchPremiums()
         }}
+      />
+    </div>
+  )
+}
+
+/** Ett utkast med rabatt: kund, dokument, skapat av, raderna och Godkänn/Avslå */
+function DokumentKort({ item, onChanged }: { item: DocumentApprovalItem; onChanged: () => void }) {
+  const lage = useDokumentRabatt(item.contractId)
+  const typ = item.type === 'offer' ? 'Offert' : 'Avtal'
+  return (
+    <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-white truncate">{item.customerName || 'Kund saknas'}</p>
+          <p className="text-xs text-slate-400">
+            {typ} (utkast){item.oneflowContractId ? `, Oneflow ${item.oneflowContractId}` : ''}
+            {item.createdByName ? `, rabatt given av ${item.createdByName}` : ''}
+            {item.createdAt ? `, skapat ${formatDate(item.createdAt)}` : ''}
+          </p>
+        </div>
+        <Link
+          to={`/admin/dokumentsignering?id=${item.contractId}`}
+          className="text-xs font-medium text-[#20c58f] hover:underline shrink-0"
+        >
+          Öppna i Dokumentsignering
+        </Link>
+      </div>
+      <DokumentRabattRuta
+        contractId={item.contractId}
+        documentType={item.type}
+        lage={lage}
+        onChanged={onChanged}
       />
     </div>
   )
