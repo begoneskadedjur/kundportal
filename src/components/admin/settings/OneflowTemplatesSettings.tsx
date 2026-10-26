@@ -61,7 +61,7 @@ export default function OneflowTemplatesSettings() {
         type: form.type,
         category: form.type === 'offer' ? form.category : null
       })
-      toast.success('Mall tillagd - den är nu valbar i wizarden och igenkänd av webhook/sync')
+      toast.success('Mall tillagd - den är nu valbar i Skapa avtal eller offert och igenkänd av webhook/sync')
       setForm(EMPTY_FORM)
       setShowAddForm(false)
       await load()
@@ -78,8 +78,8 @@ export default function OneflowTemplatesSettings() {
     try {
       await OneflowTemplateService.update(t.id, { is_active: !t.is_active })
       toast.success(t.is_active
-        ? `${t.name} avaktiverad - försvinner ur wizarden, befintliga avtal påverkas inte`
-        : `${t.name} aktiverad - valbar i wizarden igen`)
+        ? `${t.name} avaktiverad - försvinner ur Skapa avtal eller offert, befintliga avtal påverkas inte`
+        : `${t.name} aktiverad - valbar i Skapa avtal eller offert igen`)
       await load()
     } catch {
       toast.error('Kunde inte ändra status')
@@ -148,7 +148,7 @@ export default function OneflowTemplatesSettings() {
                     <button
                       onClick={() => handleToggleActive(t)}
                       disabled={saving}
-                      title={t.is_active ? 'Avaktivera (dölj i wizarden)' : 'Aktivera'}
+                      title={t.is_active ? 'Avaktivera (dölj i Skapa avtal eller offert)' : 'Aktivera'}
                       className={`p-1.5 rounded-lg transition-colors ${t.is_active ? 'text-[#20c58f] hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-700'}`}
                     >
                       <Power className="w-4 h-4" />
@@ -189,7 +189,7 @@ export default function OneflowTemplatesSettings() {
         <div className="flex items-start gap-1.5">
           <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <p className="text-xs text-slate-300">
-            <strong>Avaktivera</strong> döljer mallen i avtals-/offertwizarden - befintliga avtal
+            <strong>Avaktivera</strong> döljer mallen i Skapa avtal eller offert - befintliga avtal
             fortsätter synkas som vanligt. <strong>Radera</strong> är bara möjligt när inga avtal
             refererar mallen. En ny mall blir direkt igenkänd av webhook och nattsync; för att
             fältdata ska läsas in korrekt måste mallens fält i Oneflow ha custom-id:n satta

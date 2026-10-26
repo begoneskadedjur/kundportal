@@ -3467,7 +3467,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               Vilken typ av avtal?
             </h4>
             <p className="text-xs text-slate-400 mb-3">
-              Samma avtalstyper som i avtalswizarden. Namnet blir avtalets rubrik.
+              Samma avtalstyper som i Skapa avtal eller offert. Namnet blir avtalets rubrik.
             </p>
             <div className="space-y-1.5 max-h-72 overflow-y-auto">
               {contractTypes.map((t) => (

@@ -463,7 +463,7 @@ export default function EditCustomerModal({
             <p className="text-sm text-slate-500">Inga servicedetaljer registrerade.</p>
           )}
           <p className="text-[11px] text-slate-600 mt-2">
-            Servicedetaljer hanteras via prislistor och avtalswizarden.
+            Servicedetaljer hanteras via prislistor och Skapa avtal eller offert.
           </p>
         </div>
       </div>

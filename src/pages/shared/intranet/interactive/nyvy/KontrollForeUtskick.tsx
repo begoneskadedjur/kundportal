@@ -106,7 +106,7 @@ export default function KontrollForeUtskick() {
         </button>
         <p className="text-sm text-slate-400">{stopp ? 'Knappen går inte att trycka på så länge en punkt är röd.' : `Klart att skapa. ${avtal ? 'Avtalet' : 'Offerten'} skapas som utkast i Oneflow. Inget skickas till kunden förrän du godkänt PDF:en.`}</p>
       </div>
-      <p className="text-xs text-slate-500">Exempel, inget skickas. I wizarden tar länkarna under punkterna dig till rätt steg och tillbaka till granskningen.</p>
+      <p className="text-xs text-slate-500">Exempel, inget skickas. I Skapa avtal eller offert tar länkarna under punkterna dig till rätt steg och tillbaka till granskningen.</p>
     </div>
   )
 }

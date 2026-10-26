@@ -1251,7 +1251,7 @@ export default function OneflowContractCreator() {
         if (response.status === 502 && error?.contract?.id) {
           setDraftContract({
             id: error.contract.id,
-            warning: 'Utkastet skapades i Oneflow men tjänsterna kunde inte sparas i portalen. Välj Ändra i wizarden och skapa det igen.',
+            warning: 'Utkastet skapades i Oneflow men tjänsterna kunde inte sparas i portalen. Välj Tillbaka och ändra och skapa det igen.',
           })
           return
         }
@@ -2231,7 +2231,7 @@ export default function OneflowContractCreator() {
                   className={`${OUTLINE_BUTTON} flex items-center justify-center gap-2`}
                 >
                   {draftAction === 'remove' && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Ändra i wizarden
+                  Tillbaka och ändra
                 </button>
                 <span className="text-sm text-slate-400">Utkastet tas bort i Oneflow och ett nytt skapas när du är klar.</span>
               </div>
@@ -2248,7 +2248,7 @@ export default function OneflowContractCreator() {
             <div className={`${CARD_CLASS} p-5 flex flex-col gap-2 text-[15px]`}>
               <span className="text-base font-bold text-white">Om något saknas i PDF:en</span>
               <span className="text-slate-400 leading-relaxed">
-                Står ett fält tomt fast det var ifyllt i wizarden ligger felet i Oneflow-mallen. Välj Ändra och byt mall, eller säg till en admin.
+                Står ett fält tomt fast det var ifyllt i stegen ligger felet i Oneflow-mallen. Välj Tillbaka och ändra och byt mall, eller säg till en admin.
               </span>
             </div>
           </div>

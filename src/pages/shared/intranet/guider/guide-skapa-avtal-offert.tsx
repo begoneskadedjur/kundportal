@@ -331,7 +331,7 @@ function Innehall({ l, tryck, mk }: { l: Lage; tryck: Tryck; mk: Mk }) {
               <Knapp id="skicka" text="Skicka offerten" prim full tryck={tryck} mk={mk} />
               <p className="text-[9.5px] text-slate-400">Skickas från info@begone.se till {EPOST}.</p>
               <div className="grid grid-cols-2 gap-1 border-t border-slate-700/60 pt-1">
-                <Knapp id="andra" text="Ändra i wizarden" full tryck={tryck} mk={mk} />
+                <Knapp id="andra" text="Tillbaka och ändra" full tryck={tryck} mk={mk} />
                 <Knapp id="utkast" text="Spara som utkast" full tryck={tryck} mk={mk} />
               </div>
             </div>
@@ -436,7 +436,7 @@ function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
 const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: `${KUND} vill ha pris på att ta bort ett getingbo, ${PRIS}. Skapa offerten och skicka den. Börja med Skapa.` }
 
 const FEL: Record<string, string> = {
-  avbryt: 'Avbryt lämnar wizarden och det du fyllt i försvinner. Fortsätt i stället.',
+  avbryt: 'Avbryt lämnar Skapa avtal eller offert och det du fyllt i försvinner. Fortsätt i stället.',
   band: 'Avtal & Offerter tar dig till Dokumentsignering. Gör klart offerten först.',
   'typ:contract': 'Avtalsförslag är för löpande avtal med årspremie. Ett getingbo är ett engångsjobb, alltså Offert.',
   'f:pnr': 'Personnumret är bra att ha men stoppar inte. Fyll i namn, telefon och e-post.',
@@ -446,7 +446,7 @@ const FEL: Record<string, string> = {
   'tj:inspektion': 'Uppdraget gäller getingboet. Välj Bekämpning av getingbo.',
   textruta: 'Du kan skriva egen text här. Enklast är Skriv förslag från tjänsterna.',
   'pdf-yta': 'Det här är Oneflows PDF. Ser den rätt ut skickar du med knappen under.',
-  andra: 'Ändra i wizarden tar bort utkastet. Allt stämmer, så skicka i stället.',
+  andra: 'Tillbaka och ändra tar bort utkastet. Allt stämmer, så skicka i stället.',
   utkast: 'Spara som utkast skickar inget. Uppdraget var att skicka offerten nu.',
 }
 
@@ -467,7 +467,7 @@ function Ovning() {
       return
     }
     if (l.vy === 'ark') {
-      if (id === 'skapa:Avtal eller offert') { ga('dokument'); tips2('Wizarden är öppen', 'Avtalsförslag är förvalt. Välj Offert, eftersom det är ett engångsjobb.') }
+      if (id === 'skapa:Avtal eller offert') { ga('dokument'); tips2('Skapa avtal eller offert är öppen', 'Avtalsförslag är förvalt. Välj Offert, eftersom det är ett engångsjobb.') }
       else miss('Offerten skapar du med Avtal eller offert, överst i rutan.')
       return
     }

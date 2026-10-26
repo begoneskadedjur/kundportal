@@ -19,14 +19,14 @@ values
 (
   'guide-skapa-avtal-offert',
   'Skapa och skicka en offert eller ett avtal',
-  'Skapa, Avtal eller offert, stegen i wizarden, Kontroll före utskick och Oneflows PDF innan du skickar.',
+  'Skapa, Avtal eller offert, stegen, Kontroll före utskick och Oneflows PDF innan du skickar.',
   'handbok', 'ekonomi',
   $json$[
     {"type":"intro","roller":["technician"],"var":"Skapa › Avtal eller offert. På datorn också Avtal och offerter › Skapa avtal eller offert i sidomenyn","tar":"6 min","behover":"Kundens namn, telefon och e-post, och vad jobbet kostar","enhet":"mobil"},
     {"type":"kortsvar","text":"Tryck [[Skapa|allman.plus]] och välj Avtal eller offert. Gå igenom stegen med [[Nästa]] och granska. Tryck [[Skapa och visa Oneflows PDF]], titta på PDF:en och tryck [[Skicka offerten]] eller [[Skicka för signering]]. Kunden får dokumentet från info@begone.se."},
     {"type":"visning","steg":[
       {"text":"Tryck [[Skapa|allman.plus]].","ser":"Rutan Vad vill du göra? öppnas."},
-      {"text":"Tryck Avtal eller offert.","ser":"Wizarden öppnas på steget Vad ska du skapa? Avtalsförslag är förvalt."},
+      {"text":"Tryck Avtal eller offert.","ser":"Skapa avtal eller offert öppnas på steget Vad ska du skapa? Avtalsförslag är förvalt."},
       {"text":"Tryck Offert. Ska kunden ha ett löpande avtal med årspremie väljer du Avtalsförslag.","ser":"Offert är vald: engångsuppdrag med fast pris som kunden godkänner i Oneflow."},
       {"text":"Gå igenom stegen med [[Nästa]]. I steget Offertinnehåll heter knappen [[Granska offerten]]. Tryck på den.","ser":"Granskningen visar offerten som kunden ser den och rutan Kontroll före utskick med röda, gula och gröna punkter."},
       {"text":"Tryck [[Skapa och visa Oneflows PDF]].","ser":"Offerten skapas som utkast i Oneflow och du ser Så här ser kunden offerten. Inget är skickat än."},
@@ -45,13 +45,13 @@ values
     {"type":"felsok","items":[
       {"fraga":"Jag kan inte trycka Nästa","svar":"Bottenlisten säger vad som saknas, till exempel Fyll i e-postadress, Fyll i organisationsnummer eller Lägg till minst en tjänst. Fyll i det, så går det vidare."},
       {"fraga":"Det står Rätta de röda punkterna först","svar":"En röd punkt i Kontroll före utskick stoppar knappen Skapa och visa Oneflows PDF. Tryck Rätta under och den del som står, rätta, och tryck [[Tillbaka till granskningen]]."},
-      {"fraga":"Ett fält är tomt i PDF:en fast jag fyllde i det","svar":"Då ligger felet i Oneflow-mallen. Tryck [[Ändra i wizarden]] och byt mall, eller säg till en admin."},
+      {"fraga":"Ett fält är tomt i PDF:en fast jag fyllde i det","svar":"Då ligger felet i Oneflow-mallen. Tryck [[Tillbaka och ändra]] och byt mall, eller säg till en admin."},
       {"fraga":"Jag vill skicka senare","svar":"Tryck [[Spara som utkast]]. Utkastet ligger kvar i Dokumentsignering under Utkast att skicka, och där skickar du det med Granska och skicka."}
     ]},
     {"type":"bra","items":[
       "Kunden får offerten eller avtalet från info@begone.se, aldrig från din egen e-post.",
       "Röd punkt stoppar. Gul punkt är en varning: E-post för faktura kan till exempel kunden fylla i vid signeringen.",
-      "Ändra i wizarden tar bort utkastet i Oneflow. Ett nytt skapas när du granskar igen.",
+      "Tillbaka och ändra tar bort utkastet i Oneflow. Ett nytt skapas när du granskar igen.",
       "Från ett ärende: tryck [[Ärendets verktyg|falt.verktyg]] och Skapa offert. Då är ärendets tjänster och artiklar redan ifyllda.",
       "Skickade offerter och avtal följer du i Dokumentsignering. Kontoret bokar in när kunden har signerat."
     ]},
@@ -105,10 +105,10 @@ values
     {"type":"quiz","fragor":[
       {"fraga":"Ett avtal ligger under Signerade. Vad gör du?","alternativ":["Bokar besöket själv","Ingenting, kontoret registrerar kunden och bokar in","Skickar avtalet en gång till"],"ratt":1,"forklaring":"Signerade dokument bokar kontoret in. Du ser i listan när det är bokat."},
       {"fraga":"Kunden har inte öppnat offerten på fem dagar. Vad föreslår rutan Nästa steg?","alternativ":["Ring kunden och hör om offerten kom fram","Radera offerten","Vänta tills fristen gått ut"],"ratt":0,"forklaring":"Ring och logga samtalet. Då ser både du och kontoret vad som hänt."},
-      {"fraga":"Var hamnar en offert du sparade som utkast i wizarden?","alternativ":["Under Klara","Under Att göra, Utkast att skicka","Den syns inte i portalen"],"ratt":1,"forklaring":"Utkasten ligger under Att göra tills du skickar dem med Granska och skicka."}
+      {"fraga":"Var hamnar en offert du sparade som utkast i Skapa avtal eller offert?","alternativ":["Under Klara","Under Att göra, Utkast att skicka","Den syns inte i portalen"],"ratt":1,"forklaring":"Utkasten ligger under Att göra tills du skickar dem med Granska och skicka."}
     ]},
     {"type":"avslut","lankar":[
-      {"slug":"guide-skapa-avtal-offert","label":"Skapa och skicka en offert eller ett avtal","description":"Wizarden från Skapa till Skicka."},
+      {"slug":"guide-skapa-avtal-offert","label":"Skapa och skicka en offert eller ett avtal","description":"Från Skapa till Skicka."},
       {"slug":"guide-min-kundresa","label":"Se hur det går för dina offerter och avtal","description":"Signerade, förfallna och tiden till signering."},
       {"slug":"guide-ticket-systemet","label":"Tickets","description":"Fråga kontoret om ett dokument."}
     ],"fraga":"Koordinatorn, eller skriv en ticket till rollen Koordinator."}
@@ -155,7 +155,7 @@ values
     ]},
     {"type":"avslut","lankar":[
       {"slug":"guide-dokumentsignering-tekniker","label":"Följ dina offerter och avtal i Dokumentsignering","description":"Där du ringer och skickar."},
-      {"slug":"guide-skapa-avtal-offert","label":"Skapa och skicka en offert eller ett avtal","description":"Wizarden från Skapa till Skicka."}
+      {"slug":"guide-skapa-avtal-offert","label":"Skapa och skicka en offert eller ett avtal","description":"Från Skapa till Skicka."}
     ],"fraga":"Koordinatorn, eller skriv en ticket till rollen Koordinator."}
   ]$json$::jsonb,
   1, false, true, 32, now(), array['technician']
