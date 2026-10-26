@@ -489,7 +489,9 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
   }
 
   // Stäng etableringsärendet (RLS-verifierat: 0 uppdaterade rader = behörighet saknas).
-  // workReport: systematisk avslutstext, skrivs bara när fältet är tomt.
+  // workReport: systematisk avslutstext med Kommentar från tekniker. Fältet döljs för
+  // teknikern i nya vyn (2026-10-26); finns redan text (t.ex. från kontoret) läggs
+  // avslutstexten under, den skriver aldrig över.
   const closeEstablishmentCase = async (caseId: string, workReport?: string): Promise<boolean> => {
     // Klockan startade vid Framme i ärendet: räkna in tiden och stoppa den
     const { data: tidRad } = await supabase
@@ -516,10 +518,13 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
       return false
     }
 
-    if (workReport && !(updatedRows[0] as { work_report?: string | null }).work_report?.trim()) {
+    if (workReport) {
+      // Förra avslutets automatiska text (ärendet öppnat igen) ersätts
+      const tidigare = (updatedRows[0] as { work_report?: string | null }).work_report?.trim() || ''
+      const befintlig = /^Etablering: \d+ station/.test(tidigare) ? '' : tidigare
       const { error: reportError } = await supabase
         .from('cases')
-        .update({ work_report: workReport })
+        .update({ work_report: befintlig ? `${befintlig}\n\n${workReport}` : workReport })
         .eq('id', caseId)
       if (reportError) console.warn('Kunde inte skriva auto-arbetsrapport:', reportError)
     }
@@ -550,18 +555,25 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
   // Spärr mot dubbelstart: rutan Pågående etablering, wizardens inomhusavslut och
   // formulärets X/Färdig går alla hit. Ett andra anrop medan ett pågår ignoreras,
   // så ärendet aldrig hämtas, synkas och stängs två gånger parallellt.
+  // Kommentar från tekniker krävs (2026-10-26): utan kommentar öppnas frågan
+  // (kommentarFraga, KommentarDialog i EtableringsFlode) och avslutet fortsätter därifrån.
   const avslutPagar = useRef(false)
-  const finishEstablishment = async (customerId: string, name: string) => {
+  const [kommentarFraga, setKommentarFraga] = useState<{ customerId: string; name: string } | null>(null)
+  const finishEstablishment = async (customerId: string, name: string, kommentar?: string) => {
+    if (!kommentar?.trim()) {
+      setKommentarFraga({ customerId, name })
+      return
+    }
     if (avslutPagar.current) return
     avslutPagar.current = true
     try {
-      await finishEstablishmentInner(customerId, name)
+      await finishEstablishmentInner(customerId, name, kommentar.trim())
     } finally {
       avslutPagar.current = false
     }
   }
 
-  const finishEstablishmentInner = async (customerId: string, name: string) => {
+  const finishEstablishmentInner = async (customerId: string, name: string, kommentar: string) => {
     const { data: openCase, error: openCaseError } = await supabase
       .from('cases')
       .select('id, created_at')
@@ -676,7 +688,8 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
       `Etablering: ${placedTotal} station${placedTotal === 1 ? '' : 'er'} utplacerad${placedTotal === 1 ? '' : 'e'}` +
       (addonCount > 0
         ? `, varav ${addonCount} tilläggsstation${addonCount === 1 ? '' : 'er'} utöver avtal enligt överenskommelse med kund.`
-        : '.')
+        : '.') +
+      `\nKommentar från tekniker: ${kommentar}`
 
     // Nya tillägg per år/per månad ska alltid få frågan om arbetstid
     let newAddons = false
@@ -831,8 +844,16 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
 
   // Avsluta etablering direkt (rutan Pågående etablering). Samma väg som
   // handleFinishBatch utan att någon placering pågår i formuläret.
-  const finishEstablishmentFor = async (customerId: string, name?: string) => {
-    await finishEstablishment(customerId, name || customerName(customerId))
+  const finishEstablishmentFor = async (customerId: string, name?: string, kommentar?: string) => {
+    await finishEstablishment(customerId, name || customerName(customerId), kommentar)
+  }
+
+  // Frågan om Kommentar från tekniker (avslut från formuläret och inomhusflödet)
+  const avbrytKommentar = () => setKommentarFraga(null)
+  const bekraftaKommentar = async (kommentar: string) => {
+    const fraga = kommentarFraga
+    setKommentarFraga(null)
+    if (fraga) await finishEstablishment(fraga.customerId, fraga.name, kommentar)
   }
 
   // Krysset och Avbryt i Placera station: stänger bara rutan (2026-10-24).
@@ -935,6 +956,7 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
     // avslut
     establishmentSummary, setEstablishmentSummary, finishingEstablishment, addonLabourStep,
     confirmFinishEstablishment, cancelEstablishmentSummary, finishEstablishmentFor,
+    kommentarFraga, avbrytKommentar, bekraftaKommentar,
     // schema
     showSchedulePrompt, setShowSchedulePrompt, schedulePromptCustomerId, schedulePromptCustomerName,
     showScheduleWizard, setShowScheduleWizard, batchScheduleUnits, handleScheduleFromList,

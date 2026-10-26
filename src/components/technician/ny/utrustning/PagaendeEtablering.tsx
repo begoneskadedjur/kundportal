@@ -21,7 +21,7 @@ import { KNAPP_PRIMAR, KNAPP_SEKUNDAR, KORT, IKONKNAPP, datum } from './utrustni
 interface Props {
   rader: PagaendeEtableringRad[]
   onPlacera: (customerId: string) => void
-  onFardig: (customerId: string, kund: string) => void | Promise<void>
+  onFardig: (customerId: string, kund: string, kommentar: string) => void | Promise<void>
   /** Kund vars avslut pågår, knappen visar att den arbetar */
   avslutar?: string | null
 }

@@ -736,6 +736,11 @@ export function AvslutaFraga({ kund, placerade, avtalat, tryck, markera, nr }: {
         <p className="text-[11px] leading-relaxed text-slate-300">
           {klar ? `Alla ${avtalat} stationer är placerade.` : `${placerade} av ${avtalat} stationer är placerade, ${avtalat - placerade} saknas.`} Ärendet stängs och tilläggsstationer faktureras.
         </p>
+        {/* Kommentar från tekniker krävs (2026-10-26). I guiden är den redan skriven. */}
+        <div>
+          <p className="mb-0.5 text-[10.5px] font-medium text-slate-300">Kommentar från tekniker <span className="text-red-400">*</span></p>
+          <p className="rounded-lg border border-slate-700 bg-slate-900 p-1.5 text-[10.5px] text-white">Stationerna står längs fasaden och vid lastkajen. Porten är kodlåst.</p>
+        </div>
         <div className="grid grid-cols-2 gap-1.5">
           <NyKnapp block onClick={() => tryck('avsluta-avbryt')} markor={mk(markera, 'avsluta-avbryt', nr)}>Avbryt</NyKnapp>
           <NyKnapp block prim={klar} onClick={() => tryck('avsluta-ja')} markor={mk(markera, 'avsluta-ja', nr)}>{klar ? 'Avsluta etablering' : 'Avsluta ändå'}</NyKnapp>

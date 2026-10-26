@@ -21,6 +21,7 @@ import { EquipmentPlacementForm } from '../../../shared/equipment/EquipmentPlace
 import type { CustomerStationSummary } from '../../../../services/equipmentService'
 import type { Etableringsflode } from './useEtableringsflode'
 import { KNAPP_PRIMAR, KNAPP_SEKUNDAR, KNAPP_TYST } from './utrustningUi'
+import { KommentarDialog } from './AvslutaEtablering'
 
 interface Props {
   flode: Etableringsflode
@@ -35,6 +36,11 @@ export function EtableringsFlode({ flode: f, allCustomers, onIndoorFinished, onT
 
   return (
     <>
+      {/* Kommentar från tekniker innan etableringen avslutas från formuläret eller inomhusflödet */}
+      {f.kommentarFraga && (
+        <KommentarDialog kund={f.kommentarFraga.name} onAvbryt={f.avbrytKommentar} onAvsluta={k => { void f.bekraftaKommentar(k) }} />
+      )}
+
       {/* Wizard: Kund, Typ, Placera */}
       <AddStationWizard
         isOpen={f.isWizardOpen}

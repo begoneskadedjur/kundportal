@@ -41,7 +41,7 @@ values
       "Bocken längst till höger på en rad är snabb-OK. Tryck på den och svara [[OK]] på frågan Markera Station 3 som OK? Stationen sparas utan förbrukning, foto och anteckning.",
       "Förbrukningen sätter stationens status. Under Varning är rutan grön, från Varning gul och från Kritisk röd. Väljer du ett preparat kan gränserna följa preparatet.",
       "Avsluta kontrollrunda stoppar bara ordningen. Det du har sparat finns kvar, och du kan trycka Starta runda igen.",
-      "Kommentar från tekniker och kameran överst gäller hela besöket. Kommentaren krävs för att klarmarkera och står i kontrollrapporten. Du kan lägga till högst 10 bilder.",
+      "Kommentar från tekniker och kameran överst gäller hela besöket. Kommentaren krävs för att klarmarkera. Den står i kontrollrapporten och skrivs in i arbetsrapporten automatiskt. Du kan lägga till högst 10 bilder.",
       "Besöket ingår i kundens avtal och faktureras inte. Tilläggsstationer sköts i kontrollrundan och faktureras utöver avtalet."
     ]},
     {"type":"interactive","component":"nyvy/StationerForbrukning"},
@@ -108,7 +108,7 @@ values
   'handbok', 'utrustning',
   $json$[
     {"type":"intro","roller":["technician"],"var":"Etableringsbesöket › steget Arbetet › Gå till utplacering","tar":"6 min","behover":"Ett bokat etableringsbesök och stationerna med dig","enhet":"mobil"},
-    {"type":"kortsvar","text":"Tryck [[Jag är framme]] och [[Gå till utplacering|bokning.etablering]] i steget Arbetet. Välj Utomhus, välj typ, tryck [[Hämta GPS]] och [[Skapa placering]] för varje station. När alla är ute trycker du [[Färdig med etablering]]. Etableringen ingår i avtalet, bara tilläggsstationer faktureras."},
+    {"type":"kortsvar","text":"Tryck [[Jag är framme]] och [[Gå till utplacering|bokning.etablering]] i steget Arbetet. Välj Utomhus, välj typ, tryck [[Hämta GPS]] och [[Skapa placering]] för varje station. När alla är ute trycker du [[Färdig med etablering]] och skriver en Kommentar från tekniker. Etableringen ingår i avtalet, bara tilläggsstationer faktureras."},
     {"type":"visning","steg":[
       {"text":"Öppna etableringsbesöket och tryck [[Jag är framme]].","ser":"Steget Arbetet visar Placera ut stationerna och knappen Gå till utplacering."},
       {"text":"Tryck [[Gå till utplacering|bokning.etablering]].","ser":"Ärendefönstret stängs och sidan Stationer öppnas med rutan Välj typ. Kunden är redan vald. Ärendet är fortfarande öppet."},
@@ -116,7 +116,7 @@ values
       {"text":"Tryck på typen, till exempel Betongstation.","ser":"Typen markeras grön. Mekanisk fälla kräver också serienummer."},
       {"text":"Stå vid stationen och tryck [[Hämta GPS]].","ser":"Rutan blir grön med GPS hämtad, och Noggrannhet visas under."},
       {"text":"Tryck [[Skapa placering]].","ser":"Stationen är placerad visas med antalet placerade nu och knapparna Placera fler utomhus, Placera inomhus och Färdig med etablering."},
-      {"text":"När alla stationer är ute: tryck [[Färdig med etablering]].","ser":"Etableringsärendet stängs. Har kunden inget schema frågar portalen Återkommande kontroller med Senare och Lägg upp schema."}
+      {"text":"När alla stationer är ute: tryck [[Färdig med etablering]], skriv en Kommentar från tekniker och tryck [[Avsluta etablering]].","ser":"Etableringsärendet stängs. Arbetsrapporten skrivs automatiskt med antalet stationer och din kommentar. Har kunden inget schema frågar portalen Återkommande kontroller med Senare och Lägg upp schema."}
     ]},
     {"type":"felsok","items":[
       {"fraga":"Det står GPS-position krävs. Tryck på Hämta GPS.","svar":"Tryck [[Hämta GPS]], eller [[Välj på karta]] och tryck på platsen på kartan."},
@@ -128,7 +128,7 @@ values
     {"type":"bra","items":[
       "Etableringen och avtalets stationer ingår i avtalet och faktureras inte. Stationer kunden betalar för utöver avtalet bockar du i som Tillägg utöver avtal, de faktureras.",
       "Finns tilläggsstationer visar portalen Stäng ärendet och skicka till fakturering med raderna innan ärendet stängs. Tryck Stäng och fakturera.",
-      "Avsluta etablering i rutan Pågående etablering frågar först. Är alla ute heter knappen Avsluta etablering, saknas stationer heter den Avsluta ändå.",
+      "Avsluta etablering i rutan Pågående etablering frågar först och vill ha en Kommentar från tekniker. Är alla ute heter knappen Avsluta etablering, saknas stationer heter den Avsluta ändå. Arbetsrapporten skrivs automatiskt med antalet stationer och kommentaren, du ser den i steget Rapport efteråt.",
       "Inomhus väljer du planritningen och trycker på platsen där stationen står. Ute och inne kan blandas i samma etablering.",
       "Placera fler utomhus kommer ihåg typen från förra stationen. Kontrollera den innan du sparar."
     ]},

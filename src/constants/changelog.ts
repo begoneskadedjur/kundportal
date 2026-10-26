@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.98.0',
+    date: '2026-10-26',
+    title: 'Arbetsrapporten skrivs automatiskt på kontroller och etableringar',
+    items: [
+      { kind: 'andring', text: 'I nya arbetsvyn skriver du inte längre i arbetsrapporten på kontroller och etableringar. Den skrivs automatiskt när du klarmarkerar eller avslutar: antalet stationer och din Kommentar från tekniker. Du ser den i steget Rapport efteråt.' },
+      { kind: 'nyhet', text: 'När du avslutar en etablering skriver du en Kommentar från tekniker, på samma sätt som när du klarmarkerar en kontroll.' },
+      { kind: 'andring', text: 'Kunden ser kommentaren i besöksrapporten i kundportalen och i ärendets rapport, inte två gånger.' },
+    ],
+  },
+  {
     version: '3.97.1',
     date: '2026-10-26',
     title: 'Godkännanden för alla rabattansvariga',

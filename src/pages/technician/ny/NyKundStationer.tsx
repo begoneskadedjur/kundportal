@@ -499,7 +499,7 @@ export default function NyKundStationer() {
     }
   }
 
-  const fardig = async (cid: string, namn: string) => { await flode.finishEstablishmentFor(cid, namn) }
+  const fardig = async (cid: string, namn: string, kommentar: string) => { await flode.finishEstablishmentFor(cid, namn, kommentar) }
 
   // ── Rendering ──
   if (!laddar && !hittades) {

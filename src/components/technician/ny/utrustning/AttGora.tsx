@@ -94,7 +94,7 @@ function PerTypText({ e }: { e: EtableringInfo }) {
 interface EtableringProps {
   etableringar: EtableringInfo[]
   onPlacera: (customerId: string) => void
-  onFardig: (customerId: string, kund: string) => void
+  onFardig: (customerId: string, kund: string, kommentar: string) => void
   onOppnaArende: (caseId: string) => void
   avslutar: string | null
 }

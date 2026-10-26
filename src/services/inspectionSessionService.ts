@@ -1438,10 +1438,13 @@ export async function updateSessionPhotoCaption(
  * och intäktsvyerna — tidigare lucka där kontrollärenden saknade avslutsdatum).
  * workReport: systematisk avslutstext ("Kontrollerat 8/10 stationer." osv) —
  * skrivs BARA när ärendets work_report är tomt, manuell text skrivs aldrig över.
+ * laggTill (nya vyn, 2026-10-26): texten med Kommentar från tekniker läggs under
+ * befintlig text i stället för att hoppas över, eftersom fältet döljs för teknikern.
  */
 export async function updateCaseStatusToCompleted(
   caseId: string,
-  workReport?: string | null
+  workReport?: string | null,
+  val?: { laggTill?: boolean }
 ): Promise<boolean> {
   const { data, error } = await supabase
     .from('cases')
@@ -1459,10 +1462,13 @@ export async function updateCaseStatusToCompleted(
     return false
   }
 
-  if (workReport && !(data[0] as { work_report?: string | null }).work_report?.trim()) {
+  let befintlig = (data[0] as { work_report?: string | null }).work_report?.trim() || ''
+  // Upplåst och klarmarkerad igen: förra gångens automatiska text ersätts
+  if (val?.laggTill && /^Kontrollerat \d+\/\d+ stationer/.test(befintlig)) befintlig = ''
+  if (workReport && (!befintlig || val?.laggTill)) {
     const { error: reportError } = await supabase
       .from('cases')
-      .update({ work_report: workReport })
+      .update({ work_report: befintlig ? `${befintlig}\n\n${workReport}` : workReport })
       .eq('id', caseId)
     if (reportError) console.warn('Kunde inte skriva auto-arbetsrapport:', reportError)
   }

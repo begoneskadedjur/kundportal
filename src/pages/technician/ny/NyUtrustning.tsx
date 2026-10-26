@@ -260,9 +260,9 @@ export default function NyUtrustning() {
   } | null>(null)
   const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
 
-  const fardig = async (customerId: string, kund: string) => {
+  const fardig = async (customerId: string, kund: string, kommentar: string) => {
     setAvslutar(customerId)
-    try { await flode.finishEstablishmentFor(customerId, kund) } finally { setAvslutar(null) }
+    try { await flode.finishEstablishmentFor(customerId, kund, kommentar) } finally { setAvslutar(null) }
   }
   const visaKontroller = () => {
     setFlik('kontroller')

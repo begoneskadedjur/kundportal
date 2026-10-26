@@ -1646,11 +1646,17 @@ export default function StationInspectionPanel({
         autoReport += `\n${pickedUpCount} tilläggsstation${pickedUpCount === 1 ? '' : 'er'} upphämtad${pickedUpCount === 1 ? '' : 'e'} enligt överenskommelse med kund.`
       }
 
+      // Arbetsrapporten (2026-10-26): den automatiska raden och Kommentar från
+      // tekniker. Fältet döljs för teknikern; texten syns i kundportalen, i
+      // organisationsvyerna och i ärendets rapport, och blir fakturans Utfört arbete.
+      const kommentar = sessionNotes.trim()
+      const arbetsrapport = kommentar ? `${autoReport}\nKommentar från tekniker: ${kommentar}` : autoReport
+
       const updated = await completeInspectionSession(session.id)
       if (updated) {
         // Uppdatera även ärendets status till "Avslutat" om case_id finns
         if (session.case_id) {
-          const caseUpdated = await updateCaseStatusToCompleted(session.case_id, autoReport)
+          const caseUpdated = await updateCaseStatusToCompleted(session.case_id, arbetsrapport, { laggTill: true })
           if (!caseUpdated) {
             toast.error('Inspektionen avslutades men ärendets status kunde inte sättas till Avslutat. Kontrollera ärendet')
           }
@@ -1689,7 +1695,7 @@ export default function StationInspectionPanel({
               customerId: session.customer_id,
               technicianId: session.technician_id,
               technicianName: session.technician?.name || null,
-              workPerformed: sessionNotes ? `${autoReport}\n${sessionNotes}` : autoReport
+              workPerformed: arbetsrapport
             })
             if (billing.invoiceError) {
               toast.error(`Fakturan kunde inte skapas: ${billing.invoiceError}. Raderna ligger kvar. Kontoret fakturerar från Merförsäljning.`, { duration: 10000 })

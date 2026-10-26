@@ -1300,6 +1300,9 @@ export default function EditContractCaseModal({
       // Remove fields that don't exist in database
       delete cleanedFormData.reports
       delete (cleanedFormData as any).service_group_id  // transient fält
+      // Kontroller och etableringar i nya vyn: arbetsrapporten skrivs bara av avslutet
+      // (klarmarkering eller Färdig med etablering), så modalens kopia får aldrig skriva över den
+      if (nyArbetsvy && (isInspection || isEstablishment)) delete (cleanedFormData as any).work_report
 
       // Provision-flagga
       ;(cleanedFormData as any).is_commission_eligible = commissionEligible
@@ -2571,7 +2574,11 @@ export default function EditContractCaseModal({
             <div className={stegBlock('rapport')}>
               {isInspection ? (
                 <HjalpText id="steg-rapport-station" rubrik="Rapport">
-                  Kontrollrapporten visas här när kontrollrundan är avslutad. Där laddar du ned den som PDF eller Excel och skickar den till kunden.
+                  Kontrollrapporten visas här när kontrollrundan är avslutad. Där laddar du ned den som PDF eller Excel och skickar den till kunden. Arbetsrapporten skrivs automatiskt med antalet stationer och din Kommentar från tekniker.
+                </HjalpText>
+              ) : isEstablishment ? (
+                <HjalpText id="steg-rapport-etablering" rubrik="Rapport">
+                  Arbetsrapporten skrivs automatiskt när du trycker Färdig med etablering: antalet utplacerade stationer och din Kommentar från tekniker.
                 </HjalpText>
               ) : (
                 <HjalpText id="steg-rapport" rubrik="Rapport">
@@ -2884,6 +2891,18 @@ export default function EditContractCaseModal({
           {/* Arbetsrapport */}
           {iSteg(['rapport'], (
           <CaseModalSection icon={FileText} iconClassName="text-purple-400" title="Arbetsrapport">
+            {/* Kontroller och etableringar i nya vyn (2026-10-26): teknikern skriver
+                Kommentar från tekniker i kontrollrundan eller när etableringen avslutas.
+                Arbetsrapporten skrivs automatiskt vid avslutet och visas här som läsbar text. */}
+            {nyArbetsvy && (isInspection || isEstablishment) ? (
+              formData.work_report?.trim() ? (
+                <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{formData.work_report}</p>
+              ) : (
+                <p className="text-sm text-slate-400">
+                  Skrivs automatiskt när {isInspection ? 'kontrollen klarmarkeras' : 'etableringen avslutas'}: antalet stationer och din Kommentar från tekniker.
+                </p>
+              )
+            ) : (
             <textarea
               value={formData.work_report}
               onChange={(e) => setFormData(prev => ({ ...prev, work_report: e.target.value }))}
@@ -2892,6 +2911,7 @@ export default function EditContractCaseModal({
               className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
               disabled={isCustomerView}
             />
+            )}
           </CaseModalSection>
           ))}
 

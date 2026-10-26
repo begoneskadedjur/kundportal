@@ -1250,8 +1250,9 @@ export default function CaseDetailsModal({
                         </div>
                       )}
 
-                      {/* Sessionnotering — saniterad från interna ärendenummer */}
-                      {inspectionSession.notes && (
+                      {/* Sessionnotering, saniterad från interna ärendenummer. Står den redan i
+                          besöksrapporten (skrivs in vid klarmarkering sedan 2026-10-26) visas den inte två gånger. */}
+                      {inspectionSession.notes && !(fallbackData?.work_report || '').includes(inspectionSession.notes.trim()) && (
                         <div className="border-t border-slate-700/40 px-4 py-3">
                           <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Kommentar från tekniker</p>
                           <p className="text-sm text-slate-300">
