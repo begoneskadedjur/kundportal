@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { fetchAllRows } from '../../lib/fetchAllRows'
 import { BeGoneCaseRow, Technician, WorkSchedule, isScheduledCase, ALL_VALID_STATUSES, isDocumentSignedAwaitingStatus } from '../../types/database'
 import { isTechWorkingAt, formatTime } from '../../components/coordinator/schedule/scheduleUtils'
 import { Case } from '../../types/cases'
@@ -200,9 +201,14 @@ export default function CoordinatorSchedule() {
     try {
       if (isInitialLoad.current) setLoading(true)
 
-      const [techResult, privateResult, businessResult, contractResult, absenceResult] = await Promise.all([
+      // Ärendetabellerna hämtas i block om 1 000 (fetchAllRows). Utan det
+      // stannade PostgREST tyst vid 1 000 rader: 2026-10-26 hade cases 1 088
+      // rader och 40 kommande ärenden, bland dem Mathias Syrisk ortodoxa
+      // 2026-10-23, syntes inte i schemat. id som andra sorteringsnyckel ger
+      // stabila block.
+      const [techResult, privateRows, businessRows, contractRows, absenceResult] = await Promise.all([
         supabase.from('technicians').select('*').eq('is_active', true).order('name'),
-        supabase.from('private_cases').select(`
+        fetchAllRows((from, to) => supabase.from('private_cases').select(`
           id, title, status, priority, start_date, due_date, created_at, updated_at,
           adress, kontaktperson, skadedjur, annat_skadedjur,
           e_post_kontaktperson, telefon_kontaktperson, personnummer, pris,
@@ -216,8 +222,8 @@ export default function CoordinatorSchedule() {
           parent_case_id, created_by_technician_id, created_by_technician_name,
           service_id, service:services!service_id(name),
           oneflow_contract_id
-        `).is('legacy_archived_at', null).is('deleted_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
-        supabase.from('business_cases').select(`
+        `).is('legacy_archived_at', null).is('deleted_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }).order('id').range(from, to)),
+        fetchAllRows((from, to) => supabase.from('business_cases').select(`
           id, title, status, priority, start_date, due_date, created_at, updated_at,
           adress, kontaktperson, skadedjur, annat_skadedjur, bestallare, company_name,
           e_post_kontaktperson, telefon_kontaktperson, org_nr, pris,
@@ -230,8 +236,8 @@ export default function CoordinatorSchedule() {
           parent_case_id, created_by_technician_id, created_by_technician_name,
           service_id, service:services!service_id(name),
           oneflow_contract_id
-        `).is('legacy_archived_at', null).is('deleted_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
-        supabase.from('cases').select(`
+        `).is('legacy_archived_at', null).is('deleted_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }).order('id').range(from, to)),
+        fetchAllRows((from, to) => supabase.from('cases').select(`
           *, customer:customers(
             company_name, contact_address, contact_person, contact_phone,
             contact_email, billing_email, billing_address,
@@ -240,28 +246,25 @@ export default function CoordinatorSchedule() {
           contract:contracts!cases_contract_id_fkey(
             id, address_label, contact_address, oneflow_contract_id
           )
-        `).is('deleted_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
+        `).is('deleted_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }).order('id').range(from, to)),
         supabase.from('technician_absences').select('*'),
       ])
 
       if (techResult.error) throw techResult.error
-      if (privateResult.error) throw privateResult.error
-      if (businessResult.error) throw businessResult.error
-      if (contractResult.error) throw contractResult.error
       if (absenceResult.error) throw absenceResult.error
 
       const fetchedTechnicians = techResult.data || []
       setTechnicians(fetchedTechnicians)
       setAbsences(absenceResult.data || [])
-      setContractCases(contractResult.data || [])
+      setContractCases(contractRows)
 
       // Fas 13b: oneflow_contract_id läses nu direkt från private_cases /
       // business_cases-kolumnen (ingen runtime-lookup behövs). case_type
       // är fortfarande JS-flagga för tabellrouting.
       const combinedCases = [
-        ...(privateResult.data || []).map(c => ({ ...c, case_type: 'private' as const })),
-        ...(businessResult.data || []).map(c => ({ ...c, case_type: 'business' as const })),
-        ...(contractResult.data || []).map(adaptCaseToBeGoneRow),
+        ...privateRows.map(c => ({ ...c, case_type: 'private' as const })),
+        ...businessRows.map(c => ({ ...c, case_type: 'business' as const })),
+        ...contractRows.map(adaptCaseToBeGoneRow),
       ]
 
       // Batch-hämta besöksräknare från case_updates_log
@@ -270,10 +273,12 @@ export default function CoordinatorSchedule() {
       const caseIdSet = new Set(caseIds)
       let visitCountMap: Record<string, number> = {}
       if (caseIds.length > 0) {
-        const { data: logRows } = await supabase
+        const logRows = await fetchAllRows<{ case_id: string }>((from, to) => supabase
           .from('case_updates_log')
           .select('case_id')
           .eq('update_type', 'revisit_scheduled')
+          .order('id')
+          .range(from, to))
         if (logRows) {
           for (const row of logRows) {
             if (caseIdSet.has(row.case_id)) {
