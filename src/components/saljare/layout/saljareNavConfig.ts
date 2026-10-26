@@ -18,6 +18,7 @@ import {
   FileSignature,
   Inbox,
   AlertTriangle,
+  BadgeCheck,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 
@@ -50,6 +51,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Leads (Webb)', icon: Inbox, path: '/saljare/leads-webb', badgeKey: 'webLeads' },
       { label: 'Kundresa', icon: GitBranch, path: '/saljare/kundresa' },
       { label: 'Avslutade ärenden', icon: Trash2, path: '/saljare/avslutade-arenden' },
+      { label: 'Godkännanden', icon: BadgeCheck, path: '/saljare/godkannanden', requires: 'discounts' },
     ],
   },
   {
@@ -92,6 +94,7 @@ export const breadcrumbMap: Record<string, string> = {
 
   // Verktyg
   '/saljare/ai-assistent': 'AI Assistent',
+  '/saljare/godkannanden': 'Godkännanden',
   '/saljare/tillbud-avvikelser': 'Tillbud & Avvikelser',
   '/saljare/intranat': 'Intranät',
   '/saljare/larosate': 'Lärosäte',

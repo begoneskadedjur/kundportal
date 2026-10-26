@@ -47,6 +47,14 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '3.97.1',
     date: '2026-10-26',
+    title: 'Godkännanden för alla rabattansvariga',
+    items: [
+      { kind: 'andring', text: 'Godkännanden finns i menyn för den som är rabattansvarig, oavsett roll: admin, koordinator eller säljare. Övriga ser inte längre menyposten.' },
+    ],
+  },
+  {
+    version: '3.97.1',
+    date: '2026-10-26',
     title: 'Schemat visar alla ärenden igen',
     items: [
       { kind: 'buggfix', text: 'Schemat visade bara de 1 000 senast skapade avtalsärendena. När fler ärenden lades upp föll äldre bort ur schemat, till exempel en kontroll hos Syrisk ortodoxa i Mathias schema 2026-10-23. Nu hämtas alla.' },

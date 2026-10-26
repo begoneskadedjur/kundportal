@@ -373,6 +373,8 @@ function App() {
 
               {/* Ärenden (koordinator-specifik) */}
               <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="koordinator"><KontorDokumentsignering /></ProtectedRoute>} />
+              {/* Godkännanden för rabattansvariga (sidan visar spärrvy för övriga) */}
+              <Route path="godkannanden" element={<ProtectedRoute requiredRole="koordinator"><DiscountApprovals /></ProtectedRoute>} />
               <Route path="offerthantering" element={<Navigate to="/koordinator/dokumentsignering" replace />} />
               <Route path="sok-arenden" element={<ProtectedRoute requiredRole="koordinator"><CaseSearch /></ProtectedRoute>} />
               <Route path="arenden" element={<ProtectedRoute requiredRole="koordinator"><CasesPage /></ProtectedRoute>} />
@@ -419,6 +421,7 @@ function App() {
               <Route path="leads-webb/marknad" element={<ProtectedRoute requiredRole="säljare"><Marknad /></ProtectedRoute>} />
               <Route path="leadsstatistik" element={<Navigate to="/saljare/leads?flik=statistik" replace />} />
               <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="säljare"><OfferFollowUp /></ProtectedRoute>} />
+              <Route path="godkannanden" element={<ProtectedRoute requiredRole="säljare"><DiscountApprovals /></ProtectedRoute>} />
               <Route path="offerthantering" element={<Navigate to="/saljare/dokumentsignering" replace />} />
               <Route path="kundresa" element={<ProtectedRoute requiredRole="säljare"><CustomerJourney /></ProtectedRoute>} />
               <Route path="avslutade-arenden" element={<ProtectedRoute requiredRole="säljare"><ClosedCasesFunnel /></ProtectedRoute>} />

@@ -47,6 +47,9 @@ const TYPE_BADGE: Record<InvoiceType, { label: string; className: string }> = {
   contract: { label: 'Avtal', className: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' },
 }
 
+/** Portalen sidan visas i (/admin, /koordinator eller /saljare), för länkar till portalens egna sidor */
+const portalPrefix = () => `/${window.location.pathname.split('/')[1] || 'admin'}`
+
 const formatDate = (date: string | null) =>
   date ? new Date(date).toLocaleDateString('sv-SE') : '-'
 
@@ -912,7 +915,7 @@ function DokumentKort({ item, onChanged }: { item: DocumentApprovalItem; onChang
           </p>
         </div>
         <Link
-          to={`/admin/dokumentsignering?id=${item.contractId}`}
+          to={`${portalPrefix()}/dokumentsignering?id=${item.contractId}`}
           className="text-xs font-medium text-[#20c58f] hover:underline shrink-0"
         >
           Öppna i Dokumentsignering

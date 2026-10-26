@@ -75,6 +75,7 @@ export const navGroups: NavGroup[] = [
     icon: Receipt,
     items: [
       { label: 'Fakturering', icon: Receipt, path: '/koordinator/fakturering' },
+      { label: 'Godkännanden', icon: BadgeCheck, path: '/koordinator/godkannanden', requires: 'discounts' },
     ],
   },
   {
@@ -120,6 +121,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/koordinator/leads-webb/marknad': 'Marknad',
   // Fakturering
   '/koordinator/fakturering': 'Fakturering',
+  '/koordinator/godkannanden': 'Godkännanden',
 
   // Organisation
   '/koordinator/tickets': 'Tickets',

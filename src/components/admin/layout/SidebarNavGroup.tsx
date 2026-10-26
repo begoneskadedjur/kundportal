@@ -10,6 +10,7 @@ import { useAddonPendingBadge } from '../../../hooks/useAddonPending'
 import { useProcurementBadge } from '../../../hooks/useProcurementBadge'
 import { useWebLeadsBadge } from '../../../hooks/useWebLeadsBadge'
 import { useProcurementAccess } from '../../../hooks/useProcurementAccess'
+import { useAuth } from '../../../contexts/AuthContext'
 
 interface SidebarNavGroupProps {
   group: NavGroup
@@ -28,8 +29,10 @@ function ItemBadge({ count }: { count: number }) {
 
 export function SidebarNavGroup({ group: groupIn, collapsed, currentPath }: SidebarNavGroupProps) {
   const { allowed: procurementAllowed } = useProcurementAccess()
+  const { profile } = useAuth()
   // Poster med åtkomstkrav döljs för den som saknar åtkomsten
-  const group = { ...groupIn, items: groupIn.items.filter((i) => i.requires !== 'procurement' || procurementAllowed) }
+  const group = { ...groupIn, items: groupIn.items.filter((i) =>
+    (i.requires !== 'procurement' || procurementAllowed) && (i.requires !== 'discounts' || !!profile?.can_approve_discounts)) }
   const isAnyActive = group.items.some(item => currentPath.startsWith(item.path))
   const [expanded, setExpanded] = useState(group.pinned || isAnyActive)
   const GroupIcon = group.icon

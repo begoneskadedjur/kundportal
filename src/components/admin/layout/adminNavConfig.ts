@@ -44,8 +44,9 @@ export interface NavItem {
   path: string
   /** Nyckel för dynamisk räknarbadge i sidomenyn (t.ex. ohanterade incidenter) */
   badgeKey?: 'incidents' | 'intranet' | 'tickets' | 'addons' | 'procurement' | 'webLeads'
-  /** Posten visas bara för den som har åtkomsten (se useProcurementAccess) */
-  requires?: 'procurement'
+  /** Posten visas bara för den som har åtkomsten: upphandling (useProcurementAccess)
+   *  eller rabattansvarig (profiles.can_approve_discounts) */
+  requires?: 'procurement' | 'discounts'
   /** Extern adress: posten öppnas i ny flik (upphandlingsportalen på egen subdomän) */
   externalUrl?: string
 }
@@ -94,7 +95,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Ekonomisk översikt', icon: DollarSign, path: '/admin/ekonomi' },
       { label: 'Fakturering', icon: Receipt, path: '/admin/fakturering' },
-      { label: 'Godkännanden', icon: BadgeCheck, path: '/admin/godkannanden' },
+      { label: 'Godkännanden', icon: BadgeCheck, path: '/admin/godkannanden', requires: 'discounts' },
       { label: 'Provisioner', icon: Wallet, path: '/admin/provisioner' },
     ]
   },
