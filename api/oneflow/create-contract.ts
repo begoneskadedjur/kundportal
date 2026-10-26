@@ -89,7 +89,6 @@ interface ContractRequestBody {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-const kronor = (n: number) => `${Math.round(n).toLocaleString('sv-SE')} kr`
 const procentText = (n: number) => n.toLocaleString('sv-SE', { maximumFractionDigits: 2 })
 
 // FÄLTMAPPNING FÖR OLIKA DOKUMENTTYPER
@@ -178,8 +177,8 @@ function buildDataFieldsForDocument(
 // Källa: https://developer.oneflow.com/docs/product (Price: base_amount,
 // discount_percent, discount_amount, amount) och verifierat med GET
 // /v1/contracts/{id} där product_groups[].products[].price_1 har just de fälten.
-// Beskrivningen får dessutom "Listpris X kr, rabatt Y %, pris efter rabatt Z kr"
-// så att kunden ser det i PDF:en oavsett hur mallen visar kolumnerna.
+// Provat med en riktig offert 2026-10-26 (mall 8598798): PDF:en visar listpriset
+// överstruket, "Rabatt: 10 %" och priset efter rabatt, så beskrivningen rörs inte.
 type OneflowPrice = {
   base_amount: { amount: string }
   discount_amount?: { amount: string }
@@ -252,17 +251,9 @@ function convertProductsToOneflow(
         ? { base_amount: { amount: listPrice.toString() }, discount_percent: discountPercent.toString() }
         : { base_amount: { amount: listPrice.toString() }, discount_amount: { amount: '0' } }
 
-      let description: string = product.description
-      if (discountPercent > 0) {
-        const qty = Number(quantity) > 0 ? Number(quantity) : 1
-        const efter = listPrice * qty * (1 - discountPercent / 100)
-        const rad = `Listpris ${kronor(listPrice * qty)}, rabatt ${procentText(discountPercent)} %, pris efter rabatt ${kronor(efter)}`
-        description = description ? `${description}. ${rad}` : rad
-      }
-
       return {
         name: product.name,
-        description,
+        description: product.description,
         price_1: price,
         price_2: { ...price },
         quantity: {
