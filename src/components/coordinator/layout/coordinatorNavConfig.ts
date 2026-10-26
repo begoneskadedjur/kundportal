@@ -25,6 +25,7 @@ import {
   Inbox,
   FileText,
   BookCheck,
+  BadgeCheck,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 
