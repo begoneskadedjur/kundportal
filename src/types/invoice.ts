@@ -213,7 +213,7 @@ export const INVOICE_STATUS_CONFIG: Record<InvoiceStatus, {
   },
   pending_approval: {
     label: 'Kräver godkännande',
-    description: 'Rabatt given, väntar på admin-godkännande',
+    description: 'Väntar på godkännande av faktureringsansvarig',
     color: 'text-amber-400',
     bgColor: 'bg-amber-500/10',
     borderColor: 'border-amber-500/30',

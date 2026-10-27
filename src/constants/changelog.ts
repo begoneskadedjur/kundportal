@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.98.1',
+    date: '2026-10-27',
+    title: 'Premiefakturor visas inte längre som inaktuella',
+    items: [
+      { kind: 'buggfix', text: 'Premiefakturor för nya avtal kunde stå som "Fakturan är inaktuell" med en Uppdatera-knapp som inte fungerade. Varningen var fel: premiefakturan byggs ur avtalet och räknas om när den skickas. Nu visas varningen bara för fakturor från ärenden.' },
+      { kind: 'andring', text: 'En faktura som väntar på godkännande säger Väntar på godkännande av faktureringsansvarig, inte Rabatt given, eftersom det inte alltid gäller en rabatt.' },
+    ],
+  },
+  {
     version: '3.98.0',
     date: '2026-10-26',
     title: 'Arbetsrapporten skrivs automatiskt på kontroller och etableringar',

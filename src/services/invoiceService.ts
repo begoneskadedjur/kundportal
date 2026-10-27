@@ -959,6 +959,13 @@ export class InvoiceService {
     // Bara relevant för icke-skickade/betalda fakturor
     if (['sent', 'paid', 'cancelled'].includes(invoice.status)) return { stale: false }
 
+    // Premiefakturor byggs ur avtalet och planeras om när de skickas
+    // (InvoiceDetailModal 2a2), inte ur ärendets rader. Deras created_at är
+    // fakturadatumet (midnatt), så en avtalsrad som fått sitt pris samma dag
+    // gav falskt "inaktuell" och en Uppdatera-knapp som inte fungerar
+    // (Brf Tapeten 1, INV-202610-13142, 2026-10-27).
+    if (invoice.invoice_type === 'contract') return { stale: false }
+
     // Hämta case_billing_items kopplade till just denna faktura
     const linkedItemIds = invoice.items
       .filter(i => i.case_billing_item_id != null)
