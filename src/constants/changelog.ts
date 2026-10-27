@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.99.0',
+    date: '2026-10-27',
+    title: 'Fakturan visar var jobbet gjordes',
+    items: [
+      { kind: 'nyhet', text: 'När ärendets adress skiljer sig från fakturaadressen skickas den som leveransadress till Fortnox och syns på fakturan. Kunden ser var jobbet gjordes, även när fakturan går till ett huvudkontor eller en skanningscentral.' },
+      { kind: 'andring', text: 'Rutan Utfört arbete i fakturan är omgjord: tekniker, datum, arbetstid och skadedjur överst, och raden Utfört på talar om ifall adressen blir leveransadress på fakturan.' },
+      { kind: 'nyhet', text: 'Arbetsrapporten för alla besök och ärendets specialrapport läser du direkt från fakturan. Tryck Läs eller Visa så öppnas de i en panel, utan att du lämnar fakturan.' },
+    ],
+  },
+  {
     version: '3.98.1',
     date: '2026-10-27',
     title: 'Premiefakturor visas inte längre som inaktuella',

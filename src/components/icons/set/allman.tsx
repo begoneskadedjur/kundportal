@@ -64,6 +64,8 @@ export const allmanIcons = {
       <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
     </>
   ),
+  // Helskärm: fyra hörn som pekar utåt
+  'allman.helskarm': <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" />,
   // Filter: tre streck som blir kortare
   'allman.filter': <path d="M4 7h16M7 12h10M10 17h4" />,
   // Sök: lupp

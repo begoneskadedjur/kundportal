@@ -70,6 +70,8 @@ export interface Invoice {
   fastighetsbeteckning: string | null
 
   fortnox_document_number: string | null
+  /** Leveransadressen som skickades till Fortnox (ärendets adress), null = ingen */
+  delivery_address?: string | null
 }
 
 /**

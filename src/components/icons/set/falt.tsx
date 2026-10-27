@@ -219,4 +219,13 @@ export const faltIcons = {
       <path d="M12 11v8M3.5 13.5H7M17 13.5h3.5M5 9l2.2 1.4M19 9l-2.2 1.4M5 18.5l2.2-1.4M19 18.5l-2.2-1.4" />
     </>
   ),
+  // Preparat: laboratorieflaska med vätska (fakturamodalens Utfört arbete, 2026-10)
+  'falt.preparat': (
+    <>
+      <path d="M9.5 3.5h5M10.5 3.5v5.2L5.8 17.3A2.2 2.2 0 0 0 7.7 20.5h8.6a2.2 2.2 0 0 0 1.9-3.2L13.5 8.7V3.5" />
+      <path d="M7.6 14h8.8" />
+      <circle cx="11" cy="17" r=".7" fill="currentColor" stroke="none" />
+      <circle cx="13.6" cy="16.2" r=".5" fill="currentColor" stroke="none" />
+    </>
+  ),
 } satisfies Record<`falt.${string}`, ReactNode>

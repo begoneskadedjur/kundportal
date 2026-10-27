@@ -1,7 +1,7 @@
 // src/components/admin/invoicing/InvoiceDetailModal.tsx
 // Modal för att visa och hantera fakturadetaljer med ärendekontext och kommunikation
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import {
   X,
   AlertTriangle,
@@ -19,15 +19,12 @@ import {
   XCircle,
   Download,
   RefreshCw,
-  Bug,
   Users,
   Clock,
   ClipboardCheck,
   ChevronDown,
   ChevronUp,
   MessageSquare,
-  FlaskConical,
-  Timer,
   Home,
   RotateCcw,
   Trash2,
@@ -56,8 +53,6 @@ import { calculateRotRutSummary } from '../../../utils/rotRutConstants'
 import { toLocalISOStringWithOffset } from '../../../utils/dateHelpers'
 import type { CaseBillingItem } from '../../../types/caseBilling'
 import { useCaseContext } from '../../../hooks/useCaseContext'
-import type { CaseContext } from '../../../hooks/useCaseContext'
-import { formatSwedishDateTime } from '../../../types/database'
 import DateField from '../../ui/DateField'
 import ServiceCostBreakdown from '../../shared/ServiceCostBreakdown'
 import CaseModalSection from '../../shared/CaseModalSection'
@@ -65,6 +60,7 @@ import InvoiceStatusStepper from '../../shared/InvoiceStatusStepper'
 import InvoicePulseRow from './InvoicePulseRow'
 import InvoiceDeliveryPanel from './InvoiceDeliveryPanel'
 import { caseMarkingOnInvoice } from '../../../shared/caseMarking'
+import { invoiceWorkAddress } from '../../../shared/invoiceWorkAddress'
 import { InvoiceDeliveryError, InvoiceDeliveryService } from '../../../services/invoiceDeliveryService'
 import { toFortnoxDeliveryType, isInvoiceDeliveryMethod, type DeliveryEvaluation } from '../../../shared/invoiceDelivery'
 import InvoiceMarkingSection from './InvoiceMarkingSection'
@@ -73,21 +69,20 @@ import InvoiceVisitTimeline from './InvoiceVisitTimeline'
 import { useInvoicePulse, usePriceListCheck } from '../../../hooks/useInvoicePulse'
 import { useInvoiceMarking } from '../../../hooks/useInvoiceMarking'
 import { useInvoiceCaseChain } from '../../../hooks/useInvoiceCaseChain'
-import { useInvoiceVisit, type VisitSnapshot } from '../../../hooks/useInvoiceVisit'
+import { useInvoiceVisit } from '../../../hooks/useInvoiceVisit'
+import { useCaseReports } from '../../../hooks/useCaseReports'
+import WorkPerformedSection from './WorkPerformedSection'
 import { useInvoiceAddons } from '../../../hooks/useInvoiceAddons'
 import { InvoiceAddonBlock, InvoiceAddonCosts, InvoiceAddonSideCard } from './InvoiceAddonSection'
 import { addonLineName, addonPeriodText, buildFortnoxInvoiceRows, fortnoxText, type InvoiceItemLike } from '../../../shared/invoiceAddonLines'
 import { splitCaseLines, formatHours } from '../../../shared/addonEconomics'
-import { formatVisitTechnicians } from '../../../services/visitService'
 import CommentSection from '../../communication/CommentSection'
-import CaseContextImagePreview from '../../communication/CaseContextImagePreview'
 import EmbeddedMapPreview from '../../communication/EmbeddedMapPreview'
 import { createSystemComment } from '../../../services/communicationService'
 import { useAuth } from '../../../contexts/AuthContext'
 import type { CaseType } from '../../../types/communication'
 import type { CasePreparationWithDetails } from '../../../types/casePreparations'
 
-// Formatera minuter till "Xh Ym"
 /**
  * Avgränsar ett ärendes case_billing_items till DEN HÄR fakturan.
  *
@@ -151,232 +146,7 @@ function scopeItemsToInvoice(
   return [...matchedServices, ...scopedArticles]
 }
 
-const formatTimeSpent = (minutes: number | null): string | null => {
-  if (!minutes || minutes <= 0) return null
-  const h = Math.floor(minutes / 60)
-  const m = Math.round(minutes % 60)
-  if (h > 0 && m > 0) return `${h}h ${m}m`
-  if (h > 0) return `${h}h`
-  return `${m}m`
-}
-
-// Skadedjursnivå 0-4 och problembild 1-5 — samma skala, färger och labels som
-// VisitHistoryPanel. Punkt + text, aldrig piller.
-const pestLevelColors: Record<number, string> = {
-  0: 'text-emerald-400',
-  1: 'text-yellow-400',
-  2: 'text-orange-400',
-  3: 'text-red-400',
-  4: 'text-red-300',
-}
-
-const pestLevelLabels: Record<number, string> = {
-  0: 'Ingen aktivitet',
-  1: 'Låg',
-  2: 'Medel',
-  3: 'Hög',
-  4: 'Kritisk',
-}
-
-const problemRatingColors: Record<number, string> = {
-  1: 'text-emerald-400',
-  2: 'text-emerald-400',
-  3: 'text-amber-400',
-  4: 'text-red-400',
-  5: 'text-red-300',
-}
-
-const problemRatingLabels: Record<number, string> = {
-  1: 'Utmärkt',
-  2: 'Bra',
-  3: 'OK',
-  4: 'Allvarligt',
-  5: 'Kritiskt',
-}
-
-// Delat "Utfört arbete"-innehåll — samma JSX för desktop-sektionen och
-// den utfällbara mobilvyn: metadatarad + arbetsrapport med visa mer-toggle
-// + använda preparat + bilder. Ren presentation, ingen datahämtning.
-//
-// visit = besökssnapshotet fakturan avser (useInvoiceVisit). När ett återbesök
-// bokats är ärendets egna fält nollställda och scheduled_start flyttad till
-// NÄSTA besök — snapshotet är då den enda korrekta källan och går före
-// caseContext. caseContext behålls som fallback för allt.
-function WorkPerformedContent({
-  caseContext,
-  preparations,
-  visit
-}: {
-  caseContext: CaseContext | null
-  preparations: CasePreparationWithDetails[]
-  visit?: VisitSnapshot | null
-}) {
-  const [reportExpanded, setReportExpanded] = useState(false)
-  // "Visa mer" ska bara finnas när texten faktiskt är avklippt. Antal rader
-  // går inte att räkna i förväg (radbrytning beror på bredd och teckensnitt),
-  // så vi mäter elementets verkliga höjd mot dess synliga höjd.
-  const reportRef = useRef<HTMLParagraphElement>(null)
-  const [reportClamped, setReportClamped] = useState(false)
-  // Beräknas före den tidiga returen nedan: hooks måste anropas i samma
-  // ordning varje render, och effekten beror på rapporttexten.
-  const report = visit?.work_performed || caseContext?.rapport || null
-
-  useEffect(() => {
-    const el = reportRef.current
-    if (!el) { setReportClamped(false); return }
-    const measure = () => setReportClamped(el.scrollHeight > el.clientHeight + 1)
-    measure()
-    // Bredden ändras när modalen öppnas eller fönstret storleksändras
-    const observer = new ResizeObserver(measure)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [report, reportExpanded])
-
-  if (!caseContext && !visit) {
-    return <p className="text-sm text-slate-500 py-1">Ingen arbetsrapport ännu</p>
-  }
-
-  // Besöket kan ha utförts av flera tekniker — visa hela laget kommaseparerat.
-  // Saknas listan (äldre besök) gäller primärteknikern som förr.
-  const technicianName =
-    formatVisitTechnicians(visit?.technicians, visit?.technician_name) ||
-    caseContext?.primaryAssigneeName ||
-    null
-  const performedAt = visit?.visit_date || caseContext?.startDate || null
-  // Besökets tid vinner, men 0 minuter betyder "inte registrerad" — fall då tillbaka
-  // på ärendets värde i stället för att dölja en tid som faktiskt finns
-  const timeSpentMinutes = (visit?.time_spent_minutes || null) ?? caseContext?.timeSpentMinutes ?? null
-  const timeSpent = formatTimeSpent(timeSpentMinutes)
-  const pestType = caseContext?.pestType || null
-
-  const recommendations = visit?.recommendations?.trim() || null
-  const pestLevel = visit?.pest_level ?? null
-  const problemRating = visit?.problem_rating ?? null
-
-  return (
-    <div className="space-y-2.5">
-      {/* Metadata: tekniker · utförandedatum · arbetstid · skadedjur */}
-      {(technicianName || performedAt || timeSpent || pestType) && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          {technicianName && (
-            <span className="inline-flex items-center gap-1.5 text-slate-300">
-              <User className="w-3.5 h-3.5 text-green-400" />
-              {technicianName}
-            </span>
-          )}
-          {performedAt && (
-            <span className="inline-flex items-center gap-1.5 text-slate-300 tabular-nums">
-              <Calendar className="w-3.5 h-3.5 text-purple-400" />
-              {formatSwedishDateTime(performedAt)}
-            </span>
-          )}
-          {timeSpent && (
-            <span className="inline-flex items-center gap-1.5 text-slate-300 tabular-nums">
-              <Timer className="w-3.5 h-3.5 text-green-400" />
-              {timeSpent}
-            </span>
-          )}
-          {pestType && (
-            <span className="inline-flex items-center gap-1.5 text-slate-300">
-              <Bug className="w-3.5 h-3.5 text-orange-400" />
-              {pestType}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Skadedjursnivå + problembild från besöket — punkt och text, inga piller */}
-      {(pestLevel != null || problemRating != null) && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          {pestLevel != null && (
-            <span>
-              <span className="text-slate-500">Skadedjursnivå: </span>
-              <span className={`inline-flex items-center gap-1.5 font-medium tabular-nums ${pestLevelColors[pestLevel] ?? 'text-slate-300'}`}>
-                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                {pestLevel} · {pestLevelLabels[pestLevel] ?? `Nivå ${pestLevel}`}
-              </span>
-            </span>
-          )}
-          {problemRating != null && (
-            <span>
-              <span className="text-slate-500">Problembild: </span>
-              <span className={`inline-flex items-center gap-1.5 font-medium tabular-nums ${problemRatingColors[problemRating] ?? 'text-slate-300'}`}>
-                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                {problemRating} · {problemRatingLabels[problemRating] ?? `Nivå ${problemRating}`}
-              </span>
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Arbetsrapport */}
-      {report ? (
-        <div className="bg-slate-900/50 rounded-lg p-2.5">
-          <p
-            ref={reportRef}
-            className={`text-sm text-slate-300 whitespace-pre-wrap ${reportExpanded ? '' : 'line-clamp-6'}`}
-          >
-            {report}
-          </p>
-          {(reportClamped || reportExpanded) && (
-            <button
-              type="button"
-              onClick={() => setReportExpanded(!reportExpanded)}
-              className="mt-1.5 text-xs text-[#20c58f] hover:text-[#1bb07e]"
-            >
-              {reportExpanded ? 'Visa mindre' : 'Visa mer'}
-            </button>
-          )}
-        </div>
-      ) : (
-        <p className="text-sm text-slate-500">Ingen arbetsrapport ännu</p>
-      )}
-
-      {/* Rekommendationer från besöket */}
-      {recommendations && (
-        <div>
-          <h4 className="text-xs font-medium text-slate-400 mb-1">Rekommendationer</h4>
-          <p className="text-sm text-amber-300/80 whitespace-pre-wrap leading-relaxed">{recommendations}</p>
-        </div>
-      )}
-
-      {/* Använda preparat */}
-      {preparations.length > 0 && (
-        <div>
-          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 mb-1">
-            <FlaskConical className="w-3.5 h-3.5 text-teal-400" />
-            Använda preparat
-          </h4>
-          <div className="bg-slate-900/50 rounded-lg border border-slate-700/50 divide-y divide-slate-700/50">
-            {preparations.map(p => (
-              <div key={p.id} className="px-2.5 py-2 flex items-center justify-between">
-                <div>
-                  <span className="text-sm text-slate-200">{p.preparation?.name || 'Okänt preparat'}</span>
-                  {p.preparation?.type && (
-                    <span className="ml-1.5 px-1.5 py-0.5 text-[10px] rounded bg-teal-500/20 text-teal-400 font-medium">
-                      {p.preparation.type}
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs text-slate-400">{p.quantity} {p.unit}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Bilder */}
-      {caseContext && (
-        <CaseContextImagePreview
-          caseId={caseContext.id}
-          caseType={caseContext.caseType}
-          maxThumbnails={4}
-        />
-      )}
-    </div>
-  )
-}
-
+// Rutan "Utfört arbete" ligger i WorkPerformedSection.tsx (ombyggd 2026-10).
 interface InvoiceDetailModalProps {
   isOpen: boolean
   onClose: () => void
@@ -626,6 +396,24 @@ export default function InvoiceDetailModal({
       .maybeSingle()
       .then(({ data }) => setLinkedCaseNumber(data?.case_number || null))
   }, [invoice?.case_id, invoice?.case_type])
+
+  // Rutan Utfört arbete (WorkPerformedSection): ärendets besöksrapporter och
+  // specialrapporter till läspanelen. Samma props på dator och i mobilvyn.
+  const caseReports = useCaseReports(
+    isOpen && invoice?.case_id ? invoice.case_id : null,
+    isOpen && invoice ? effectiveCaseType : null
+  )
+  const workPerformedProps = {
+    caseId: invoice?.case_id ?? null,
+    caseNumber: linkedCaseNumber,
+    caseContext,
+    visit,
+    preparations,
+    reports: caseReports,
+    billingAddress: invoice?.customer_address ?? null,
+    customerName: invoice?.customer_name ?? null,
+    loading: contextLoading,
+  }
 
   // Besöksnummer per fakturarad. Privat/företag länkar direkt via
   // case_billing_item_id; adhoc/avtal länkar via contract_billing_items som
@@ -977,12 +765,14 @@ export default function InvoiceDetailModal({
         work_order_number?: string | null
         work_object?: string | null
         room_number?: string | null
+        /** Utförandeadressen (jsonb), blir leveransadress i Fortnox */
+        address?: unknown
       } | null = null
       if (invoice.case_id) {
         if (effectiveCaseType === 'contract') {
           const { data } = await supabase
             .from('cases')
-            .select('case_number, completed_date, scheduled_start, primary_technician_name, invoice_marking, work_order_number, work_object, room_number')
+            .select('case_number, completed_date, scheduled_start, primary_technician_name, invoice_marking, work_order_number, work_object, room_number, address')
             .eq('id', invoice.case_id)
             .maybeSingle()
           if (data) {
@@ -996,25 +786,27 @@ export default function InvoiceDetailModal({
               work_order_number: d.work_order_number,
               work_object: d.work_object,
               room_number: d.room_number,
+              address: d.address,
             }
           }
         } else if (invoice.case_type === 'business') {
           const { data } = await supabase
             .from('business_cases')
-            .select('case_number, completed_date, start_date, primary_assignee_name, markning_faktura, customer_group_id')
+            .select('case_number, completed_date, start_date, primary_assignee_name, markning_faktura, customer_group_id, adress')
             .eq('id', invoice.case_id)
             .maybeSingle()
           if (data) {
             const d = data as any
-            caseMetaEarly = { ...d, invoice_marking: d.markning_faktura }
+            caseMetaEarly = { ...d, invoice_marking: d.markning_faktura, address: d.adress }
           }
         } else {
           const { data } = await supabase
             .from('private_cases')
-            .select('case_number, completed_date, start_date, primary_assignee_name')
+            .select('case_number, completed_date, start_date, primary_assignee_name, adress')
             .eq('id', invoice.case_id)
             .maybeSingle()
-          caseMetaEarly = (data as any) || null
+          const d = data as { case_number: string | null; completed_date: string | null; start_date: string | null; primary_assignee_name: string | null; adress: unknown } | null
+          caseMetaEarly = d ? { ...d, address: d.adress } : null
         }
       }
       const technicianName = caseMetaEarly?.primary_assignee_name ?? null
@@ -1268,6 +1060,17 @@ export default function InvoiceDetailModal({
         fortnoxPayload.InvoiceRows = [{ Description: fortnoxText(caseMarking.rowText) }, ...invoiceRows]
       }
 
+      // Utförandeadressen som leveransadress när den skiljer sig från
+      // fakturaadressen (src/shared/invoiceWorkAddress.ts). Fortnox skriver ut
+      // den som eget block "Leveransadress"; kundkortet påverkas inte.
+      // Läses från ärendet vid sändningen, som märkningen.
+      const workAddress = invoiceWorkAddress({
+        workAddress: caseMetaEarly?.address,
+        billingAddress: invoice.customer_address,
+        name: invoice.customer_name,
+      })
+      if (workAddress.fortnox) Object.assign(fortnoxPayload, workAddress.fortnox)
+
       // Årspremiefakturor (inget ärende): avtalets diarienummer som extern
       // referens och kundansvarig som Vår referens. Samlad faktura (flera
       // avtal): diarienummer från raderna, gemensam kundansvarig om alla delar.
@@ -1336,10 +1139,15 @@ export default function InvoiceDetailModal({
         }
       }
 
-      // 5. Spara DocumentNumber + det förfallodatum som skickades till Fortnox
+      // 5. Spara DocumentNumber + det förfallodatum och den leveransadress
+      // som skickades till Fortnox
       await supabase
         .from('invoices')
-        .update({ fortnox_document_number: fortnoxInvoice.DocumentNumber, due_date: dueDate })
+        .update({
+          fortnox_document_number: fortnoxInvoice.DocumentNumber,
+          due_date: dueDate,
+          delivery_address: workAddress.status === 'leverans' ? workAddress.text : null,
+        })
         .eq('id', invoice.id)
 
       // 6. Uppdatera status till draft (utkast i Fortnox — ej bokfört, ej skickat ännu)
@@ -1758,15 +1566,7 @@ export default function InvoiceDetailModal({
                 )}
 
                 {/* Utfört arbete — ärendekontext från teknikern */}
-                <CaseModalSection icon={ClipboardCheck} iconClassName="text-amber-400" title="Utfört arbete">
-                  {contextLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <RefreshCw className="w-4 h-4 text-slate-400 animate-spin" />
-                    </div>
-                  ) : (
-                    <WorkPerformedContent caseContext={caseContext} preparations={preparations} visit={visit} />
-                  )}
-                </CaseModalSection>
+                <WorkPerformedSection {...workPerformedProps} />
 
                 {/* Fakturakedja — delfakturerade ärenden: vad är fakturerat, vad väntar */}
                 {invoice.case_id && (
@@ -2365,9 +2165,7 @@ export default function InvoiceDetailModal({
                     {marking && <InvoiceMarkingSection marking={marking} customerName={invoice.customer_name} />}
 
                     {/* Utfört arbete — samma innehåll som desktop-sektionen */}
-                    <CaseModalSection icon={ClipboardCheck} iconClassName="text-amber-400" title="Utfört arbete">
-                      <WorkPerformedContent caseContext={caseContext} preparations={preparations} visit={visit} />
-                    </CaseModalSection>
+                    <WorkPerformedSection {...workPerformedProps} />
 
                     {/* Avtalskontext — mobil */}
                     {(invoice.invoice_type === 'contract' || invoice.invoice_type === 'adhoc') && (

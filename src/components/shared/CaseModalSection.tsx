@@ -7,6 +7,8 @@ import type { LucideIcon } from 'lucide-react'
 
 interface CaseModalSectionProps {
   icon?: LucideIcon
+  /** Egen ikon i stället för en lucide-ikon, t.ex. <Icon name="falt.rapport" />. Vinner över icon. */
+  iconNode?: React.ReactNode
   /** Färgklass för ikonen, t.ex. "text-blue-400" */
   iconClassName?: string
   title?: string
@@ -20,6 +22,7 @@ interface CaseModalSectionProps {
 
 export default function CaseModalSection({
   icon: Icon,
+  iconNode,
   iconClassName = 'text-slate-400',
   title,
   actions,
@@ -39,7 +42,9 @@ export default function CaseModalSection({
         <div className="flex items-center justify-between gap-2 mb-2">
           {title && (
             <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 min-w-0">
-              {Icon && <Icon className={`w-4 h-4 flex-shrink-0 ${iconClassName}`} />}
+              {iconNode
+                ? <span className={`flex flex-shrink-0 ${iconClassName}`}>{iconNode}</span>
+                : Icon && <Icon className={`w-4 h-4 flex-shrink-0 ${iconClassName}`} />}
               <span className="truncate">{title}</span>
             </h3>
           )}

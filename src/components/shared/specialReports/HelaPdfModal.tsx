@@ -23,7 +23,8 @@ interface HelaPdfModalProps {
   vy: string
   hamtarPdf: boolean
   onLaddaNer: () => void
-  onSkicka: () => void
+  /** Utan onSkicka visas ingen Skicka-knapp (läsläget i fakturamodalen) */
+  onSkicka?: () => void
 }
 
 export default function HelaPdfModal(props: HelaPdfModalProps) {
@@ -129,14 +130,16 @@ function Innehall({ onClose, report, vy, hamtarPdf, onLaddaNer, onSkicka }: Hela
             {hamtarPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon name="rapport.ladda" size={16} />}
             <span className="hidden sm:inline">Ladda ner PDF</span>
           </button>
-          <button
-            type="button"
-            onClick={onSkicka}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#20c58f] px-3 text-xs font-bold text-[#04140d] hover:bg-[#1ba876] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]/60"
-          >
-            <Icon name="rapport.skicka" size={16} />
-            <span className="hidden sm:inline">Skicka till kund</span>
-          </button>
+          {onSkicka && (
+            <button
+              type="button"
+              onClick={onSkicka}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#20c58f] px-3 text-xs font-bold text-[#04140d] hover:bg-[#1ba876] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]/60"
+            >
+              <Icon name="rapport.skicka" size={16} />
+              <span className="hidden sm:inline">Skicka till kund</span>
+            </button>
+          )}
           <button ref={stangRef} type="button" aria-label="Stäng" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white">
             <Icon name="allman.stang" size={20} />
           </button>
