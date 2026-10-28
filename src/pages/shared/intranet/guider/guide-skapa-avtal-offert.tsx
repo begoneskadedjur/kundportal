@@ -196,7 +196,7 @@ function Innehall({ l, tryck, mk }: { l: Lage; tryck: Tryck; mk: Mk }) {
           <StegRubrik nr={idx} rubrik="Välj mall" text="Mallen styr offertens fasta text i Oneflow." />
           <div className="grid gap-1">
             {OFFER_TEMPLATES.map(t => (
-              <ValKort key={t.id} id={`mall:${t.id}`} namn={mallNamn(t.name)} text={t.category === 'company' ? 'Företag' : 'Privatperson'} vald={l.mall === t.id} ikon="dok.offert" tryck={tryck} mk={mk} />
+              <ValKort key={t.id} id={`mall:${t.id}`} namn={mallNamn(t.name)} text={[t.category === 'company' ? 'Företag' : 'Privatperson', t.deduction ? `${t.deduction}-avdrag` : null].filter(Boolean).join(' · ')} vald={l.mall === t.id} ikon="dok.offert" tryck={tryck} mk={mk} />
             ))}
           </div>
         </>

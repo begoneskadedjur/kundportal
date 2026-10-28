@@ -15,7 +15,9 @@ const EMPTY_FORM = {
   oneflow_template_id: '',
   name: '',
   type: 'contract' as 'contract' | 'offer',
-  category: 'company' as 'company' | 'individual'
+  category: 'company' as 'company' | 'individual',
+  /** Avdraget mallens text söker. '' = inget avdrag. */
+  deduction_type: '' as '' | 'ROT' | 'RUT'
 }
 
 export default function OneflowTemplatesSettings() {
@@ -59,7 +61,9 @@ export default function OneflowTemplatesSettings() {
         oneflow_template_id: form.oneflow_template_id,
         name: form.name,
         type: form.type,
-        category: form.type === 'offer' ? form.category : null
+        category: form.type === 'offer' ? form.category : null,
+        // ROT/RUT gäller bara privatpersoner; mallen bestämmer avdraget i guiden
+        deduction_type: form.type === 'offer' && form.category === 'individual' && form.deduction_type ? form.deduction_type : null
       })
       toast.success('Mall tillagd - den är nu valbar i Skapa avtal eller offert och igenkänd av webhook/sync')
       setForm(EMPTY_FORM)
@@ -139,6 +143,7 @@ export default function OneflowTemplatesSettings() {
                       <span className="text-xs text-slate-400 ml-2">
                         ID {t.oneflow_template_id}
                         {t.category ? ` · ${t.category === 'company' ? 'Företag' : 'Privatperson'}` : ''}
+                        {t.deduction_type ? ` · ${t.deduction_type}-avdrag` : ''}
                         {` · ${count} avtal i systemet`}
                         {!t.is_active ? ' · AVAKTIVERAD' : ''}
                       </span>
@@ -242,6 +247,20 @@ export default function OneflowTemplatesSettings() {
                 >
                   <option value="company">Företag</option>
                   <option value="individual">Privatperson</option>
+                </select>
+              </div>
+            )}
+            {form.type === 'offer' && form.category === 'individual' && (
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">ROT/RUT-avdrag i mallens text</label>
+                <select
+                  value={form.deduction_type}
+                  onChange={e => setForm(f => ({ ...f, deduction_type: e.target.value as '' | 'ROT' | 'RUT' }))}
+                  className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                >
+                  <option value="">Inget avdrag</option>
+                  <option value="ROT">ROT (30 %)</option>
+                  <option value="RUT">RUT (50 %)</option>
                 </select>
               </div>
             )}

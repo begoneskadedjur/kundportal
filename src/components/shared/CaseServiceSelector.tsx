@@ -57,6 +57,7 @@ import { ARTICLE_CATEGORY_CONFIG } from '../../types/articles'
  */
 type CustomerArticlePrice = { custom_price: number; quantity_tiers: QuantityTier[] | null }
 import PriceCalculatorPanel, { type PriceGuideDiscount } from './PriceCalculatorPanel'
+import { tillatnaAvdrag, type MallAvdrag } from '../../shared/rotRutDokument'
 
 interface CaseServiceSelectorProps {
   caseId?: string
@@ -83,6 +84,13 @@ interface CaseServiceSelectorProps {
   initialDraftItems?: CaseBillingItemWithRelations[]
   initialPriceAssignments?: Record<string, string>
   initialPriceMarkups?: Record<string, number>
+  /**
+   * Skapa avtal eller offert: mallens avdrag (3.106.0). 'ROT' = bara ROT kan väljas,
+   * 'RUT' = bara RUT, 'none' = inget avdrag. Utelämnad = som i ärendet, båda.
+   * Rader som redan har ett avdrag mallen inte tillåter ändras aldrig automatiskt,
+   * de flaggas så att användaren byter själv.
+   */
+  allowedDeduction?: MallAvdrag
 }
 
 const formatPrice = (price: number) =>
@@ -127,6 +135,7 @@ export default function CaseServiceSelector({
   initialDraftItems,
   initialPriceAssignments,
   initialPriceMarkups,
+  allowedDeduction,
 }: CaseServiceSelectorProps) {
   const { profile } = useAuth()
   // All data
@@ -421,6 +430,11 @@ export default function CaseServiceSelector({
   // arbetskostnaden, inte på paketpris där material/preparat ingår.
   // Tjänsten som är markerad som arbetstidstjänst (used_for_addon_labour) i
   // första hand, annars första avdragsberättigade tjänsten.
+  // Avdragen mallen tillåter (Skapa avtal eller offert); i ärendet båda
+  const tillat = tillatnaAvdrag(allowedDeduction)
+  const mallText = allowedDeduction === 'none'
+    ? 'Mallen har inget ROT- eller RUT-avdrag'
+    : allowedDeduction ? `Mallen gäller bara ${allowedDeduction}` : ''
   const laborService = addonServices.find(s => s.used_for_addon_labour)
     ?? addonServices.find(s => s.rot_eligible || s.rut_eligible)
     ?? null
@@ -954,11 +968,9 @@ export default function CaseServiceSelector({
     setSplitAmount(suggested)
     setSplitHours(formatHoursSv(hours > 0 ? hours : 1))
     // Förvälj avdragstyp bara när arbetstjänsten är berättigad för exakt en typ
-    setSplitType(
-      laborService?.rot_eligible && !laborService?.rut_eligible ? 'ROT'
-        : laborService?.rut_eligible && !laborService?.rot_eligible ? 'RUT'
-        : null
-    )
+    const kanRot = !!laborService?.rot_eligible && tillat.rot
+    const kanRut = !!laborService?.rut_eligible && tillat.rut
+    setSplitType(kanRot && !kanRut ? 'ROT' : kanRut && !kanRot ? 'RUT' : null)
     setSplitItemId(item.id)
   }
 
@@ -991,6 +1003,10 @@ export default function CaseServiceSelector({
     }
     if ((splitType === 'ROT' && !laborService.rot_eligible) || (splitType === 'RUT' && !laborService.rut_eligible)) {
       setSplitError(`${laborService.name} är inte berättigad till ${splitType}.`)
+      return
+    }
+    if ((splitType === 'ROT' && !tillat.rot) || (splitType === 'RUT' && !tillat.rut)) {
+      setSplitError(`${mallText}. Välj ${tillat.rot ? 'ROT' : tillat.rut ? 'RUT' : 'en annan mall i steget Mall'}.`)
       return
     }
     // Totalen (exkl. moms) som fördelas: tjänsteraden + ev. befintlig arbetsrad
@@ -1601,16 +1617,21 @@ export default function CaseServiceSelector({
               // (arbetstidstjänster i katalogen). Avdrag på paketpriser där material
               // ingår blir fel mot Skatteverket — arbetskostnaden delas istället ut
               // till en egen arbetstidsrad via "Dela upp för ROT/RUT" nedan.
-              const showRot = !!svc?.rot_eligible
-              const showRut = !!svc?.rut_eligible
+              // Mallen (Skapa avtal eller offert) begränsar vilka avdrag som visas
+              const showRot = !!svc?.rot_eligible && tillat.rot
+              const showRut = !!svc?.rut_eligible && tillat.rut
               // Legacy: avdrag satt på icke-berättigad tjänst — visa så det kan tas bort
-              const misplacedDeduction = !!item.rot_rut_type && !showRot && !showRut
-              const showRotRut = caseType === 'private' && (showRot || showRut || misplacedDeduction)
+              const misplacedDeduction = !!item.rot_rut_type && !svc?.rot_eligible && !svc?.rut_eligible
+              // Avdrag som mallen inte tillåter: visas så att det kan bytas eller tas bort
+              const mallFel = !misplacedDeduction && !!item.rot_rut_type
+                && !(item.rot_rut_type === 'ROT' ? tillat.rot : tillat.rut)
+              const showRotRut = caseType === 'private' && (showRot || showRut || misplacedDeduction || mallFel)
               // "Dela upp för ROT/RUT" — bara privatärenden, ej på arbetstidsraden själv,
               // ej på prislistelåsta rader (deras pris får inte ändras här)
               const splittable = caseType === 'private'
                 && !readOnly
-                && !showRot && !showRut
+                && !svc?.rot_eligible && !svc?.rut_eligible
+                && (tillat.rot || tillat.rut)
                 && item.total_price > 0
                 && !(item.service_id && customerServicePrices[item.service_id] !== undefined)
                 && !derivedLockedServiceIds.has(item.id)
@@ -1776,6 +1797,14 @@ export default function CaseServiceSelector({
                           </span>
                         </div>
                       )}
+                      {mallFel && (
+                        <div className="flex items-start gap-1.5 text-xs text-amber-400">
+                          <Icon name="rapport.avvikelse" className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <span>
+                            {mallText}, men raden har {item.rot_rut_type}. {tillat.rot || tillat.rut ? `Välj ${tillat.rot ? 'ROT' : 'RUT'} eller Inget avdrag` : 'Välj Inget avdrag'}, eller byt mall i steget Mall.
+                          </span>
+                        </div>
+                      )}
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <label className="flex items-center gap-1 cursor-pointer">
                           <input
@@ -1877,6 +1906,14 @@ export default function CaseServiceSelector({
                           )}
                         </div>
                         <p className="text-xs text-slate-500">Material och övrigt {formatPrice(materialInkl)}</p>
+                        {laborChild.rot_rut_type && !(laborChild.rot_rut_type === 'ROT' ? tillat.rot : tillat.rut) && (
+                          <p className="flex items-start gap-1.5 text-xs text-amber-400">
+                            <Icon name="rapport.avvikelse" className="w-3.5 h-3.5 shrink-0 mt-px" />
+                            <span>
+                              {mallText}, men arbetskostnaden har {laborChild.rot_rut_type}. {tillat.rot || tillat.rut ? `Tryck Ändra och välj ${tillat.rot ? 'ROT' : 'RUT'}` : 'Tryck Ta bort uppdelning'}, eller byt mall i steget Mall.
+                            </span>
+                          </p>
+                        )}
                         {laborChild.rot_rut_type && (
                           readOnly ? (
                             laborChild.fastighetsbeteckning ? (
@@ -1966,7 +2003,7 @@ export default function CaseServiceSelector({
                           <div className="col-span-2 sm:col-span-1">
                             <span className="block text-[11px] text-slate-400 mb-0.5">Avdrag</span>
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
-                              {laborService.rot_eligible && (
+                              {laborService.rot_eligible && tillat.rot && (
                                 <label className="flex items-center gap-1 cursor-pointer">
                                   <input
                                     type="radio"
@@ -1978,7 +2015,7 @@ export default function CaseServiceSelector({
                                   <span className="text-xs text-slate-300">ROT ({getEffectiveRotPercent(laborService)} %)</span>
                                 </label>
                               )}
-                              {laborService.rut_eligible && (
+                              {laborService.rut_eligible && tillat.rut && (
                                 <label className="flex items-center gap-1 cursor-pointer">
                                   <input
                                     type="radio"
@@ -2631,8 +2668,8 @@ export default function CaseServiceSelector({
               : i.unit_price,
             quantity: i.quantity,
             discount_percent: i.discount_percent,
-            rot_eligible: !!svc?.rot_eligible,
-            rut_eligible: !!svc?.rut_eligible,
+            rot_eligible: !!svc?.rot_eligible && tillat.rot,
+            rut_eligible: !!svc?.rut_eligible && tillat.rut,
             rot_rate_percent: svc?.rot_rate_percent ?? null,
             rut_rate_percent: svc?.rut_rate_percent ?? null,
             discountable: !readOnly && isDiscountableServiceRow(i),

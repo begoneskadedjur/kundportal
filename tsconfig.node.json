@@ -61,6 +61,9 @@
     // och avtalslivscykeln (webhookens inaktivering av kunder)
     "src/shared/avtalsKundKoppling.ts",
     "src/utils/contractLifecycle.ts",
+    // ROT/RUT-spärren och arbetsradernas koppling (create-contract), mallens avdrag
+    "src/shared/rotRutDokument.ts",
+    "src/constants/oneflowTemplates.ts",
 
     // Upphandlingsportalen: radtyper och rena regler (matchning, dedup,
     // avtalsslut, län) som delas mellan synk-cronen och klienten

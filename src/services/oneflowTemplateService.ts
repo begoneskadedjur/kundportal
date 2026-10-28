@@ -16,6 +16,8 @@ export interface OneflowTemplateRow {
   category: 'company' | 'individual' | null
   popular: boolean
   is_active: boolean
+  /** ROT eller RUT om mallens text söker avdraget, null = inget avdrag */
+  deduction_type?: 'ROT' | 'RUT' | null
   created_at: string
   updated_at: string
 }
@@ -26,6 +28,7 @@ export interface OneflowTemplateInput {
   type: 'contract' | 'offer'
   category?: 'company' | 'individual' | null
   popular?: boolean
+  deduction_type?: 'ROT' | 'RUT' | null
 }
 
 function rowToLegacyShape(row: OneflowTemplateRow): OneflowTemplate {
@@ -34,7 +37,8 @@ function rowToLegacyShape(row: OneflowTemplateRow): OneflowTemplate {
     name: row.name,
     type: row.type,
     category: row.category ?? undefined,
-    popular: row.popular || undefined
+    popular: row.popular || undefined,
+    deduction: row.deduction_type === 'ROT' || row.deduction_type === 'RUT' ? row.deduction_type : undefined
   }
 }
 
@@ -115,6 +119,7 @@ export class OneflowTemplateService {
         name: input.name.trim(),
         type: input.type,
         category: input.type === 'offer' ? (input.category ?? null) : null,
+        deduction_type: input.type === 'offer' ? (input.deduction_type ?? null) : null,
         popular: input.popular ?? false
       })
       .select()

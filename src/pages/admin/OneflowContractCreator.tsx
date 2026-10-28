@@ -50,6 +50,7 @@ import {
 } from '../../shared/avtalsKontroll'
 import AvtalsKundVal, { KopplingsRad } from '../../components/shared/avtalsKund/AvtalsKundVal'
 import { useIdNummerForslag } from '../../hooks/useIdNummerForslag'
+import { mallensAvdrag, rotRutFel } from '../../shared/rotRutDokument'
 import { AvtalsKundService } from '../../services/avtalsKundService'
 import { kopplingSkaSlappas } from '../../shared/avtalsKundKoppling'
 import {
@@ -125,6 +126,8 @@ interface WizardData {
     /** Rabatt i procent på listpriset (unit_price), total_price är efter rabatt */
     discount_percent?: number | null
     discount_motivation?: string | null
+    /** ROT/RUT-arbetsrad: tjänsteraden den hör till (case_billing_items.id) */
+    labor_for_item_id?: string | null
     service?: {
       rot_rate_percent?: number | null
       rut_rate_percent?: number | null
@@ -1112,6 +1115,9 @@ export default function OneflowContractCreator() {
     // Manuellt läge: kräv minst en tjänst (item_type='service') i draftItems
     if (currentStep === productsStep) {
       if (rabattUtanMotivering) return false
+      // ROT/RUT: både ROT och RUT, avdrag på en tjänst som inte är arbetstid,
+      // eller ett avdrag som mallen inte tillåter (src/shared/rotRutDokument.ts)
+      if (rotRutFelText) return false
       if (wizardData.case_id) {
         return !!(wizardData.prefillServices && wizardData.prefillServices.length > 0)
       }
@@ -1148,34 +1154,10 @@ export default function OneflowContractCreator() {
       if (rabattUtanMotivering) return 'Skriv en motivering till rabatten i prisguiden'
       if (wizardData.case_id) {
         if (!wizardData.prefillServices || wizardData.prefillServices.length === 0) return 'Lägg till minst en tjänst på ärendet'
-        return validateRotRutRows(wizardData.prefillServices)
+        return rotRutFelText
       }
       if (!wizardData.draftItems.some(i => i.item_type === 'service')) return 'Lägg till minst en tjänst'
-      return validateRotRutRows(wizardData.draftItems.filter(i => i.item_type === 'service'))
-    }
-    return ''
-  }
-
-  // Guardrail: ROT/RUT-avdrag måste ligga på arbetstidstjänster (avdraget
-  // beräknas på arbetskostnaden) och ett dokument kan bara ha en avdragstyp.
-  const validateRotRutRows = (
-    rows: Array<{
-      rot_rut_type?: 'ROT' | 'RUT' | null
-      service_name?: string | null
-      service?: { rot_eligible?: boolean; rut_eligible?: boolean } | null
-    }>
-  ): string => {
-    const deductionRows = rows.filter(r => r.rot_rut_type)
-    if (deductionRows.length === 0) return ''
-    const hasRot = deductionRows.some(r => r.rot_rut_type === 'ROT')
-    const hasRut = deductionRows.some(r => r.rot_rut_type === 'RUT')
-    if (hasRot && hasRut) return 'Dokumentet kan inte ha både ROT och RUT – dela upp i separata ärenden'
-    const misplaced = deductionRows.filter(
-      r => r.service && !r.service.rot_eligible && !r.service.rut_eligible
-    )
-    if (misplaced.length > 0) {
-      const names = misplaced.map(r => r.service_name || 'Tjänst').join(', ')
-      return `ROT/RUT ligger på "${names}" som inte är en arbetstidstjänst – använd "Dela upp för ROT/RUT"`
+      return rotRutFelText
     }
     return ''
   }
@@ -1183,6 +1165,21 @@ export default function OneflowContractCreator() {
   // Hitta rätt mall baserat på dokumenttyp
   const availableTemplates = wizardData.documentType === 'offer' ? offerTemplates : contractTemplates
   const selectedTemplate = availableTemplates.find(t => t.id === wizardData.selectedTemplate)
+
+  // ROT/RUT (3.106.0): mallen bestämmer avdraget. ROT-mallen tillåter bara ROT,
+  // RUT-mallen bara RUT och övriga mallar inget avdrag. Avdraget får bara ligga på
+  // arbetstid och ett dokument har högst en avdragstyp. Felet spärrar Nästa i
+  // Tjänster, ger en röd punkt i granskningen och stoppar handleSubmit.
+  // Raderna ändras aldrig automatiskt när mallen byts: felet visas i stället.
+  const mallAvdrag = mallensAvdrag(selectedTemplate)
+  const rotRutRader: Array<{ rot_rut_type?: 'ROT' | 'RUT' | null; service_name?: string | null; service?: { rot_eligible?: boolean; rut_eligible?: boolean } | null }> =
+    wizardData.case_id && wizardData.prefillServices && wizardData.prefillServices.length > 0
+      ? wizardData.prefillServices
+      : wizardData.draftItems.filter(i => i.item_type === 'service')
+  const rotRutFelText = rotRutFel(
+    rotRutRader,
+    mallAvdrag ? { avdrag: mallAvdrag, namn: selectedTemplate?.name.replace(/\s*[\u2013\u2014]\s*/g, ', ') } : null
+  )
 
   // Leads (Webb): kopplar en skickad offert till webbförfrågan som guiden öppnades från.
   // Anropas först när offerten publicerats; utkast och avtal kopplas aldrig.
@@ -1272,9 +1269,11 @@ export default function OneflowContractCreator() {
       : wizardData.draftItems.filter(i => i.item_type === 'service').length,
   }), [wizardData])
   // Kundkopplingen: ett huvudkontor med enheter kräver att omfattningen är vald
-  const kontrollPunkter = saknarOmfattning
-    ? [...avtalsKontroll, { niva: 'rod' as const, text: 'Välj vilka enheter avtalet omfattar', avsnitt: 'motpart' as const }]
-    : avtalsKontroll
+  const kontrollPunkter = [
+    ...avtalsKontroll,
+    ...(saknarOmfattning ? [{ niva: 'rod' as const, text: 'Välj vilka enheter avtalet omfattar', avsnitt: 'motpart' as const }] : []),
+    ...(rotRutFelText ? [{ niva: 'rod' as const, text: rotRutFelText, avsnitt: 'tjanster' as const }] : []),
+  ]
   const kontrollStoppar = harStopp(kontrollPunkter)
 
   const avsnittSteg: Record<KontrollAvsnitt, number> = {
@@ -1291,6 +1290,13 @@ export default function OneflowContractCreator() {
   }
 
   const handleSubmit = async () => {
+    // ROT/RUT-felet stoppar även här (servern kontrollerar igen innan Oneflow)
+    if (rotRutFelText) {
+      setSubmitError(rotRutFelText)
+      setSubmitErrorStep(productsStep)
+      toast.error(rotRutFelText)
+      return
+    }
     // Konvertera tjänster → SelectedProduct-format för API:et (aldrig inköpsartiklar!)
     const partyType = wizardData.partyType as CustomerType
     let convertedProducts: SelectedProduct[] = []
@@ -1432,6 +1438,8 @@ export default function OneflowContractCreator() {
                 rot_rut_type: s.rot_rut_type ?? null,
                 fastighetsbeteckning: s.fastighetsbeteckning ?? null,
                 mapped_service_id: null,
+                // ROT/RUT-arbetsraden pekar på sin tjänsterad (draft_id); servern pekar om till de nya id:na
+                labor_for_item_id: s.labor_for_item_id ?? null,
               }))
             : wizardData.draftItems.map(i => ({
                 draft_id: i.id,
@@ -1455,6 +1463,9 @@ export default function OneflowContractCreator() {
                 rot_rut_type: i.rot_rut_type,
                 fastighetsbeteckning: i.fastighetsbeteckning ?? null,
                 mapped_service_id: i.mapped_service_id,
+                // ROT/RUT-arbetsraden pekar på tjänsteradens lokala id (draft_id). Servern pekar
+                // om till de nya id:na, så att kopplingen följer med till Boka in och fakturan
+                labor_for_item_id: i.labor_for_item_id ?? null,
               }))
           )
         })
@@ -1757,6 +1768,7 @@ export default function OneflowContractCreator() {
                   ? (template.category === 'company' ? 'Företag' : 'Privatperson')
                   : null,
                 template.popular ? 'Mest använd' : null,
+                template.deduction ? `${template.deduction}-avdrag` : null,
               ].filter(Boolean).join(' · ') || beskrivning || undefined
               return (
                 <ValKortLitet
@@ -1770,6 +1782,12 @@ export default function OneflowContractCreator() {
                 />
               )
             })}
+            {rotRutFelText && (
+              <p role="status" className="sm:col-span-2 flex items-start gap-2 text-sm text-amber-400">
+                <span className="w-2 h-2 rounded-full bg-amber-500 mt-[6px] shrink-0" aria-hidden="true" />
+                <span>Tjänsterna passar inte mallen. {rotRutFelText} Du rättar det i steget Tjänster.</span>
+              </p>
+            )}
           </div>
         )
 
@@ -2034,6 +2052,7 @@ export default function OneflowContractCreator() {
           <div className={`${CARD_CLASS} p-4 sm:p-6`}>
             {hasCaseLink ? (
               <CaseServiceSelector
+                allowedDeduction={mallAvdrag}
                 caseId={wizardData.case_id}
                 caseType={wizardData.case_type ?? (wizardData.partyType === 'company' ? 'business' : 'private')}
                 customerId={null}
@@ -2059,6 +2078,7 @@ export default function OneflowContractCreator() {
               />
             ) : (
               <CaseServiceSelector
+                allowedDeduction={mallAvdrag}
                 draftMode
                 caseType={wizardData.partyType === 'company' ? 'business' : 'private'}
                 customerId={null}

@@ -6,6 +6,8 @@ export interface OneflowTemplate {
   type: 'contract' | 'offer'
   category?: 'company' | 'individual' // För offert-mallar
   popular?: boolean
+  /** Avdraget mallens text söker (oneflow_templates.deduction_type). Saknas = inget avdrag. */
+  deduction?: 'ROT' | 'RUT'
 }
 
 // Offert-mallar som vi använder
@@ -26,13 +28,15 @@ export const OFFER_TEMPLATES: OneflowTemplate[] = [
     id: '8919012', 
     name: 'Offertförslag – ROT (Privatperson)',
     type: 'offer',
-    category: 'individual'
+    category: 'individual',
+    deduction: 'ROT'
   },
   { 
     id: '8919059', 
     name: 'Offertförslag – RUT (Privatperson)',
     type: 'offer',
-    category: 'individual'
+    category: 'individual',
+    deduction: 'RUT'
   }
 ]
 

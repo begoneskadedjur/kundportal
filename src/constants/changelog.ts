@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.106.0',
+    date: '2026-10-28',
+    title: 'Mallen bestämmer ROT och RUT i offerten',
+    items: [
+      { kind: 'buggfix', text: 'I Skapa avtal eller offert bestämmer mallen nu avdraget: med ROT-mallen går bara ROT att välja, med RUT-mallen bara RUT och med övriga mallar inget avdrag. Både ROT och RUT, avdrag på en tjänst som inte är arbetstid eller ett avdrag som inte passar mallen spärrar Nästa med en rad om vad som ska rättas. Arbetskostnaden i en offert utan ärende behåller sin koppling till tjänsten när offerten bokas in, och kontorets guide Skapa och skicka en offert visar hur det går till.' },
+    ],
+  },
+  {
     version: '3.105.1',
     date: '2026-10-28',
     title: 'Org.nr och adress följer med när en offert bokas in',

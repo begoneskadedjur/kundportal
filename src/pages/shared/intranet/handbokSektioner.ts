@@ -70,7 +70,7 @@ export const HANDBOK_SEKTIONER: HandbokSektion[] = [
     ikon: 'dok.offert',
     slugs: [
       'guide-skapa-avtal-offert', 'guide-skapa-avtalsforslag', 'guide-dokumentsignering-tekniker', 'guide-min-kundresa', 'guide-leads-tekniker',
-      'guide-skapa-avtalsforslag-kontor', 'guide-dokumentsignering-saljare', 'guide-leads-saljare',
+      'guide-dokumentsignering-saljare', 'guide-skapa-avtalsforslag-kontor', 'guide-leads-saljare',
       'guide-dokumentsignering', 'guide-boka-in', 'guide-leads-kontor',
     ],
   },

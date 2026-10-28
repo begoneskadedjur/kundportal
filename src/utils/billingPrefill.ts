@@ -19,6 +19,8 @@ export interface PrefillService {
   /** Rabatt i procent på listpriset (unit_price); total_price är priset efter rabatt */
   discount_percent?: number | null
   discount_motivation?: string | null
+  /** ROT/RUT-arbetsrad: tjänsteraden den hör till. Följer med till offertens rader (3.106.0) */
+  labor_for_item_id?: string | null
   service?: {
     rot_rate_percent?: number | null
     rut_rate_percent?: number | null
@@ -45,6 +47,7 @@ export function mapBillingItemsToPrefillServices(
       fastighetsbeteckning: item.fastighetsbeteckning ?? null,
       discount_percent: Number(item.discount_percent || 0),
       discount_motivation: item.discount_motivation ?? null,
+      labor_for_item_id: item.labor_for_item_id ?? null,
       service: item.service
         ? {
             rot_rate_percent: item.service.rot_rate_percent ?? null,

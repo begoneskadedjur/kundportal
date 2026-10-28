@@ -6,6 +6,8 @@ import {
   arUuid, jamforIdNummer, kundensIdNummer, valideraKundOchOmfattning, type KopplingsKund,
 } from '../../src/shared/avtalsKundKoppling'
 import { identityNumberVariants } from '../../src/shared/contractSigning'
+import { delaArbetsrader, mallensAvdrag, rotRutFel, type MallAvdrag } from '../../src/shared/rotRutDokument'
+import { getTemplateById } from '../../src/constants/oneflowTemplates'
 // Node.js 18+ har inbyggd fetch
 
 interface ContractRequestBody {
@@ -92,6 +94,8 @@ interface ContractRequestBody {
     rot_rut_type?: 'ROT' | 'RUT' | null
     fastighetsbeteckning?: string | null
     mapped_service_id?: string | null
+    /** ROT/RUT-arbetsrad: tjänsteradens draft_id. Pekas om till tjänsteradens nya id vid persistens */
+    labor_for_item_id?: string | null
     /** Motivering till rabatten (krävs när discount_percent > 0) */
     discount_motivation?: string | null
     /** Ärendets rad rabatten kommer från: godkännandet ärvs om den är godkänd med samma procent */
@@ -397,6 +401,47 @@ export default async function handler(
       })
       if (ejGodkand) {
         return res.status(409).json({ message: 'Rabatten väntar på godkännande', code: 'discount_pending' })
+      }
+    }
+  }
+
+  // ROT/RUT (3.106.0): samma regler som guiden (src/shared/rotRutDokument.ts), innan
+  // något skapas i Oneflow. Ett avdrag, bara på arbetstid, och det avdrag mallen
+  // bär (oneflow_templates.deduction_type, ROT-mallen 30 %, RUT-mallen 50 %).
+  // Inget i det som skickas till Oneflow ändras här, bara spärren.
+  if (Array.isArray(draftItems)) {
+    const avdragsRader = draftItems.filter(
+      i => i && i.item_type === 'service' && (i.rot_rut_type === 'ROT' || i.rot_rut_type === 'RUT')
+    )
+    if (avdragsRader.length > 0) {
+      const db = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!)
+      const tjanstIds = Array.from(new Set(
+        avdragsRader.map(r => r.service_id).filter((id): id is string => typeof id === 'string' && UUID_RE.test(id))
+      ))
+      const [katalogSvar, mallSvar] = await Promise.all([
+        tjanstIds.length > 0
+          ? db.from('services').select('id, rot_eligible, rut_eligible').in('id', tjanstIds)
+          : Promise.resolve({ data: [] as Array<{ id: string; rot_eligible: boolean | null; rut_eligible: boolean | null }>, error: null }),
+        db.from('oneflow_templates').select('name, deduction_type').eq('oneflow_template_id', String(templateId ?? '')).maybeSingle(),
+      ])
+      if (katalogSvar.error) console.error('[create-contract] ROT/RUT: tjänsterna kunde inte läsas:', katalogSvar.error.message)
+      const katalog = new Map(((katalogSvar.data ?? []) as Array<{ id: string; rot_eligible: boolean | null; rut_eligible: boolean | null }>).map(s => [s.id, s]))
+      // Mallen: databasen först, annars den hårdkodade listan. Okänd mall = ingen mallkontroll.
+      const mallRad = mallSvar.error ? null : (mallSvar.data as { name: string; deduction_type: string | null } | null)
+      const kandMall = getTemplateById(String(templateId ?? ''))
+      const avdrag: MallAvdrag | undefined = mallRad
+        ? (mallRad.deduction_type === 'ROT' || mallRad.deduction_type === 'RUT' ? mallRad.deduction_type : 'none')
+        : mallensAvdrag(kandMall)
+      const fel = rotRutFel(
+        avdragsRader.map(r => ({
+          rot_rut_type: r.rot_rut_type,
+          service_name: r.service_name,
+          service: (r.service_id && katalog.get(r.service_id)) || null,
+        })),
+        avdrag ? { avdrag, namn: (mallRad?.name ?? kandMall?.name ?? null)?.replace(/\s*[\u2013\u2014]\s*/g, ', ') } : null
+      )
+      if (fel) {
+        return res.status(400).json({ message: fel, detail: fel, code: 'rot_rut' })
       }
     }
   }
@@ -849,6 +894,8 @@ export default async function handler(
           rot_rut_type: item.rot_rut_type || null,
           fastighetsbeteckning: item.fastighetsbeteckning || null,
           mapped_service_id: mappedServiceIdOverride,
+          // Sätts bara på arbetsraderna i steg 1b (ompekad till tjänstens nya id)
+          labor_for_item_id: null as string | null,
         })
 
         // Steg 1: insert tjänster först (utan mapped_service_id), så vi kan få deras DB-id:n.
@@ -865,37 +912,51 @@ export default async function handler(
         const draftToDbId = new Map<string, string>()
 
         if (services.length > 0) {
-          const serviceRows = services.map(s => buildRow(s, null))
-          const { data: insertedServices, error: servicesError } = await supabase
-            .from('case_billing_items')
-            .insert(serviceRows)
-            .select('id, service_code, service_name, discount_percent, requires_approval')
-
-          if (servicesError) {
-            console.error('[persist] Insert av services misslyckades:', servicesError)
-            return res.status(502).json({
-              message: 'Kontrakt skapades men tjänster kunde inte sparas',
-              contract: createdContract,
-              persist_error: servicesError.message,
+          // ROT/RUT v2 (3.106.0): arbetsraderna (labor_for_item_id = tjänsteradens draft_id)
+          // sparas efter sina tjänster och pekar på tjänstens nya id. Utan kopplingen blev
+          // arbetsraden fristående efter Boka in och syntes som en egen rad på fakturan.
+          const { foraldrar, arbetsrader } = delaArbetsrader(services)
+          const insertedServices: Array<{ id: string; service_code: string | null; service_name: string | null; discount_percent: number | null; requires_approval: boolean | null; labor_for_item_id: string | null }> = []
+          for (const [batch, arArbete] of [[foraldrar, false], [arbetsrader, true]] as const) {
+            if (batch.length === 0) continue
+            const serviceRows = batch.map(s => {
+              const rad = buildRow(s, null)
+              if (arArbete && s.labor_for_item_id) rad.labor_for_item_id = draftToDbId.get(s.labor_for_item_id) ?? null
+              return rad
             })
+            const { data: inserted, error: servicesError } = await supabase
+              .from('case_billing_items')
+              .insert(serviceRows)
+              .select('id, service_code, service_name, discount_percent, requires_approval, labor_for_item_id')
+
+            if (servicesError) {
+              console.error('[persist] Insert av services misslyckades:', servicesError)
+              return res.status(502).json({
+                message: 'Kontrakt skapades men tjänster kunde inte sparas',
+                contract: createdContract,
+                persist_error: servicesError.message,
+              })
+            }
+
+            // Mappa insatta tjänster tillbaka till draft-items via index-ordning
+            // (Supabase insert returnerar rader i samma ordning som input)
+            if (inserted) {
+              batch.forEach((draftService, idx) => {
+                const dbRow = inserted[idx]
+                if (dbRow && draftService.draft_id) {
+                  draftToDbId.set(draftService.draft_id, dbRow.id)
+                }
+              })
+              insertedServices.push(...inserted)
+            }
           }
 
-          // Mappa insatta tjänster tillbaka till draft-items via index-ordning
-          // (Supabase insert returnerar rader i samma ordning som input)
-          if (insertedServices) {
-            services.forEach((draftService, idx) => {
-              const dbRow = insertedServices[idx]
-              if (dbRow && draftService.draft_id) {
-                draftToDbId.set(draftService.draft_id, dbRow.id)
-              }
-            })
-          }
-
-          console.log(`[persist] Sparade ${serviceRows.length} tjänster`)
+          console.log(`[persist] Sparade ${services.length} tjänster, varav ${arbetsrader.length} ROT/RUT-arbetsrader`)
 
           // Rabatt som väntar: notis till rabattansvariga med länk till dokumentet
           // (case_type null + rubrikprefix, src/shared/dokumentNotis.ts)
-          const vantande = (insertedServices ?? []).filter(r => r.requires_approval && Number(r.discount_percent) > 0)
+          // Arbetsraderna följer sin tjänst (godkänns med den), så de räknas inte upp
+          const vantande = insertedServices.filter(r => r.requires_approval && Number(r.discount_percent) > 0 && !r.labor_for_item_id)
           if (vantande.length > 0) {
             try {
               const { data: ansvariga } = await supabase
