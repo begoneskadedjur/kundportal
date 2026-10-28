@@ -45,7 +45,7 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '3.102.0',
+    version: '3.103.0',
     date: '2026-10-28',
     title: 'Guider för avtalsförslag och offerter',
     items: [
