@@ -78,7 +78,10 @@ export default function BookInModal({ offer, userId, onClose, onDone }: BookInMo
           .select('organization_number, contact_address')
           .eq('id', offer.id)
           .maybeSingle()
-        const idNr = doc?.organization_number?.trim() || null
+        // BeGones eget org.nr har sparats som kundens på äldre privatoffertar
+        // (webhookens reserv före 3.105.2): det får aldrig följa med
+        const rawIdNr = doc?.organization_number?.trim() || null
+        const idNr = rawIdNr && rawIdNr.replace(/\D/g, '') !== '5593789208' ? rawIdNr : null
         const adress = doc?.contact_address?.trim() || null
         const row: Record<string, unknown> = {
           title: title.trim(),

@@ -544,9 +544,13 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     contact_person: findField('Kontaktperson', 'kontaktperson', 'kontakt-person', 'contact-person') || counterParticipant?.name || firstParticipant?.name || null,
     contact_email: findField('e-post-kontaktperson', 'kontaktperson-e-post', 'contact-email', 'e-post') || counterParticipant?.email || firstParticipant?.email || null,
     contact_phone: findField('telefonnummer-kontaktperson', 'tel-nr', 'telefon', 'phone', 'telefonnummer') || counterParticipant?.phone_number || firstParticipant?.phone_number || null,
-    contact_address: findField('utforande-adress', 'utförande-adress', 'adress', 'address', 'leveransadress') || null,
+    // Offertmallarna heter utfrande-adress och per--org-nr (Oneflow tar bort å/ä/ö),
+    // samma nycklar som sync-offers och import-contracts mappar
+    contact_address: findField('utfrande-adress', 'utforande-adress', 'utförande-adress', 'adress', 'address', 'leveransadress') || null,
     company_name: findField('foretag', 'företag', 'kund', 'company', 'bolag') || counterParty?.name || counterParticipant?.name || null,
-    organization_number: findField('org-nr', 'orgnr', 'per-org-nr', 'organisationsnummer') || counterParty?.identification_number || firstParty?.identification_number || null,
+    // Aldrig firstParty som reserv: det är BeGone (559378-9208), som då sparades
+    // som kundens nummer på privatoffertar där motparten saknar id-nummer
+    organization_number: findField('per--org-nr', 'org-nr', 'orgnr', 'per-org-nr', 'organisationsnummer') || counterParty?.identification_number || null,
     
     // Avtal/Offert-detaljer  
     agreement_text: agreementParts.join('\n\n'),

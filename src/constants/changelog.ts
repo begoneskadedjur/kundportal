@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.105.2',
+    date: '2026-10-28',
+    title: 'Rätt personnummer och adress från offerter',
+    items: [
+      { kind: 'buggfix', text: 'När en offert till en privatperson signerades sparade portalen Begones eget org.nr i stället för kundens personnummer, och utförandeadressen följde inte med. Nu läses personnummer, org.nr och utförandeadress från rätt fält i offerten.' },
+    ],
+  },
+  {
     version: '3.106.0',
     date: '2026-10-28',
     title: 'Mallen bestämmer ROT och RUT i offerten',
