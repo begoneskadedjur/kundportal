@@ -532,9 +532,23 @@ export default async function handler(
   if (selectedProducts && selectedProducts.length > 0) {
     const oneflowProducts = convertProductsToOneflow(selectedProducts, partyType)
     if (oneflowProducts.length > 0) {
+      // Kolumnerna sätts här och gäller före mallens inställning (3.103.0).
+      // Mallarnas price_1-kolumn summeras utan antal i fyra avtalsmallar
+      // (8462854, 10331847, 8465556, 9324573): 5 592 x 5 + 1 200 x 4 visades
+      // som "Pris: 6 792". price_2 summeras med antal i alla tio mallar
+      // (provat med utkast 2026-10-28). Priset står i båda kolumnerna, så
+      // bara price_2 visas, med etiketten "Pris". Premien räknas oförändrat
+      // (src/shared/oneflowProductValue.ts). Källa:
+      // https://developer.oneflow.com/docs/product-group (configuration.columns).
       productGroups = [{
         products: oneflowProducts,
-        configuration: { hide_price_summation: false }
+        configuration: {
+          hide_price_summation: false,
+          columns: [
+            { key: 'price_1', enabled: false, label: 'Pris' },
+            { key: 'price_2', enabled: true, label: 'Pris' },
+          ],
+        }
       }]
     }
   }
