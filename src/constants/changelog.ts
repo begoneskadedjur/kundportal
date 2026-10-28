@@ -47,6 +47,14 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '3.104.0',
     date: '2026-10-28',
+    title: 'Tydlig knapp för att klarmarkera stationskontrollen',
+    items: [
+      { kind: 'andring', text: 'Förloppet i stationskontrollen är nu en stor knapp. Den fylls i takt med kontrollerade stationer, ute och inne tillsammans, och blir grön med texten Klarmarkera kontrollen när alla är klara. Trycker du innan dess ser du hur många som är kvar ute och inne och kan gå direkt till rätt område.' },
+    ],
+  },
+  {
+    version: '3.104.0',
+    date: '2026-10-28',
     title: 'Avtalets summa i Oneflow räknar med antal',
     items: [
       { kind: 'buggfix', text: 'I fyra avtalsmallar räknade Oneflow ihop priserna utan antal, så ett avtal med 5 fällor à 5 592 kr kunde visa summan 5 592 kr för kunden. Nu skapar portalen avtal och offerter så att summan alltid är pris gånger antal, med rabatten synlig per rad. Gäller nya dokument från Skapa avtal eller offert.' },

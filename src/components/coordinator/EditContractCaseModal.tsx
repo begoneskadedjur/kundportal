@@ -2514,7 +2514,7 @@ export default function EditContractCaseModal({
             <div className={stegBlock('arbete')}>
               {isInspection ? (
                 <HjalpText id="steg-arbete-station" rubrik="Kontrollera stationerna">
-                  Tryck på en station på kartan eller i listan, eller starta en runda så tar appen dem i nummerordning. Alla stationer måste vara kontrollerade innan besöket kan klarmarkeras. Klarmarkera gör du i kontrollen nedanför.
+                  Tryck på en station på kartan eller i listan, eller starta en runda så tar appen dem i nummerordning. Alla stationer måste vara kontrollerade innan besöket kan klarmarkeras. Klarmarkera gör du med den stora knappen överst i kontrollen nedanför. Den fylls i takt med stationerna, ute och inne, och blir grön när alla är klara.
                 </HjalpText>
               ) : isEstablishment ? (
                 <HjalpText id="steg-arbete-etablering" rubrik="Placera ut stationerna">
@@ -3526,7 +3526,7 @@ export default function EditContractCaseModal({
                     : undefined}
                   helaArendetViaSteg={isInspection ? {
                     steg: 'arbete',
-                    text: `Du stänger besöket med Klarmarkera i kontrollrundan i steget Arbetet. ${utoverAvtaletText}`,
+                    text: `Du stänger besöket med knappen Klarmarkera kontrollen överst i stationskontrollen i steget Arbetet. ${utoverAvtaletText}`,
                   } : isEstablishment ? {
                     steg: 'arbete',
                     text: `Du avslutar etableringen med Färdig i utplaceringen, som du når från steget Arbetet. Där räknas tilläggsstationerna som satts ut, och de faktureras utöver avtalet. Det som ingår i avtalet faktureras inte.`,
