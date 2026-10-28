@@ -70,6 +70,16 @@ export default function BookInModal({ offer, userId, onClose, onDone }: BookInMo
       } else {
         // Engångsoffert → private_cases/business_cases (samma tabeller som övriga engångsärenden)
         const table = offerKind === 'business' ? 'business_cases' : 'private_cases'
+        // Org.nr/personnummer och adress följer med från dokumentet, annars
+        // saknas de när ärendet avslutas och fakturan skapas (BE-0009173).
+        // Listans FollowUpOffer bär inte fälten, de läses från contracts här.
+        const { data: doc } = await supabase
+          .from('contracts')
+          .select('organization_number, contact_address')
+          .eq('id', offer.id)
+          .maybeSingle()
+        const idNr = doc?.organization_number?.trim() || null
+        const adress = doc?.contact_address?.trim() || null
         const row: Record<string, unknown> = {
           title: title.trim(),
           status: 'Öppen',
@@ -81,6 +91,8 @@ export default function BookInModal({ offer, userId, onClose, onDone }: BookInMo
           oneflow_contract_id: offer.oneflow_contract_id,
         }
         if (offerKind === 'business' && offer.company_name) row.bestallare = offer.company_name
+        if (idNr) row[offerKind === 'business' ? 'org_nr' : 'personnummer'] = idNr
+        if (adress) row.adress = adress
         const { data, error } = await supabase.from(table).insert([row]).select('id').single()
         if (error) throw error
         bookedCaseId = data.id

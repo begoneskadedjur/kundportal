@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.105.1',
+    date: '2026-10-28',
+    title: 'Org.nr och adress följer med när en offert bokas in',
+    items: [
+      { kind: 'buggfix', text: 'Boka in från Offertuppföljning tog bara med kontaktperson, e-post och telefon. Ärendet saknade då org.nr (eller personnummer) och adress, och fakturan fick inga sådana uppgifter. Nu följer båda med från det signerade dokumentet.' },
+    ],
+  },
+  {
     version: '3.105.0',
     date: '2026-10-28',
     title: 'Klarmarkera kontrollen överallt och i guiden',
