@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.105.0',
+    date: '2026-10-28',
+    title: 'Klarmarkera kontrollen överallt och i guiden',
+    items: [
+      { kind: 'andring', text: 'Medan stationskontrollen pågår är Vidare till rapport en vit knapp. Klarmarkera kontrollen är den enda gröna knappen i steget Arbetet.' },
+      { kind: 'andring', text: 'Sidan Stationskontroll som öppnas utanför ärendet har samma klarmarkeringsknapp som steget Arbetet.' },
+      { kind: 'andring', text: 'Guiden Gör en stationskontroll visar den nya knappen och den vita Vidare-knappen.' },
+    ],
+  },
+  {
     version: '3.104.0',
     date: '2026-10-28',
     title: 'Tydlig knapp för att klarmarkera stationskontrollen',

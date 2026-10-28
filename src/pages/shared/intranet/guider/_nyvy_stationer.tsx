@@ -182,6 +182,8 @@ export interface Runda {
   runda: boolean
   /** Stationen som pulserar i rundan */
   puls?: number | null
+  /** Raden under klarmarkeringsknappen: vad som är kvar (tryck före 100 %) */
+  visaKvar?: boolean
 }
 
 /** Stationslistans rad: typruta, nummer och typ, senaste kontrollen, OK-bocken */
@@ -218,7 +220,7 @@ export function StationRad({ s, klar, varde, tryck, markera, nr }: {
 }
 
 /**
- * Kontrollen inbäddad i steget Arbetet: bocken Klarmarkera ärende, förloppet,
+ * Kontrollen inbäddad i steget Arbetet: förloppet som knappen Klarmarkera kontrollen,
  * kommentaren, Ute/Inne med Starta runda, rundraden, kartan och listan.
  * Mål: 'klar', 'starta', 'avsluta-runda', 'hoppa', 'stn:N', 'rad:N', 'ok:N'.
  */
@@ -246,20 +248,28 @@ export function KontrollRunda({ r, tryck, markera, nr }: { r: Runda; tryck: (id:
 
   return (
     <div className="grid gap-1.5">
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="flex justify-between text-[10.5px] text-slate-300"><span>{klara} av {totalt} stationer</span><span className="tabular-nums">{procent} %</span></p>
-          <div className="mt-0.5 h-1 w-full rounded-full bg-slate-700"><div className="h-1 rounded-full bg-[#20c58f]" style={{ width: `${procent}%` }} /></div>
-        </div>
-        {klara > 0 && (
-          <Markor markor={mk(markera, 'klar', nr)}>
-            <button type="button" onClick={() => tryck('klar')} aria-label="Klarmarkera ärende" title="Klarmarkera ärende"
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#20c58f] text-[#04140d]">
-              <Icon name="station.klar" size={20} />
-            </button>
-          </Markor>
-        )}
-      </div>
+      {/* Förloppet är klarmarkeringsknappen (KlarmarkeraKnapp): fylls med bockarna, grön vid 100 % */}
+      <Markor markor={mk(markera, 'klar', nr)} block>
+        <button type="button" onClick={() => tryck('klar')}
+          aria-label={kvar ? `${klara} av ${totalt} stationer kontrollerade, ${totalt - klara} kvar` : 'Klarmarkera kontrollen'}
+          className={`relative flex h-10 w-full items-center overflow-hidden rounded-lg border px-2.5 ${kvar ? 'border-slate-700 bg-slate-800 text-white' : 'border-[#20c58f] bg-[#20c58f] text-[#04140d]'}`}>
+          {kvar && <span aria-hidden className="absolute inset-y-0 left-0 bg-[#20c58f]/30" style={{ width: `${procent}%` }} />}
+          <span className="relative flex w-full items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-[11.5px] font-semibold">
+              {!kvar && <Icon name="station.klar" size={16} />}
+              {kvar ? <span><span className="tabular-nums">{klara} av {totalt}</span> kontrollerade</span> : 'Klarmarkera kontrollen'}
+            </span>
+            <span className={`text-[10.5px] font-medium tabular-nums ${kvar ? 'text-slate-300' : 'opacity-75'}`}>{kvar ? `${totalt - klara} kvar` : `${totalt} av ${totalt}`}</span>
+          </span>
+        </button>
+      </Markor>
+      {r.visaKvar && kvar && (
+        <p className="flex items-center gap-1.5 text-[10.5px] text-slate-300">
+          <span aria-hidden className="h-1.5 w-1.5 flex-none rounded-full bg-amber-400" />
+          Kontrollera alla stationer för att klarmarkera.
+          <span className="flex items-center gap-0.5 font-semibold text-[#20c58f] underline underline-offset-2"><Icon name="station.ute" size={16} className="h-3 w-3" />{totalt - klara} kvar ute</span>
+        </p>
+      )}
       <div className="flex gap-1">
         <span className="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2 text-[10.5px] text-slate-500"><Icon name="allman.anteckning" size={16} className="h-3.5 w-3.5" />Kommentar från tekniker</span>
         <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-slate-300"><Icon name="allman.foto" size={16} /></span>

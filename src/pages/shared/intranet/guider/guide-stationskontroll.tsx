@@ -3,12 +3,14 @@
 // Etiketterna följer EditContractCaseModal i stegflödet (stegen Framme, Arbetet,
 // Rapport, Utöver avtalet, Klart för service_type inspection; den gröna knappen
 // Jag är framme; HjalpText Kontrollera stationerna) och StationInspectionPanel
-// inbäddad med hideHeader (Klarmarkera ärende, X av Y stationer, Ute/Inne, Starta
+// inbäddad med hideHeader (KlarmarkeraKnapp: X av Y kontrollerade, N kvar, Klarmarkera
+// kontrollen, Kontrollera alla stationer för att klarmarkera.; Ute/Inne, Starta
 // runda, Station N av M, Avsluta kontrollrunda, Station N OK, Markera Station N
 // som OK?, stationsarket med Flytta, Byt typ, Historik, Förbrukning (g), Minska/Öka
 // med 5, Varning: 10, Kritisk: 25, Preparat (valfritt), Foto, Anteckning, Spara,
 // Klarmarkera ärende?, Du har inte inspekterat alla stationer ännu., Ja, klarmarkera)
-// och KlartSteg (Ärendet är avslutat). Kontrollerat 2026-10-24. Påhittad kund.
+// och KlartSteg (Ärendet är avslutat). Vidare till rapport är vit medan kontrollen
+// pågår (nastaSekundar). Kontrollerat 2026-10-28. Påhittad kund.
 
 import { useState } from 'react'
 import { OvningRam, type OvningSvar } from '../skarmkit'
@@ -31,6 +33,8 @@ interface Lage {
   varde: number | null
   fraga: { typ: 'ok'; stn: number } | { typ: 'klar' } | null
   toast: string | null
+  /** Raden under klarmarkeringsknappen: vad som är kvar */
+  visaKvar?: boolean
 }
 
 function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void; markera?: string; nr: number }) {
@@ -42,7 +46,7 @@ function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void
     <NySkarm sida="arenden" titel="Mina ärenden" under="4 att ta hand om nu" onRam={tryck}
       over={<>
         <NyArende typ="inspection" aktivt={l.steg} nr="BE-0004620" status={avslutat ? 'Avslutat' : 'Bokad'} statusFarg={avslutat ? 'bg-[#20c58f]' : 'bg-amber-400'}
-          kund="Exempel AB, Exempelgatan 12, Gävle" nastaText={l.steg === 'framme' ? 'Jag är framme' : undefined}
+          kund="Exempel AB, Exempelgatan 12, Gävle" nastaText={l.steg === 'framme' ? 'Jag är framme' : undefined} nastaSekundar={l.steg === 'arbete'}
           onNasta={() => tryck('nasta')} onTillbaka={() => tryck('tillbaka')} onSteg={id => tryck(`steg:${id}`)} onIkon={tryck}
           markor={markera === 'nasta' ? { pa: true, nr, mal: 'nasta' } : undefined}>
           {l.steg === 'framme' && <FrammeSteg kontakt="Anna Exempel" />}
@@ -123,9 +127,9 @@ function Ovning() {
   const kontrollera = (stn: number, varde: number | null, toast: string) => {
     const klara = new Set(l.kontrollerade).add(stn)
     const varden = varde === null ? l.varden : { ...l.varden, [stn]: varde }
-    setL({ ...l, kontrollerade: klara, varden, ark: null, varde: null, fraga: null, puls: l.runda ? nastaOkontrollerad(l.stationer, klara) : null, toast })
+    setL({ ...l, kontrollerade: klara, varden, ark: null, varde: null, fraga: null, visaKvar: false, puls: l.runda ? nastaOkontrollerad(l.stationer, klara) : null, toast })
     const kvar = l.stationer.length - klara.size
-    tips('Sparad', kvar > 0 ? `${kvar} ${kvar === 1 ? 'station' : 'stationer'} kvar.` : 'Alla tre är kontrollerade. Klarmarkera besöket med den gröna bocken uppe till höger.')
+    tips('Sparad', kvar > 0 ? `${kvar} ${kvar === 1 ? 'station' : 'stationer'} kvar.` : 'Alla tre är kontrollerade. Knappen överst har blivit grön. Tryck på Klarmarkera kontrollen.')
   }
 
   const tryck = (id: string) => {
@@ -179,7 +183,11 @@ function Ovning() {
       if (n === 2) miss('Station 2 hade 15 gram förbrukning. Bocken sparar utan förbrukning. Tryck på raden för att öppna stationen i stället.')
       else setL({ ...l, fraga: { typ: 'ok', stn: n }, toast: null })
     } else if (id === 'klar') {
-      setL({ ...l, fraga: { typ: 'klar' }, toast: null })
+      const kvar = l.stationer.length - l.kontrollerade.size
+      if (kvar > 0) {
+        setL({ ...l, visaKvar: true, toast: null })
+        miss(`Knappen visar hur långt du har kommit och går att trycka på först när alla stationer är kontrollerade. ${kvar} ${kvar === 1 ? 'station' : 'stationer'} kvar.`)
+      } else setL({ ...l, fraga: { typ: 'klar' }, toast: null })
     } else if (id === 'avsluta-runda') {
       setL({ ...l, runda: false, puls: null })
       tips('Rundan avslutad', 'Det du sparat finns kvar. Tryck Starta runda igen eller tryck direkt på en station.')

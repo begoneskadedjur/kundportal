@@ -102,6 +102,8 @@ interface StegKnapparProps {
   /** Pågår (sparar): knapparna är avstängda och Nästa visar en snurra */
   upptagen?: boolean
   nastaAvstangd?: boolean
+  /** Nästa som vit knapp med kant i stället för grön, när något annat på skärmen är huvudvalet */
+  nastaSekundar?: boolean
   /** Extra innehåll till vänster om knapparna, till exempel Stäng */
   extra?: ReactNode
   className?: string
@@ -116,6 +118,7 @@ export function StegKnappar({
   nastaText,
   upptagen = false,
   nastaAvstangd = false,
+  nastaSekundar = false,
   extra,
   className = '',
 }: StegKnapparProps) {
@@ -140,7 +143,11 @@ export function StegKnappar({
           type="button"
           onClick={onNasta}
           disabled={upptagen || nastaAvstangd}
-          className="flex-[2] h-14 rounded-2xl bg-[#20c58f] text-[#04281c] text-base font-bold flex items-center justify-center gap-2 px-2 transition-colors hover:bg-[#1bb07f] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className={`flex-[2] h-14 rounded-2xl text-base font-bold flex items-center justify-center gap-2 px-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 ${
+            nastaSekundar
+              ? 'border border-slate-600 bg-slate-800/60 text-white hover:bg-slate-800 focus-visible:ring-[#20c58f]'
+              : 'bg-[#20c58f] text-[#04281c] hover:bg-[#1bb07f] focus-visible:ring-white'
+          }`}
         >
           {upptagen ? (
             <Icon name="allman.laddar" size={20} className="animate-spin" />

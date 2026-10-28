@@ -2156,6 +2156,8 @@ export default function EditContractCaseModal({
       onTillbaka={foregaendeSteg ? () => gaTillSteg(foregaendeSteg.id) : undefined}
       onNasta={nastaSteg ? gaVidare : undefined}
       nastaText={startaTidVidFramme ? 'Jag är framme' : undefined}
+      // Stationskontrollen pågår: Klarmarkera kontrollen är huvudvalet, Vidare blir vit
+      nastaSekundar={isInspection && aktivtSteg === 'arbete' && localCaseData?.status !== 'Avslutat'}
       upptagen={stegUpptaget || loading}
     />
   )

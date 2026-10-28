@@ -82,6 +82,7 @@ import type { IndoorStationWithRelations } from '../../types/indoor'
 import { useAddonRemovalGuard, useAddonPaidLock } from '../../hooks/useAddonRemovalGuard'
 import AddonRemovalNotice from '../../components/shared/equipment/AddonRemovalNotice'
 import { Icon } from '../../components/icons/Icon'
+import KlarmarkeraKnapp, { AvslutatForlopp } from '../../components/technician/inspection/KlarmarkeraKnapp'
 import { resolveStationIcon } from '../../components/shared/stationIcons'
 import StationTypeTile from '../../components/shared/stations/StationTypeTile'
 import StationToolbar from '../../components/shared/stations/StationToolbar'
@@ -1829,7 +1830,7 @@ export default function StationInspectionModule() {
           delen av en telefonskärm */}
       <div className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur border-b border-slate-800">
         <div className="max-w-4xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-2">
             <button
               type="button"
               onClick={() => navigate(-1)}
@@ -1842,20 +1843,6 @@ export default function StationInspectionModule() {
               <h1 className="text-[17px] font-bold text-white leading-tight">Stationskontroll</h1>
               <p className="text-xs text-slate-400 truncate">{session?.customer?.company_name}</p>
             </div>
-
-            {/* Klarmarkera: bara när rundan pågår och minst en station är kontrollerad */}
-            {session?.status === 'in_progress' && progress && progress.inspectedStations > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowCompleteConfirm(true)}
-                disabled={isSubmitting}
-                aria-label="Klarmarkera ärende"
-                title="Klarmarkera ärende"
-                className="w-11 h-11 flex-shrink-0 rounded-xl bg-[#20c58f] hover:bg-[#1bb07f] text-[#04140d] flex items-center justify-center transition-colors disabled:opacity-60"
-              >
-                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon name="station.klar" size={20} />}
-              </button>
-            )}
 
             {/* Lås upp-knapp för avslutade inspektioner */}
             {session?.status === 'completed' && (
@@ -1870,22 +1857,17 @@ export default function StationInspectionModule() {
             )}
           </div>
 
-          {/* Förlopp */}
-          {session && progress && (
-            <div className="mt-2 space-y-1.5">
-              <div className="flex justify-between text-xs text-slate-300">
-                <span>{progress.inspectedStations} av {progress.totalStations} stationer</span>
-                <span className="tabular-nums">{progress.percentComplete} %</span>
-              </div>
-              <div className="w-full bg-slate-700 rounded-full h-1.5">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress.percentComplete}%` }}
-                  className="bg-[#20c58f] h-1.5 rounded-full"
-                />
-              </div>
-            </div>
+          {/* Förlopp som klarmarkeringsknapp (ute och inne tillsammans) */}
+          {session && progress && session.status !== 'completed' && (
+            <KlarmarkeraKnapp
+              progress={progress}
+              sessionStatus={session.status}
+              isSubmitting={isSubmitting}
+              onKlarmarkera={() => setShowCompleteConfirm(true)}
+              onVisaOmrade={setActiveTab}
+            />
           )}
+          {session && progress && session.status === 'completed' && <AvslutatForlopp progress={progress} />}
         </div>
       </div>
 

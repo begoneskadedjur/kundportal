@@ -255,6 +255,8 @@ interface NyArendeProps {
   /** Texten på den gröna knappen, standard "Vidare till <nästa steg>" */
   nastaText?: string
   onNasta?: () => void
+  /** Nästa som vit knapp med kant, som när stationskontrollen pågår */
+  nastaSekundar?: boolean
   onTillbaka?: () => void
   /** Klick på en stegikon */
   onSteg?: (id: StegId) => void
@@ -271,7 +273,7 @@ interface NyArendeProps {
  * ikonerna, innehållet och Tillbaka / den gröna knappen längst ner.
  * Telefon: hela skärmen. Dator: modal i mitten av sidan.
  */
-export function NyArende({ typ, aktivt, nr, status, statusFarg = 'bg-amber-400', kund, nastaText, onNasta, onTillbaka, onSteg, markor, onIkon, ingarIAvtalet, children }: NyArendeProps) {
+export function NyArende({ typ, aktivt, nr, status, statusFarg = 'bg-amber-400', kund, nastaText, onNasta, nastaSekundar, onTillbaka, onSteg, markor, onIkon, ingarIAvtalet, children }: NyArendeProps) {
   const enhet = useGuideEnhet()
   const steg = stegForArende(typ, ingarIAvtalet === undefined ? {} : { ingarIAvtalet })
   const idx = Math.max(0, steg.findIndex(s => s.id === aktivt))
@@ -327,7 +329,7 @@ export function NyArende({ typ, aktivt, nr, status, statusFarg = 'bg-amber-400',
           <span className="min-w-0 flex-1">
             <Markor markor={pa(markor, 'nasta')} block>
               <button type="button" onClick={onNasta}
-                className="flex h-9 w-full items-center justify-center gap-1 truncate rounded-xl bg-[#20c58f] px-2 text-[12.5px] font-bold text-[#04281c]">
+                className={`flex h-9 w-full items-center justify-center gap-1 truncate rounded-xl px-2 text-[12.5px] font-bold ${nastaSekundar ? 'border border-slate-600 bg-slate-800/60 text-white' : 'bg-[#20c58f] text-[#04281c]'}`}>
                 <span className="truncate">{gron}</span>
               </button>
             </Markor>
