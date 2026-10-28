@@ -8,7 +8,8 @@
 //  3. Sök spegeln på org-/personnummer. Exakt en aktiv träff → adoptera numret.
 //     Flera aktiva, eller bara inaktiva → returnera kandidater, koordinatorn
 //     väljer i modalen (beslut 2026-09-03: aldrig auto-val).
-//  4. Ingen träff → nästa lediga nummer i gruppens intervall (max i spegel +
+//     Kräver ingen kundgrupp: saknas den sätts gruppen vars serie innehåller numret.
+//  4. Ingen träff (kräver kundgrupp) → nästa lediga nummer i gruppens intervall (max i spegel +
 //     portal + räknare, plus ett) och POST till Fortnox. Dubblettkod 2000637
 //     ("används redan / raderat") → nästa nummer, max 5 försök.
 //  5. Skriv tillbaka: customers.customer_number, customer_group_id,
@@ -38,6 +39,7 @@ import {
   buildFortnoxCustomerCard,
   decideCandidate,
   fortnoxErrorMessage,
+  groupForCustomerNumber,
   isFortnoxDuplicateCustomerError,
   isPersonnummer,
   nextFreeNumber,
@@ -134,6 +136,16 @@ async function resolveGroup(customer: CustomerRow, groupId: string | undefined):
   return null
 }
 
+/** Aktiv kundgrupp vars serie innehåller numret, om exakt en finns. */
+async function groupForAdoptedNumber(customerNumber: number): Promise<GroupRow | null> {
+  const { data } = await supabase
+    .from('customer_groups')
+    .select('id, name, series_start, series_end, current_counter, is_private_default, is_active')
+    .lte('series_start', customerNumber)
+    .gte('series_end', customerNumber)
+  return groupForCustomerNumber((data ?? []) as (GroupRow & { is_active: boolean | null })[], customerNumber)
+}
+
 /** Skriv tillbaka numret till portalen. Hanterar unik-krock (23505). */
 async function writeBack(params: {
   customer: CustomerRow
@@ -222,9 +234,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const group = await resolveGroup(customer, groupId)
   const isPrivate = isPersonnummer(customer.organization_number)
-  if (!group && !isPrivate) {
-    return res.status(400).json({ error: 'Kundgrupp saknas. Sätt kundgrupp på ärendet eller kundkortet innan fakturan skickas till Fortnox.' })
-  }
+  // Kundgrupp krävs först när ett NYTT kort ska skapas (steg 4). Ett befintligt
+  // kort med samma org.nr adopteras även utan grupp, och gruppen sätts då ur
+  // numrets serie (avtal skapade direkt i Oneflow saknar ofta grupp).
   if (!isPrivate && !customer.organization_number) {
     return res.status(400).json({ error: 'Organisationsnummer saknas på kunden. Krävs för att lägga upp kunden i Fortnox.' })
   }
@@ -306,8 +318,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         if (put.data?.Customer) await upsertMirrorFromFortnoxCustomer(put.data.Customer)
       }
-      const wb = await writeBack({ customer, group, invoiceId, customerNumber: numeric })
-      await bumpGroupCounter(group, numeric)
+      // Saknar kunden grupp: gruppen vars serie innehåller numret, om entydig
+      const adoptGroup = group ?? (await groupForAdoptedNumber(numeric))
+      const wb = await writeBack({ customer, group: adoptGroup, invoiceId, customerNumber: numeric })
+      await bumpGroupCounter(adoptGroup, numeric)
       // Ett val från kunden (Oneflow) eller ekonomi gäller före kortets gamla
       // leveranssätt. Bara DefaultDeliveryTypes.Invoice skrivs: kontrollerat
       // 2026-10-22 att Fortnox då lämnar alla andra fält orörda.
@@ -332,7 +346,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // 4. Skapa ny kund med nästa lediga nummer i intervallet
   if (!group) {
-    return res.status(400).json({ error: 'Ingen privatkundsgrupp (is_private_default) är konfigurerad' })
+    return res.status(400).json({
+      error: isPrivate
+        ? 'Ingen privatkundsgrupp (is_private_default) är konfigurerad'
+        : 'Kundgrupp saknas. Sätt kundgrupp på ärendet eller kundkortet innan fakturan skickas till Fortnox.',
+    })
   }
   const [{ data: mirrorRows }, { data: portalRows }] = await Promise.all([
     supabase

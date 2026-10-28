@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.101.0',
+    date: '2026-10-28',
+    title: 'Avtalskunder får sitt kundnummer från Fortnox',
+    items: [
+      { kind: 'nyhet', text: 'En kund som saknar kundnummer i portalen men redan har ett kundkort i Fortnox med samma org.nr kopplas automatiskt inom tio minuter. Portalen skapar och byter aldrig nummer själv.' },
+      { kind: 'buggfix', text: 'Skapa utkast i Fortnox stoppade avtalskunder utan kundgrupp, även när kunden redan fanns i Fortnox. Nu används det befintliga kortet, och kundgruppen hämtas från numret. Kundgrupp krävs bara när ett nytt kort ska skapas.' },
+      { kind: 'buggfix', text: 'Avtalsfakturor visade Kundnr saknas i rött fast inget var fel. Nu står det om numret finns i Fortnox eller tilldelas när utkastet skapas, och rött bara när något stoppar, till exempel att kundgrupp eller org.nr saknas.' },
+    ],
+  },
+  {
     version: '3.100.0',
     date: '2026-10-28',
     title: 'Välj befintlig kund när du skapar avtal eller offert',

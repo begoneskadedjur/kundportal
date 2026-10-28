@@ -9,10 +9,20 @@
 // lastmodified i formatet "YYYY-MM-DD HH:MM" (svensk tid), rate limit 25 anrop/5 s.
 // Listan visar inte raderade kunder, och raderade nummer får aldrig återanvändas,
 // därför sätts missing_since i stället för att raden tas bort.
+//
+// Efter varje synk kopplas portalkunder utan nummer till ett befintligt kort
+// när det är entydigt (autoLinkPortalCustomers, regeln i planCustomerAutoLinks).
 
 import { createClient } from '@supabase/supabase-js'
 import { getValidAccessToken } from '../fortnox/refresh'
-import { orgDigits, parseFortnoxCustomerNumber } from '../../src/shared/fortnoxCustomerNumbers'
+import {
+  orgDigits,
+  parseFortnoxCustomerNumber,
+  planCustomerAutoLinks,
+  type AutoLinkMirrorRow,
+  type AutoLinkPortalRow,
+  type CustomerGroupSeries,
+} from '../../src/shared/fortnoxCustomerNumbers'
 
 const FORTNOX_API = 'https://api.fortnox.se/3'
 const PAGE_LIMIT = 500
@@ -49,6 +59,92 @@ export interface MirrorSyncResult {
   since: string | null
   /** Antal kunder som fick respektive förlorade Fortnox-stämpeln i denna synk. */
   verified: { set: number; cleared: number } | null
+  /** Portalkunder som kopplades till ett befintligt Fortnox-kort i denna synk. */
+  autoLinked?: AutoLinkResult | null
+}
+
+export interface AutoLinkResult {
+  linked: { customerId: string; companyName: string | null; customerNumber: number; groupId: string | null }[]
+  failed: { customerId: string; customerNumber: number; error: string }[]
+}
+
+/** Läser alla rader i sidor om 1 000 (PostgREST klipper tyst vid 1 000). */
+async function selectAllPages<T>(build: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T[]> {
+  const out: T[] = []
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await build(from, from + 999)
+    if (error) throw new Error(error.message)
+    const rows = (data ?? []) as T[]
+    out.push(...rows)
+    if (rows.length < 1000) return out
+  }
+}
+
+/**
+ * Kopplar portalkunder utan kundnummer till ett befintligt Fortnox-kort när
+ * det är entydigt (regeln i planCustomerAutoLinks). Skapar eller byter aldrig
+ * nummer och rör aldrig Fortnox. Sätter kundgrupp ur numrets serie bara om
+ * raden saknar en. Uppdateringen kräver att customer_number fortfarande är
+ * null, så en samtidig koppling från fakturamodalen vinner.
+ */
+export async function autoLinkPortalCustomers(): Promise<AutoLinkResult> {
+  const customers = await selectAllPages<AutoLinkPortalRow & { company_name: string | null }>((from, to) =>
+    supabase
+      .from('customers')
+      .select('id, company_name, customer_number, organization_number, customer_group_id, parent_customer_id, is_active')
+      .order('id')
+      .range(from, to)
+  )
+  const wanted = new Set<string>()
+  for (const c of customers) {
+    if (c.customer_number != null) continue
+    const d = orgDigits(c.organization_number)
+    if (d && d.length === 10) wanted.add(d)
+  }
+  const result: AutoLinkResult = { linked: [], failed: [] }
+  if (wanted.size === 0) return result
+
+  const digits = [...wanted]
+  const mirror: AutoLinkMirrorRow[] = []
+  for (let i = 0; i < digits.length; i += 100) {
+    const { data, error } = await supabase
+      .from('fortnox_customer_numbers')
+      .select('customer_number, org_digits, active, missing_since')
+      .in('org_digits', digits.slice(i, i + 100))
+    if (error) throw new Error(`Kunde inte läsa spegeln: ${error.message}`)
+    mirror.push(...((data ?? []) as AutoLinkMirrorRow[]))
+  }
+  const { data: groups, error: groupsError } = await supabase
+    .from('customer_groups')
+    .select('id, series_start, series_end, is_active')
+  if (groupsError) throw new Error(`Kunde inte läsa kundgrupperna: ${groupsError.message}`)
+
+  const plan = planCustomerAutoLinks({ customers, mirror, groups: (groups ?? []) as CustomerGroupSeries[] })
+  const names = new Map(customers.map(c => [c.id, c.company_name]))
+
+  for (const link of plan.links) {
+    const update: Record<string, unknown> = { customer_number: link.customerNumber }
+    if (link.groupId) update.customer_group_id = link.groupId
+    const { data, error } = await supabase
+      .from('customers')
+      .update(update)
+      .eq('id', link.customerId)
+      .is('customer_number', null)
+      .select('id')
+    if (error) {
+      result.failed.push({ customerId: link.customerId, customerNumber: link.customerNumber, error: error.message })
+      console.warn(`[fortnox-mirror] Kunde inte koppla ${link.customerId} till kundnr ${link.customerNumber}: ${error.message}`)
+      continue
+    }
+    if (!data || data.length === 0) continue
+    const entry = { ...link, companyName: names.get(link.customerId) ?? null }
+    result.linked.push(entry)
+    console.log(
+      `[fortnox-mirror] Kopplade "${entry.companyName ?? link.customerId}" (${link.customerId}) till befintligt Fortnox-kundnr ${link.customerNumber}` +
+      (link.groupId ? `, kundgrupp ${link.groupId}` : '')
+    )
+  }
+  return result
 }
 
 /** Fortnox lastmodified vill ha svensk lokal tid utan sekunder. */
@@ -179,6 +275,15 @@ export async function syncFortnoxCustomerMirror(mode: 'full' | 'incremental'): P
       missing = gone?.length ?? 0
     }
 
+    // Portalkunder utan nummer vars org.nr har exakt ett aktivt kort kopplas
+    // till det kortet. Fel här får aldrig fälla synken.
+    let autoLinked: AutoLinkResult | null = null
+    try {
+      autoLinked = await autoLinkPortalCustomers()
+    } catch (err) {
+      console.warn('[fortnox-mirror] Automatisk koppling misslyckades:', err instanceof Error ? err.message : err)
+    }
+
     // Verifieringsstämpeln följer spegeln: kundnummer + org.nr som matchar en
     // aktiv Fortnox-rad ger fortnox_verified_at, tappad matchning tar bort den.
     let verified: { set: number; cleared: number } | null = null
@@ -205,6 +310,7 @@ export async function syncFortnoxCustomerMirror(mode: 'full' | 'incremental'): P
       pages: counter.pages,
       since: since ? since.toISOString() : null,
       verified,
+      autoLinked,
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

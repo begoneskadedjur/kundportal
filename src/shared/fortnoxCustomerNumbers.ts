@@ -286,3 +286,161 @@ export function unitFortnoxState(
   }
   return { number: null, verified: false, sharedWith: null }
 }
+
+export interface CustomerGroupSeries {
+  id: string
+  series_start: number
+  series_end: number
+  is_active?: boolean | null
+}
+
+/**
+ * Kundgruppen vars nummerserie innehåller numret. Bara aktiva grupper räknas,
+ * och bara ett entydigt svar: överlappande serier eller ingen träff ger null.
+ */
+export function groupForCustomerNumber<T extends CustomerGroupSeries>(
+  groups: T[],
+  n: number | null | undefined
+): T | null {
+  if (n == null) return null
+  const matches = groups.filter(g => g.is_active !== false && n >= g.series_start && n <= g.series_end)
+  return matches.length === 1 ? matches[0] : null
+}
+
+export interface AutoLinkPortalRow {
+  id: string
+  customer_number: number | null
+  organization_number: string | null
+  customer_group_id: string | null
+  parent_customer_id: string | null
+  is_active: boolean | null
+}
+
+export interface AutoLinkMirrorRow {
+  customer_number: string
+  org_digits: string | null
+  active: boolean
+  missing_since: string | null
+}
+
+export type AutoLinkSkipReason =
+  | 'flera-portalrader'
+  | 'org-nr-har-redan-nummer'
+  | 'flera-aktiva-kort'
+  | 'inget-aktivt-kort'
+  | 'nummer-upptaget'
+  | 'icke-numeriskt-nummer'
+
+export interface AutoLinkPlan {
+  links: { customerId: string; customerNumber: number; groupId: string | null }[]
+  skipped: { customerId: string; reason: AutoLinkSkipReason; detail?: string }[]
+}
+
+/**
+ * Vilka portalkunder utan kundnummer som kan kopplas till ett befintligt
+ * Fortnox-kort efter spegelsynken. Kopplar bara när allt är entydigt:
+ * aktiv kundrad med eget giltigt org.nr (10 siffror, inte personnummer),
+ * exakt ett aktivt kort i spegeln med samma org.nr, ingen annan portalrad med
+ * samma org.nr, och numret inte redan på någon portalrad. Enheter utan eget
+ * org.nr, eller med huvudkontorets, faktureras via huvudkontoret och rörs inte.
+ * Kundgrupp sätts bara om raden saknar en, och bara när serien är entydig.
+ * Rader som inte är kandidater alls (har nummer, saknar org.nr, privatperson,
+ * inaktiva, ärvande enheter) listas inte i `skipped`.
+ */
+export function planCustomerAutoLinks(params: {
+  customers: AutoLinkPortalRow[]
+  mirror: AutoLinkMirrorRow[]
+  groups: CustomerGroupSeries[]
+}): AutoLinkPlan {
+  const { customers, mirror, groups } = params
+  const byId = new Map(customers.map(c => [c.id, c]))
+  const digitsOf = (c: AutoLinkPortalRow) => orgDigits(c.organization_number)
+
+  const candidates = customers.filter(c => {
+    if (c.customer_number != null || c.is_active !== true) return false
+    const digits = digitsOf(c)
+    if (!digits || digits.length !== 10 || isPersonnummer(c.organization_number)) return false
+    if (c.parent_customer_id) {
+      const parent = byId.get(c.parent_customer_id)
+      if (!parent || digitsOf(parent) === digits) return false
+    }
+    return true
+  })
+
+  const takenNumbers = new Set(
+    customers.map(c => c.customer_number).filter((n): n is number => n != null)
+  )
+  const plan: AutoLinkPlan = { links: [], skipped: [] }
+
+  for (const c of candidates) {
+    const digits = digitsOf(c) as string
+    const sameOrg = customers.filter(o => o.id !== c.id && digitsOf(o) === digits)
+    if (sameOrg.some(o => o.customer_number != null)) {
+      plan.skipped.push({ customerId: c.id, reason: 'org-nr-har-redan-nummer' })
+      continue
+    }
+    if (candidates.some(o => o.id !== c.id && digitsOf(o) === digits)) {
+      plan.skipped.push({ customerId: c.id, reason: 'flera-portalrader' })
+      continue
+    }
+    const live = mirror.filter(m => m.org_digits === digits && !m.missing_since && m.active)
+    if (live.length === 0) {
+      plan.skipped.push({ customerId: c.id, reason: 'inget-aktivt-kort' })
+      continue
+    }
+    if (live.length > 1) {
+      plan.skipped.push({
+        customerId: c.id,
+        reason: 'flera-aktiva-kort',
+        detail: live.map(m => m.customer_number).join(', '),
+      })
+      continue
+    }
+    const n = parseFortnoxCustomerNumber(live[0].customer_number)
+    if (n == null) {
+      plan.skipped.push({ customerId: c.id, reason: 'icke-numeriskt-nummer', detail: live[0].customer_number })
+      continue
+    }
+    if (takenNumbers.has(n)) {
+      plan.skipped.push({ customerId: c.id, reason: 'nummer-upptaget', detail: String(n) })
+      continue
+    }
+    takenNumbers.add(n)
+    plan.links.push({
+      customerId: c.id,
+      customerNumber: n,
+      groupId: c.customer_group_id ? null : groupForCustomerNumber(groups, n)?.id ?? null,
+    })
+  }
+  return plan
+}
+
+export type ContractFortnoxReadiness =
+  | { kind: 'mirror-single'; customerNumber: string }
+  | { kind: 'mirror-multiple' }
+  | { kind: 'mirror-inactive' }
+  | { kind: 'new' }
+  | { kind: 'no-group' }
+  | { kind: 'no-org' }
+
+/**
+ * Avtalsfaktura vars kund saknar kundnummer: vad händer när utkastet skapas
+ * (api/fortnox/allocate-customer)? Exakt ett aktivt kort adopteras, flera eller
+ * bara inaktiva kräver ett val, inget kort kräver kundgrupp för ett nytt nummer.
+ * Personnummer får privatgruppen automatiskt och räknas som grupp.
+ */
+export function contractFortnoxReadiness(params: {
+  organizationNumber: string | null | undefined
+  hasGroup: boolean
+  hits: Pick<FortnoxMirrorHit, 'customer_number' | 'active' | 'missing_since'>[]
+}): ContractFortnoxReadiness {
+  const { organizationNumber, hasGroup, hits } = params
+  if (!orgDigits(organizationNumber)) return { kind: 'no-org' }
+  const live = hits.filter(h => !h.missing_since)
+  const active = live.filter(h => h.active)
+  if (active.length === 1) return { kind: 'mirror-single', customerNumber: active[0].customer_number }
+  if (active.length > 1) return { kind: 'mirror-multiple' }
+  if (live.length > 0) return { kind: 'mirror-inactive' }
+  if (hasGroup || isPersonnummer(organizationNumber)) return { kind: 'new' }
+  return { kind: 'no-group' }
+}

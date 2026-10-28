@@ -12,6 +12,7 @@ import type { InvoiceWithItems } from '../types/invoice'
 import { formatInvoiceAmount } from '../types/invoice'
 import type { CaseBillingItem } from '../types/caseBilling'
 import { addonExpectedTotal, type InvoiceAddonLine } from '../shared/invoiceAddonLines'
+import { contractFortnoxReadiness, orgDigits, type ContractFortnoxReadiness } from '../shared/fortnoxCustomerNumbers'
 
 // Marginaltrösklar för ekonomisignalen: < BAD röd, BAD–WARN amber, > WARN grön
 export const MARGIN_BAD_BELOW = 0
@@ -80,6 +81,10 @@ export interface InvoicePulse {
   fortnoxCustomerNumber: number | null
   /** Resolvern kastade — visa "–" i stället för "saknas" */
   fortnoxLookupFailed: boolean
+  /** Avtalsfaktura utan kundnummer: vad allocate-customer gör när utkastet
+   *  skapas (befintligt kort, nytt nummer eller vad som stoppar). null = ej
+   *  tillämpligt eller uppslaget misslyckades */
+  fortnoxReadiness: ContractFortnoxReadiness | null
   /** Ackumulerad merförsäljning (adhoc, ej makulerade) under innevarande avtalsår
    *  inkl. denna faktura. null = ej adhoc eller contract_start_date saknas */
   upsellYearTotal: number | null
@@ -98,6 +103,7 @@ const EMPTY_PULSE: InvoicePulse = {
   avgPayDiffDays: null,
   fortnoxCustomerNumber: null,
   fortnoxLookupFailed: false,
+  fortnoxReadiness: null,
   upsellYearTotal: null,
   upsellYearCount: null,
 }
@@ -197,6 +203,42 @@ export function useInvoicePulse(invoice: InvoiceWithItems | null): InvoicePulse 
       }
     }
 
+    // Avtalskund utan kundnummer: finns kortet redan i Fortnox-spegeln (samma
+    // org.nr, eget eller huvudkontorets enligt resolvern), och har kunden
+    // kundgrupp om ett nytt nummer behövs? Read-only, fel ger null.
+    const fetchFortnoxReadiness = async (): Promise<ContractFortnoxReadiness | null> => {
+      if (!invoice.customer_id || billingCategory(invoice) !== 'contract') return null
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('organization_number, customer_group_id, parent_customer_id')
+        .eq('id', invoice.customer_id)
+        .maybeSingle()
+      if (!cust) return null
+      let orgNr: string | null = cust.organization_number || null
+      let groupId: string | null = cust.customer_group_id || null
+      // Enhet utan eget org.nr ärver huvudkontorets (samma regel som resolvern)
+      if ((!orgNr || !groupId) && cust.parent_customer_id) {
+        const { data: parent } = await supabase
+          .from('customers')
+          .select('organization_number, customer_group_id')
+          .eq('id', cust.parent_customer_id)
+          .maybeSingle()
+        if (!orgNr) orgNr = parent?.organization_number || null
+        if (!groupId) groupId = parent?.customer_group_id || null
+      }
+      const digits = orgDigits(orgNr)
+      let hits: { customer_number: string; active: boolean; missing_since: string | null }[] = []
+      if (digits) {
+        const { data, error } = await supabase
+          .from('fortnox_customer_numbers')
+          .select('customer_number, active, missing_since')
+          .eq('org_digits', digits)
+        if (error) return null
+        hits = (data ?? []) as typeof hits
+      }
+      return contractFortnoxReadiness({ organizationNumber: orgNr, hasGroup: !!groupId, hits })
+    }
+
     const load = async () => {
       setPulse({ ...EMPTY_PULSE, loading: true })
       const [termsDays, annualValue, customerRows, fortnox, upsellYear] = await Promise.all([
@@ -206,6 +248,9 @@ export function useInvoicePulse(invoice: InvoiceWithItems | null): InvoicePulse 
         fetchFortnoxNumber(),
         fetchUpsellYear().catch(() => null),
       ])
+      const fortnoxReadiness = fortnox.value == null && !fortnox.failed
+        ? await fetchFortnoxReadiness().catch(() => null)
+        : null
       if (cancelled) return
 
       const todayKey = localDateKey()
@@ -272,6 +317,7 @@ export function useInvoicePulse(invoice: InvoiceWithItems | null): InvoicePulse 
         avgPayDiffDays,
         fortnoxCustomerNumber: fortnox.value,
         fortnoxLookupFailed: fortnox.failed,
+        fortnoxReadiness,
         upsellYearTotal: upsellYear?.total ?? null,
         upsellYearCount: upsellYear?.count ?? null,
       })

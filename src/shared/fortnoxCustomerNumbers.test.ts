@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildFortnoxCustomerCard,
+  contractFortnoxReadiness,
   decideCandidate,
   formatOrgNrForFortnox,
   fortnoxErrorCode,
+  groupForCustomerNumber,
   isFortnoxDuplicateCustomerError,
   isPersonnummer,
   luhnValid,
@@ -11,7 +13,10 @@ import {
   orgDigits,
   parseFortnoxCustomerNumber,
   parseSwedishAddress,
+  planCustomerAutoLinks,
   toVatInclusivePrice,
+  type AutoLinkMirrorRow,
+  type AutoLinkPortalRow,
   type FortnoxMirrorHit,
 } from './fortnoxCustomerNumbers'
 
@@ -115,6 +120,171 @@ describe('decideCandidate', () => {
   })
   it('inactive-only när bara inaktiva finns', () => {
     expect(decideCandidate([hit('3561', false), hit('3562', false)]).kind).toBe('inactive-only')
+  })
+  it('klarar range null (kund utan kundgrupp)', () => {
+    const d = decideCandidate([hit('1507')], null)
+    expect(d.kind).toBe('single')
+    const m = decideCandidate([hit('2003'), hit('1511')], null)
+    if (m.kind === 'multiple') expect(m.candidates.map(c => c.customer_number)).toEqual(['1511', '2003'])
+    else throw new Error('väntade multiple')
+  })
+})
+
+const GROUPS = [
+  { id: 'brf', series_start: 1, series_end: 499, is_active: true },
+  { id: 'kommersiell', series_start: 1500, series_end: 1999, is_active: true },
+  { id: 'gammal', series_start: 3000, series_end: 3499, is_active: false },
+  { id: 'privat', series_start: 10001, series_end: 99999, is_active: true },
+]
+
+describe('groupForCustomerNumber', () => {
+  it('hittar gruppen vars serie innehåller numret', () => {
+    expect(groupForCustomerNumber(GROUPS, 1507)?.id).toBe('kommersiell')
+    expect(groupForCustomerNumber(GROUPS, 1)?.id).toBe('brf')
+    expect(groupForCustomerNumber(GROUPS, 499)?.id).toBe('brf')
+  })
+  it('null utanför alla serier, i inaktiv grupp eller utan nummer', () => {
+    expect(groupForCustomerNumber(GROUPS, 700)).toBeNull()
+    expect(groupForCustomerNumber(GROUPS, 3100)).toBeNull()
+    expect(groupForCustomerNumber(GROUPS, null)).toBeNull()
+  })
+  it('null när serierna överlappar', () => {
+    const overlap = [...GROUPS, { id: 'dubbel', series_start: 1500, series_end: 1600 }]
+    expect(groupForCustomerNumber(overlap, 1507)).toBeNull()
+    expect(groupForCustomerNumber(overlap, 1700)?.id).toBe('kommersiell')
+  })
+})
+
+describe('planCustomerAutoLinks', () => {
+  // 556481-2138 och 556036-0793 är org.nr; 19800101-1234 är ett personnummer
+  const cust = (id: string, org: string | null, extra: Partial<AutoLinkPortalRow> = {}): AutoLinkPortalRow => ({
+    id,
+    customer_number: null,
+    organization_number: org,
+    customer_group_id: null,
+    parent_customer_id: null,
+    is_active: true,
+    ...extra,
+  })
+  const card = (nr: string, digits: string, active = true, missing: string | null = null): AutoLinkMirrorRow => ({
+    customer_number: nr,
+    org_digits: digits,
+    active,
+    missing_since: missing,
+  })
+  const ANLOS = '5564812138'
+
+  it('kopplar exakt ett aktivt kort och sätter gruppen ur serien', () => {
+    const plan = planCustomerAutoLinks({
+      customers: [cust('a', '556481-2138')],
+      mirror: [card('1507', ANLOS)],
+      groups: GROUPS,
+    })
+    expect(plan.links).toEqual([{ customerId: 'a', customerNumber: 1507, groupId: 'kommersiell' }])
+  })
+  it('behåller befintlig kundgrupp', () => {
+    const plan = planCustomerAutoLinks({
+      customers: [cust('a', '556481-2138', { customer_group_id: 'brf' })],
+      mirror: [card('1507', ANLOS)],
+      groups: GROUPS,
+    })
+    expect(plan.links).toEqual([{ customerId: 'a', customerNumber: 1507, groupId: null }])
+  })
+  it('inaktivt eller raderat kort räknas inte, ett aktivt bredvid ett inaktivt kopplas', () => {
+    expect(planCustomerAutoLinks({
+      customers: [cust('a', '556481-2138')],
+      mirror: [card('1507', ANLOS, false), card('1508', ANLOS, true, '2026-10-01')],
+      groups: GROUPS,
+    }).links).toEqual([])
+    expect(planCustomerAutoLinks({
+      customers: [cust('a', '556481-2138')],
+      mirror: [card('1507', ANLOS, false), card('1508', ANLOS)],
+      groups: GROUPS,
+    }).links.map(l => l.customerNumber)).toEqual([1508])
+  })
+  it('flera aktiva kort kopplas inte', () => {
+    const plan = planCustomerAutoLinks({
+      customers: [cust('a', '556481-2138')],
+      mirror: [card('1507', ANLOS), card('2003', ANLOS)],
+      groups: GROUPS,
+    })
+    expect(plan.links).toEqual([])
+    expect(plan.skipped[0].reason).toBe('flera-aktiva-kort')
+  })
+  it('nummer som redan finns på en annan portalrad kopplas inte', () => {
+    const plan = planCustomerAutoLinks({
+      customers: [cust('a', '556481-2138'), cust('b', '556036-0793', { customer_number: 1507 })],
+      mirror: [card('1507', ANLOS)],
+      groups: GROUPS,
+    })
+    expect(plan.links).toEqual([])
+    expect(plan.skipped[0].reason).toBe('nummer-upptaget')
+  })
+  it('samma org.nr redan numrerat på en annan rad kopplas inte', () => {
+    const plan = planCustomerAutoLinks({
+      customers: [cust('a', '556481-2138'), cust('b', '5564812138', { customer_number: 1600 })],
+      mirror: [card('1507', ANLOS)],
+      groups: GROUPS,
+    })
+    expect(plan.links).toEqual([])
+    expect(plan.skipped[0].reason).toBe('org-nr-har-redan-nummer')
+  })
+  it('två onumrerade rader med samma org.nr kopplas inte', () => {
+    const plan = planCustomerAutoLinks({
+      customers: [cust('a', '556481-2138'), cust('b', '5564812138')],
+      mirror: [card('1507', ANLOS)],
+      groups: GROUPS,
+    })
+    expect(plan.links).toEqual([])
+    expect(plan.skipped.map(s => s.reason)).toEqual(['flera-portalrader', 'flera-portalrader'])
+  })
+  it('privatperson, saknat eller ofullständigt org.nr, inaktiv kund och kund med nummer rörs inte', () => {
+    const plan = planCustomerAutoLinks({
+      customers: [
+        cust('privat', '19800101-1234'),
+        cust('utan', null),
+        cust('kort', '55648'),
+        cust('inaktiv', '556481-2138', { is_active: false }),
+        cust('har', '556036-0793', { customer_number: 42 }),
+      ],
+      mirror: [card('10500', '8001011234'), card('1507', ANLOS), card('42', '5560360793')],
+      groups: GROUPS,
+    })
+    expect(plan.links).toEqual([])
+    expect(plan.skipped).toEqual([])
+  })
+  it('enhet utan eget org.nr eller med huvudkontorets ärver, enhet med eget org.nr kopplas', () => {
+    const plan = planCustomerAutoLinks({
+      customers: [
+        cust('hk', '556036-0793', { customer_number: 5004 }),
+        cust('arver', null, { parent_customer_id: 'hk' }),
+        cust('samma', '5560360793', { parent_customer_id: 'hk' }),
+        cust('eget', '556481-2138', { parent_customer_id: 'hk' }),
+      ],
+      mirror: [card('5004', '5560360793'), card('1507', ANLOS)],
+      groups: GROUPS,
+    })
+    expect(plan.links).toEqual([{ customerId: 'eget', customerNumber: 1507, groupId: 'kommersiell' }])
+  })
+})
+
+describe('contractFortnoxReadiness', () => {
+  const h = (nr: string, active = true, missing: string | null = null) => ({ customer_number: nr, active, missing_since: missing })
+  it('org.nr saknas går först', () => {
+    expect(contractFortnoxReadiness({ organizationNumber: null, hasGroup: true, hits: [] }).kind).toBe('no-org')
+  })
+  it('ett aktivt kort kopplas oavsett grupp', () => {
+    expect(contractFortnoxReadiness({ organizationNumber: '556481-2138', hasGroup: false, hits: [h('1507'), h('9', false)] }))
+      .toEqual({ kind: 'mirror-single', customerNumber: '1507' })
+  })
+  it('flera aktiva, bara inaktiva', () => {
+    expect(contractFortnoxReadiness({ organizationNumber: '556481-2138', hasGroup: true, hits: [h('1'), h('2')] }).kind).toBe('mirror-multiple')
+    expect(contractFortnoxReadiness({ organizationNumber: '556481-2138', hasGroup: true, hits: [h('1', false)] }).kind).toBe('mirror-inactive')
+  })
+  it('inget kort: nytt nummer med grupp, annars kundgrupp saknas; raderade räknas inte', () => {
+    expect(contractFortnoxReadiness({ organizationNumber: '556481-2138', hasGroup: true, hits: [h('1', true, '2026-01-01')] }).kind).toBe('new')
+    expect(contractFortnoxReadiness({ organizationNumber: '556481-2138', hasGroup: false, hits: [] }).kind).toBe('no-group')
+    expect(contractFortnoxReadiness({ organizationNumber: '19800101-1234', hasGroup: false, hits: [] }).kind).toBe('new')
   })
 })
 

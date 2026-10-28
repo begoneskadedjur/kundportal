@@ -310,6 +310,36 @@ export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, case
               <div className="text-sm font-bold text-slate-100">Nytt kundnr</div>
               <div className="text-[11px] text-slate-500 truncate">tilldelas när utkastet skapas</div>
             </>
+          ) : pulse.fortnoxReadiness?.kind === 'mirror-single' ? (
+            // Kortet finns redan i Fortnox med samma org.nr och adopteras vid utkastet
+            <>
+              <div className="text-sm font-bold text-slate-100 tabular-nums">
+                Kundnr {pulse.fortnoxReadiness.customerNumber} finns i Fortnox
+              </div>
+              <div className="text-[11px] text-slate-500 truncate">kopplas när utkastet skapas</div>
+            </>
+          ) : pulse.fortnoxReadiness?.kind === 'new' ? (
+            <>
+              <div className="text-sm font-bold text-slate-100">Nytt kundnr</div>
+              <div className="text-[11px] text-slate-500 truncate">tilldelas när utkastet skapas</div>
+            </>
+          ) : pulse.fortnoxReadiness?.kind === 'mirror-multiple' || pulse.fortnoxReadiness?.kind === 'mirror-inactive' ? (
+            <>
+              <div className="text-sm font-bold text-amber-400">
+                {pulse.fortnoxReadiness.kind === 'mirror-multiple' ? 'Flera kort i Fortnox' : 'Inaktivt kort i Fortnox'}
+              </div>
+              <div className="text-[11px] text-amber-400/80 truncate">välj när utkastet skapas</div>
+            </>
+          ) : pulse.fortnoxReadiness?.kind === 'no-group' ? (
+            <>
+              <div className="text-sm font-bold text-red-400">Kundgrupp saknas</div>
+              <div className="text-[11px] text-red-400/80 truncate">välj den på kundkortet</div>
+            </>
+          ) : pulse.fortnoxReadiness?.kind === 'no-org' ? (
+            <>
+              <div className="text-sm font-bold text-red-400">Org.nr saknas</div>
+              <div className="text-[11px] text-red-400/80 truncate">krävs för Fortnox-kortet</div>
+            </>
           ) : (
             <>
               <div className="text-sm font-bold text-red-400">Kundnr saknas</div>
