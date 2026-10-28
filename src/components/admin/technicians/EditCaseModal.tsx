@@ -683,6 +683,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     sessionStorage.setItem('prefill_customer_data', JSON.stringify({
       ...customerData,
       documentType: 'contract',
+      // Ärendets kund kopplas direkt i guiden (fälten från ärendet står kvar)
+      customer_id: currentCase?.customer_id ?? null,
       targetStep: 2 // Gå direkt till mallval
     }));
     
@@ -783,6 +785,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     sessionStorage.setItem('prefill_customer_data', JSON.stringify({
       ...customerData,
       documentType: 'offer',
+      customer_id: currentCase.customer_id ?? null,
       autoSelectTemplate: true,
       selectedTemplate,
       selectedPriceListId,

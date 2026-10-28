@@ -37,6 +37,8 @@ export interface RenewalPrefill {
   draftItems: unknown[]
   draftPriceAssignments: Record<string, string>
   renewalOfContractId: string
+  /** Avtalets kund: guiden kopplar den direkt i Motpart */
+  customer_id: string | null
   targetStep: number
   /** Bara för meddelandet i wizarden */
   renewalOfLabel: string
@@ -246,9 +248,11 @@ export async function buildRenewalPrefill(contractId: string): Promise<RenewalPr
     draftItems: items,
     draftPriceAssignments,
     renewalOfContractId: contractId,
+    customer_id: c.customer_id ?? null,
     renewalOfLabel: c.label ?? c.contract_type ?? 'tidigare avtal',
     // Saknas riktig mall måste den väljas först (steg 2). Annars går vi till
-    // kundgruppen (steg 4), som ändå aldrig är ifylld på gamla avtal.
+    // Motpart (steg 4) där kundkopplingen och enhetsvalet syns. Kundgruppen
+    // kommer efter och hoppas över när kundkortet har en.
     targetStep: template.source === 'none' ? 2 : 4,
   }
 }

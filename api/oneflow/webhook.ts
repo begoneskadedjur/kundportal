@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import fetch from 'node-fetch'
 import { refreshTemplates, isKnownTemplate, contractTypeOf, getKnownTemplateIds } from '../_lib/oneflowTemplates'
 import { processSignedContract } from '../_lib/contractSigning'
+import { isLiveContract, LIVE_CONTRACT_STATUSES, type ContractLifecycleFields } from '../../src/utils/contractLifecycle'
 import { classifyOneflowBillingField } from '../../src/shared/invoiceDelivery'
 import {
   caseStatusForDocument,
@@ -714,6 +715,56 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
   }
 }
 
+/**
+ * Ett avtal har upphört: kundrader som pekar på det (customers.oneflow_contract_id,
+ * samma urval som tidigare) sätts till terminated och inaktiva, men bara de
+ * som inte har något annat levande avtal kvar. Vid läsfel lämnas kunden aktiv.
+ */
+const deactivateCustomersWithoutLiveContracts = async (oneflowContractId: string): Promise<void> => {
+  try {
+    const { data: avtal } = await supabase
+      .from('contracts')
+      .select('id')
+      .eq('oneflow_contract_id', oneflowContractId)
+      .maybeSingle()
+    const avtalId = (avtal as { id?: string } | null)?.id ?? null
+    const { data: viaOneflow } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('oneflow_contract_id', oneflowContractId)
+    const kundIds = new Set<string>(((viaOneflow ?? []) as Array<{ id: string }>).map(c => c.id))
+
+    for (const kundId of kundIds) {
+      let q = supabase
+        .from('contracts')
+        .select('id, status, terminated_at, effective_end_date, contract_end_date')
+        .eq('customer_id', kundId)
+        .in('status', [...LIVE_CONTRACT_STATUSES])
+      if (avtalId) q = q.neq('id', avtalId)
+      const { data: andra, error } = await q
+      if (error) {
+        console.error('⚠️ Kunde inte kontrollera kundens övriga avtal, kunden lämnas aktiv:', kundId, error.message)
+        continue
+      }
+      const harLevande = ((andra ?? []) as ContractLifecycleFields[]).some(c => isLiveContract(c))
+      if (harLevande) {
+        console.log(`ℹ️ Kunden ${kundId} har andra levande avtal och lämnas aktiv`)
+        continue
+      }
+      await supabase
+        .from('customers')
+        .update({
+          contract_status: 'terminated',
+          is_active: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', kundId)
+    }
+  } catch (err) {
+    console.error('⚠️ Kunde inte uppdatera kundstatus efter avslutat avtal:', err instanceof Error ? err.message : err)
+  }
+}
+
 // Kundskapande, avtalsfält, premie, avtalskarta, fakturaplan och notis vid
 // signerat AVTAL bor i api/_lib/contractSigning.ts (processSignedContract),
 // så att samma behandling kan köras om i efterhand (api/oneflow/reprocess-signed.ts).
@@ -1034,7 +1085,14 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
             // NYTT: Identifiera och koppla kund för offerten
             if (contractData.type === 'offer' && contractData.company_name) {
-              let customerId = null
+              // Kunden som valdes i guiden (create-contract) gäller och gissas aldrig om
+              const { data: redanKopplad } = await supabase
+                .from('contracts')
+                .select('customer_id')
+                .eq('oneflow_contract_id', contractId)
+                .maybeSingle()
+              const forvald: string | null = (redanKopplad as { customer_id?: string | null } | null)?.customer_id ?? null
+              let customerId: string | null = forvald
               
               console.log('🔍 Söker efter befintlig kund för:', {
                 company: contractData.company_name,
@@ -1047,7 +1105,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
               // juridiskt bolag och kontaktperson) — .single() felar tyst vid
               // >1 träff. Välj deterministiskt: huvudkontor först, sedan äldst.
               // 1. Baserat på organisationsnummer
-              if (contractData.organization_number) {
+              if (!customerId && contractData.organization_number) {
                 const { data: orgMatches } = await supabase
                   .from('customers')
                   .select('id, site_type')
@@ -1095,7 +1153,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
               }
               
               // Uppdatera kontraktet med customer_id
-              if (customerId) {
+              if (customerId && customerId !== forvald) {
                 const { error: customerLinkError } = await supabase
                   .from('contracts')
                   .update({ 
@@ -1329,15 +1387,11 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
             })
             .eq('oneflow_contract_id', contractId)
           
-          // Uppdatera även kund status till terminated
-          await supabase
-            .from('customers')
-            .update({
-              contract_status: 'terminated',
-              is_active: false,
-              updated_at: new Date().toISOString()
-            })
-            .eq('oneflow_contract_id', contractId)
+          // Kunden sätts till terminated och inaktiv bara när den inte har något
+          // annat levande avtal kvar (samma regel som ContractScopeService.
+          // hasRemainingActiveContract). Tidigare inaktiverades kunden direkt via
+          // customers.oneflow_contract_id, även med andra avtal som gällde.
+          await deactivateCustomersWithoutLiveContracts(contractId)
           break
 
         case 'contract:signing_period_expire':

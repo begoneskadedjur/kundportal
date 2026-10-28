@@ -117,6 +117,8 @@ function offertFalt(inquiry: WebInquiry, returnPath: string) {
     // Mallen väljs i guiden; offertmallens kategori styr sedan företag eller privatperson
     targetStep: 2,
     webInquiryId: inquiry.id,
+    // Förfrågans kund kopplas direkt i guiden
+    customer_id: inquiry.customer_id ?? null,
     returnPath,
   }
 }

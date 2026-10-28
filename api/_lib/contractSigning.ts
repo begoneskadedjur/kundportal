@@ -69,6 +69,7 @@ import {
 } from '../../src/shared/contractInvoiceRows'
 import { deriveDeliveryFromContract, type DerivedDelivery } from '../../src/shared/invoiceDelivery'
 import { tolkaIdNummer } from '../../src/shared/webLeadUppgifter'
+import { jamforIdNummer, kundensIdNummer, valideraKundOchOmfattning, type KopplingsKund } from '../../src/shared/avtalsKundKoppling'
 
 export interface SigningOptions {
   /** Inga skrivningar: rapporten beskriver vad som skulle göras */
@@ -534,9 +535,46 @@ async function createOrLinkCustomer(
   })
 
   if (str(contract.customer_id)) {
-    // Kopplad redan (wizarden valde kunden): avtalet sätter vägen om den saknas
-    await applyDeliveryToExisting(ctx, String(contract.customer_id), delivery)
-    return { customerId: str(contract.customer_id), created: false }
+    // Org.nr är kundens identitet (beslut 2026-10-28): skiljer sig det signerade
+    // numret från den kopplade kundens (enhet utan eget: huvudkontorets) släpps
+    // kopplingen och avtalet matchas som utan vald kund, på det nya numret.
+    // Urvalet av enheter hörde till den gamla kunden och följer inte med.
+    const kopplatId = String(contract.customer_id)
+    const { data: kopplad } = await db
+      .from('customers')
+      .select('id, company_name, customer_number, organization_number, parent_customer_id')
+      .eq('id', kopplatId)
+      .maybeSingle()
+    const k = kopplad as Row | null
+    let foralderNr: string | null = null
+    if (k && str(k.parent_customer_id) && !str(k.organization_number)) {
+      const { data: hk } = await db.from('customers').select('organization_number').eq('id', String(k.parent_customer_id)).maybeSingle()
+      foralderNr = str((hk as Row | null)?.organization_number)
+    }
+    const kundensNr = k ? kundensIdNummer({ organization_number: str(k.organization_number) }, { organization_number: foralderNr }) : null
+    const signeratNr = str(contract.organization_number)
+    if (k && jamforIdNummer(signeratNr, kundensNr) === 'annat') {
+      const namn = str(k.company_name) ?? 'kunden'
+      const nr = k.customer_number != null ? `, kundnr ${String(k.customer_number)}` : ''
+      const ord = info.individual ? 'personnumret' : 'org.nr'
+      report.notes.push(
+        `Avtalet var kopplat till ${namn}${nr} (${ord} ${kundensNr}) men signerades med ${ord} ${signeratNr}. Kopplingen släpptes och avtalet matchades på det signerade numret. Kontrollera kunden och avtalskartan.`
+      )
+      console.warn(`[contractSigning] Avtal ${contractId}: signerat ${ord} stämmer inte med kopplad kund ${kopplatId}, kopplingen släpps`)
+      await write(ctx, `Kopplingen till kund ${kopplatId} släpps: signerat ${ord} skiljer sig från kundkortet`, async () => {
+        must(
+          await db.from('contracts').update({ customer_id: null, site_ids: null, covers_all_sites: false }).eq('id', contractId),
+          'Släpp kundkoppling'
+        )
+      })
+      contract.customer_id = null
+      contract.site_ids = null
+      contract.covers_all_sites = false
+    } else {
+      // Kopplad redan (wizarden valde kunden): avtalet sätter vägen om den saknas
+      await applyDeliveryToExisting(ctx, kopplatId, delivery)
+      return { customerId: kopplatId, created: false }
+    }
   }
   const companyName = str(contract.company_name)
   const email = str(contract.contact_email)
@@ -705,10 +743,31 @@ async function setUpContractMap(ctx: Ctx, contract: Row, customerId: string): Pr
   const startDate = str(contract.contract_start_date) ?? str(contract.start_date)
   const isNewCustomer = customerId === '(ny kund)'
 
-  // Omfattning (§ 1): kundens egen rad, om kunden inte har enheter
+  // Omfattning (§ 1). Finns redan rader görs ingenting (omkörning, eller
+  // omfattning som ändrats för hand). Valde guiden enheter (contracts.site_ids)
+  // skrivs de, annars kundens egen rad om kunden inte har enheter.
   if (!contract.covers_all_sites) {
     const { data: scope } = await db.from('contract_sites').select('id').eq('contract_id', contractId).limit(1)
-    if ((scope ?? []).length === 0) {
+    const valda = Array.isArray(contract.site_ids) ? (contract.site_ids as unknown[]).filter((v): v is string => typeof v === 'string') : []
+    if ((scope ?? []).length === 0 && valda.length > 0 && !isNewCustomer) {
+      // Kontrolleras igen mot registret: bara kundens egen rad och dess aktiva enheter
+      const { data: rader } = await db.from('customers').select('id, is_active, parent_customer_id').in('id', valda)
+      const giltiga = ((rader ?? []) as Row[])
+        .filter((r) => valideraKundOchOmfattning({ id: customerId }, { siteIds: [String(r.id)] }, [r as unknown as KopplingsKund], true).ok)
+        .map((r) => String(r.id))
+      const borta = valda.length - giltiga.length
+      if (borta > 0) report.notes.push(`${borta} av enheterna som valdes i guiden hör inte längre till kunden eller är inaktiva och togs inte med i § 1.`)
+      if (giltiga.length > 0) {
+        await write(ctx, `Omfattning (§ 1): ${giltiga.length} kundrad(er) som valdes i guiden, från ${startDate ?? 'startdatum saknas'}`, async () => {
+          must(
+            await db.from('contract_sites').insert(giltiga.map((id) => ({ contract_id: contractId, customer_id: id, active_from: startDate }))),
+            'Omfattning'
+          )
+        })
+      } else {
+        report.notes.push('Välj vilka enheter avtalet omfattar i § 1.')
+      }
+    } else if ((scope ?? []).length === 0) {
       const { data: units } = isNewCustomer
         ? { data: [] as Row[] }
         : await db.from('customers').select('id').eq('parent_customer_id', customerId).limit(1)

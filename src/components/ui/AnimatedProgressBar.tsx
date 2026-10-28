@@ -8,6 +8,8 @@
 interface Step {
   id: number
   title: string
+  /** Liten text under stegnamnet, t.ex. "Från kundkortet" när steget fyllts i automatiskt */
+  undertext?: string
 }
 
 interface AnimatedProgressBarProps {
@@ -78,7 +80,10 @@ export default function AnimatedProgressBar({
               >
                 {isCompleted ? <Bock /> : index + 1}
               </span>
-              <span>{step.title}</span>
+              <span className="flex flex-col items-start leading-tight">
+                <span>{step.title}</span>
+                {step.undertext && <span className="text-[11px] font-normal text-[#8ea3b8]">{step.undertext}</span>}
+              </span>
             </button>
           )
         })}

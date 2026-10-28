@@ -54,6 +54,10 @@
     "src/shared/contractInvoiceRows.ts",
     "src/shared/premiumShares.ts",
     "src/shared/webLeadUppgifter.ts",
+    // Kundkopplingen i Skapa avtal eller offert (create-contract, signeringen)
+    // och avtalslivscykeln (webhookens inaktivering av kunder)
+    "src/shared/avtalsKundKoppling.ts",
+    "src/utils/contractLifecycle.ts",
 
     // Upphandlingsportalen: radtyper och rena regler (matchning, dedup,
     // avtalsslut, län) som delas mellan synk-cronen och klienten

@@ -99,6 +99,8 @@ function offertFalt(lead: Lead, returnPath: string) {
     // Steg 1: dokumenttypen går att byta, sedan mall
     targetStep: 1,
     leadId: lead.id,
+    // Leadens kund kopplas direkt i guiden
+    customer_id: lead.customer_id ?? null,
     returnPath,
   }
 }

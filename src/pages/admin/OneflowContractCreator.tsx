@@ -48,6 +48,14 @@ import {
 import {
   AVTALETS_STANDARDTEXT, AVTALSOBJEKT_MAX_TECKEN, harStopp, kontrolleraAvtal, type KontrollAvsnitt, type KontrollNiva,
 } from '../../shared/avtalsKontroll'
+import AvtalsKundVal, { KopplingsRad } from '../../components/shared/avtalsKund/AvtalsKundVal'
+import { useIdNummerForslag } from '../../hooks/useIdNummerForslag'
+import { AvtalsKundService } from '../../services/avtalsKundService'
+import { kopplingSkaSlappas } from '../../shared/avtalsKundKoppling'
+import {
+  MOTPARTS_FALT, avtalspartRad, byggKoppling, harEnhetsval, kopplingForApi, kopplingensIdNummer,
+  kopplingsText, kundgruppFranKort, skiljerSig, type KundKoppling, type MotpartsFalt,
+} from '../../utils/avtalsKundFalt'
 
 interface WizardData {
   // Steg 1 - Dokumenttyp
@@ -59,7 +67,7 @@ interface WizardData {
   // Steg 3 - Avtalspart
   partyType: 'company' | 'individual'
 
-  // Steg 4 - BeGone info
+  // BeGone info (steg 4 i offert, 6 i avtal)
   anstalld: string
   'e-post-anstlld': string
   avtalslngd: string
@@ -77,7 +85,7 @@ interface WizardData {
    *  Det gamla avtalet rörs aldrig — en förnyelse är en NY period. */
   renewalOfContractId?: string
 
-  // Steg 5 - Motpart
+  // Motpart (steg 5 i offert, 4 i avtal)
   Kontaktperson: string
   'e-post-kontaktperson': string
   'telefonnummer-kontaktperson': string
@@ -87,6 +95,9 @@ interface WizardData {
   /** Valfri. Skickas som 'faktura-adress-pdf' (avtal) eller 'epost-faktura' (offert).
    *  Tomt fält: avtalet lämnar det åt kunden, offerten använder kontaktpersonens e-post. */
   'e-post-faktura': string
+  /** Befintlig kund som dokumentet kopplas till (null = ny kund). Fälten ovan
+   *  fylls i från kundkortet men gäller bara dokumentet; kundkortet ändras aldrig. */
+  kundKoppling: KundKoppling | null
 
   // Steg 6 - Prislista & Artiklar
   selectedPriceListId: string | null
@@ -217,28 +228,39 @@ function snyggaTillKontakt<T extends Record<KontaktFalt, string>>(d: T): T {
   return ut
 }
 
-const OFFER_STEPS = [
-  { id: 1, title: 'Dokument' },
-  { id: 2, title: 'Mall' },
-  { id: 3, title: 'Avtalspart' },
-  { id: 4, title: 'BeGone' },
-  { id: 5, title: 'Motpart' },
-  { id: 6, title: 'Tjänster' },
-  { id: 7, title: 'Offertinnehåll' },
-  { id: 8, title: 'Granska' }
+// Stegen har en nyckel så att allt som bygger på stegnummer (validering,
+// rubriker, Ändra från granskningen, förifyllning som hoppar till ett steg)
+// slår upp numret i stället för att räkna med en förskjutning.
+// Sedan 3.100.0 kommer Motpart före Kundgrupp i avtal: en vald kund med
+// kundgrupp förväljer gruppen och steget hoppas över.
+type StegNyckel = 'dokument' | 'mall' | 'avtalspart' | 'motpart' | 'kundgrupp' | 'begone' | 'tjanster' | 'innehall' | 'granska'
+
+const OFFER_STEPS: Array<{ id: number; key: StegNyckel; title: string }> = [
+  { id: 1, key: 'dokument', title: 'Dokument' },
+  { id: 2, key: 'mall', title: 'Mall' },
+  { id: 3, key: 'avtalspart', title: 'Avtalspart' },
+  { id: 4, key: 'begone', title: 'BeGone' },
+  { id: 5, key: 'motpart', title: 'Motpart' },
+  { id: 6, key: 'tjanster', title: 'Tjänster' },
+  { id: 7, key: 'innehall', title: 'Offertinnehåll' },
+  { id: 8, key: 'granska', title: 'Granska' }
 ]
 
-const CONTRACT_STEPS = [
-  { id: 1, title: 'Dokument' },
-  { id: 2, title: 'Mall' },
-  { id: 3, title: 'Avtalspart' },
-  { id: 4, title: 'Kundgrupp' },
-  { id: 5, title: 'BeGone' },
-  { id: 6, title: 'Motpart' },
-  { id: 7, title: 'Tjänster' },
-  { id: 8, title: 'Avtalsobjekt' },
-  { id: 9, title: 'Granska' }
+const CONTRACT_STEPS: Array<{ id: number; key: StegNyckel; title: string }> = [
+  { id: 1, key: 'dokument', title: 'Dokument' },
+  { id: 2, key: 'mall', title: 'Mall' },
+  { id: 3, key: 'avtalspart', title: 'Avtalspart' },
+  { id: 4, key: 'motpart', title: 'Motpart' },
+  { id: 5, key: 'kundgrupp', title: 'Kundgrupp' },
+  { id: 6, key: 'begone', title: 'BeGone' },
+  { id: 7, key: 'tjanster', title: 'Tjänster' },
+  { id: 8, key: 'innehall', title: 'Avtalsobjekt' },
+  { id: 9, key: 'granska', title: 'Granska' }
 ]
+
+/** Stegnumret för en nyckel i dokumenttypens steglista (-1 om steget saknas). */
+const stegNr = (documentType: 'offer' | 'contract', key: StegNyckel): number =>
+  (documentType === 'contract' ? CONTRACT_STEPS : OFFER_STEPS).find(s => s.key === key)?.id ?? -1
 
 const BILLING_FREQUENCY_LABEL: Record<string, string> = {
   annual: 'Årsvis',
@@ -423,6 +445,7 @@ function createInitialWizardData(
     foretag: '',
     'org-nr': '',
     'e-post-faktura': '',
+    kundKoppling: null,
     selectedPriceListId: null,
     selectedArticles: [],
     deductionType: null,
@@ -523,6 +546,9 @@ export default function OneflowContractCreator() {
   const [wizardData, setWizardData] = useState<WizardData>(() =>
     createInitialWizardData(defaultAnstalld, user?.email || '')
   )
+  // Senaste läget för hjälpare som körs utanför renderingen (förifyllning, fältkontroller)
+  const wizardDataRef = useRef(wizardData)
+  wizardDataRef.current = wizardData
   // Senaste offertinnehållet som skrevs automatiskt från ärendets tjänster.
   // Ändras tjänsterna skrivs texten om, men bara så länge ingen har ändrat den.
   const autoOffertTextRef = useRef<string | null>(null)
@@ -530,7 +556,7 @@ export default function OneflowContractCreator() {
   // Dynamiska steg baserat på dokumenttyp
   const STEPS = wizardData.documentType === 'contract' ? CONTRACT_STEPS : OFFER_STEPS
 
-  // Steg-offset: vid avtal skiftas steg 4+ med 1 (kundgrupp injicerat)
+  // Avtal har steget Kundgrupp, offerter inte (stegnumren slås upp med stegNr)
   const isContract = wizardData.documentType === 'contract'
 
   // Hämta kundgrupper (med session-check + error/retry-handling)
@@ -662,8 +688,8 @@ export default function OneflowContractCreator() {
               // tjänster och priser sätts upp innan dokumentet skapas.
               const hasUsableProducts = Array.isArray(customerData.prefillServices) &&
                 customerData.prefillServices.some((s: { total_price?: number }) => (s?.total_price ?? 0) > 0)
-              const productsStepNum = docType === 'contract' ? 7 : 6
-              const objectStepNum = docType === 'contract' ? 8 : 7
+              const productsStepNum = stegNr(docType === 'contract' ? 'contract' : 'offer', 'tjanster')
+              const objectStepNum = stegNr(docType === 'contract' ? 'contract' : 'offer', 'innehall')
               const targetStep = hasUsableProducts ? objectStepNum : productsStepNum
               console.log('Auto-selecting template and jumping to step:', targetStep, { hasUsableProducts })
               if (!hasUsableProducts) {
@@ -687,6 +713,12 @@ export default function OneflowContractCreator() {
 
             // Rensa sessionStorage efter användning
             sessionStorage.removeItem('prefill_customer_data')
+
+            // Kunden från söklådan, ärendet, leaden eller förnyelsen kopplas direkt.
+            // Förifyllda uppgifter (t.ex. ärendets kontakt) skrivs inte över, bara tomma fält fylls.
+            if (typeof customerData.customer_id === 'string' && customerData.customer_id) {
+              void kopplaKund(customerData.customer_id, 'fyllTomma')
+            }
           }, 100) // Vänta lite för att säkerställa state-uppdatering
 
           toast.success(`Kundinformation förifylld från ärende! (${prefillType === 'contract' ? 'Avtal' : 'Offert'})`, {
@@ -785,16 +817,176 @@ export default function OneflowContractCreator() {
     })
   }
 
-  // Steg-nummer för produkter-steget (6 för offerter, 7 för avtal)
-  const productsStep = isContract ? 7 : 6
-  // Steg-nummer för avtalsobjekt
-  const agreementStep = isContract ? 8 : 7
-  // Steg-nummer för granskning
-  const reviewStep = isContract ? 9 : 8
-  // BeGone Info-steget
-  const begoneStep = isContract ? 5 : 4
-  // Motpart-steget
-  const counterpartyStep = isContract ? 6 : 5
+  // Stegnumren slås upp ur steglistan (se CONTRACT_STEPS/OFFER_STEPS)
+  const productsStep = stegNr(wizardData.documentType, 'tjanster')
+  const agreementStep = stegNr(wizardData.documentType, 'innehall')
+  const reviewStep = stegNr(wizardData.documentType, 'granska')
+  const begoneStep = stegNr(wizardData.documentType, 'begone')
+  const counterpartyStep = stegNr(wizardData.documentType, 'motpart')
+  /** Kundgrupp (bara avtal, -1 i offert) */
+  const customerGroupStep = stegNr(wizardData.documentType, 'kundgrupp')
+  const currentKey: StegNyckel | undefined = STEPS.find(s => s.id === currentStep)?.key
+
+  // --- Kundkopplingen (Motpart) ------------------------------------------------
+  const koppling = wizardData.kundKoppling
+  const [kopplar, setKopplar] = useState(false)
+  /** Förklaring när kopplingen släppts automatiskt (org.nr stämmer inte) */
+  const [bortkoppladInfo, setBortkoppladInfo] = useState<string | null>(null)
+  const idNummerForslag = useIdNummerForslag(wizardData['org-nr'], !koppling && currentStep === counterpartyStep)
+  // Kundgruppen från kundkortet: förvald, och steget Kundgrupp hoppas över så länge den står kvar
+  const kortetsKundgrupp = kundgruppFranKort(koppling)
+  const kundgruppFranKortet = isContract && !!kortetsKundgrupp && wizardData.customer_group_id === kortetsKundgrupp
+
+  /** Hämtar antalet levande avtal för kundraden och sparar det på kopplingen. */
+  const hamtaLevandeAvtal = (partId: string) => {
+    AvtalsKundService.antalLevandeAvtal(partId).then(antal => {
+      setWizardData(prev => prev.kundKoppling && avtalspartRad(prev.kundKoppling).id === partId
+        ? { ...prev, kundKoppling: { ...prev.kundKoppling, levandeAvtal: { ...prev.kundKoppling.levandeAvtal, [partId]: antal } } }
+        : prev)
+    })
+  }
+
+  /**
+   * Lägger kopplingen på guiden. 'ersatt': fälten fylls med kundkortets värden
+   * (användaren valde kunden). 'fyllTomma': bara tomma fält fylls (förifyllning
+   * från ärende eller förnyelse, där uppgifterna redan står).
+   */
+  const tillampaKoppling = (k: KundKoppling, lage: 'ersatt' | 'fyllTomma') => {
+    setWizardData(prev => {
+      const next: WizardData = { ...prev, kundKoppling: k }
+      for (const falt of MOTPARTS_FALT) {
+        if (lage === 'ersatt' || !(prev[falt] ?? '').trim()) next[falt] = k.kundkort[falt]
+      }
+      if (lage === 'ersatt' && prev.documentType === 'contract') {
+        next.partyType = k.privat ? 'individual' : 'company'
+      }
+      // En kundgrupp som kom från förra kundens kort följer inte med till nästa
+      const forraGrupp = kundgruppFranKort(prev.kundKoppling)
+      if (forraGrupp && prev.customer_group_id === forraGrupp) next.customer_group_id = null
+      const grupp = kundgruppFranKort(k)
+      if (grupp && (lage === 'ersatt' || !next.customer_group_id)) next.customer_group_id = grupp
+      return next
+    })
+  }
+
+  /** Kopplar en befintlig kund (sökning, förslag eller förifyllning). */
+  const kopplaKund = async (customerId: string, lage: 'ersatt' | 'fyllTomma' = 'ersatt') => {
+    setKopplar(true)
+    try {
+      const org = await AvtalsKundService.hamtaOrganisation(customerId)
+      if (!org) {
+        toast.error('Kunden kunde inte läsas från kundregistret')
+        return
+      }
+      if (org.kund.is_active === false) {
+        setBortkoppladInfo(`${org.kund.company_name ?? 'Kunden'} är inaktiv i kundregistret och kopplades inte.`)
+        return
+      }
+      const k = byggKoppling(org, org.kund.id)
+      // Förifyllt org.nr som inte stämmer med kundkortet: kunden kopplas inte (org.nr är identiteten)
+      if (lage === 'fyllTomma') {
+        const angivet = wizardDataRef.current['org-nr']
+        if (kopplingSkaSlappas(angivet, kopplingensIdNummer(k), false)) {
+          setBortkoppladInfo(`Org.nr ${angivet} stämmer inte med kundkortet för ${org.kund.company_name ?? 'kunden'}, så kunden kopplades inte.`)
+          return
+        }
+      }
+      tillampaKoppling(k, lage)
+      setBortkoppladInfo(null)
+      hamtaLevandeAvtal(k.partId)
+    } finally {
+      setKopplar(false)
+    }
+  }
+
+  /** Byter kundrad inom organisationen (huvudkontoret eller en enhet). Fälten fylls om. */
+  const bytAvtalspart = (partId: string) => {
+    if (!koppling || partId === koppling.partId) return
+    const fran = avtalspartRad(koppling)
+    const hk = koppling.org.huvudkontor
+    // Från en enhet till huvudkontoret: enheten är förkryssad
+    const tidigare = hk && partId === hk.id && fran.id !== hk.id
+      ? { omfattning: 'valda' as const, valdaEnheter: [fran.id], levandeAvtal: koppling.levandeAvtal }
+      : { omfattning: koppling.omfattning, valdaEnheter: koppling.valdaEnheter, levandeAvtal: koppling.levandeAvtal }
+    const k = byggKoppling(koppling.org, partId, tidigare)
+    tillampaKoppling(k, 'ersatt')
+    if (k.levandeAvtal[partId] == null) hamtaLevandeAvtal(partId)
+  }
+
+  const andraOmfattning = (omfattning: 'alla' | 'valda', valda: string[]) => {
+    setWizardData(prev => prev.kundKoppling
+      ? { ...prev, kundKoppling: { ...prev.kundKoppling, omfattning, valdaEnheter: omfattning === 'alla' ? [] : valda } }
+      : prev)
+  }
+
+  /** Kopplar bort kunden. Fälten står kvar och gäller då en ny kund. */
+  const slappKoppling = (info: string | null) => {
+    setWizardData(prev => {
+      const forraGrupp = kundgruppFranKort(prev.kundKoppling)
+      return {
+        ...prev,
+        kundKoppling: null,
+        customer_group_id: forraGrupp && prev.customer_group_id === forraGrupp ? null : prev.customer_group_id,
+      }
+    })
+    setBortkoppladInfo(info)
+  }
+
+  /**
+   * Org.nr är kundens identitet: stämmer det inte längre med den kopplade
+   * kunden (enhet utan eget jämförs mot huvudkontorets) kopplas kunden bort.
+   * slutgiltigt = fältet har lämnats, då släpper även ett tomt eller halvt nummer.
+   */
+  const kontrolleraIdNummer = (varde: string, slutgiltigt: boolean): boolean => {
+    const k = wizardDataRef.current.kundKoppling
+    if (!k) return false
+    const kundens = kopplingensIdNummer(k)
+    if (kopplingSkaSlappas(varde, kundens, slutgiltigt)) {
+      const namn = avtalspartRad(k).company_name ?? 'kunden'
+      slappKoppling(`Kopplingen till ${namn} togs bort eftersom ${wizardDataRef.current.partyType === 'individual' ? 'personnumret' : 'org.nr'} inte längre stämmer med kundkortet (${kundens}). ${isContract ? 'Avtalet' : 'Offerten'} gäller nu en ny kund, eller sök fram rätt kund.`)
+      return true
+    }
+    return false
+  }
+
+  /** Org.nr skrivs: ett fullständigt nummer som inte stämmer kopplar bort kunden direkt. */
+  const andraIdNummer = (varde: string) => {
+    updateWizardData('org-nr', varde)
+    kontrolleraIdNummer(varde, false)
+  }
+
+  /** Raden under ett motpartsfält: ärvt från huvudkontoret, eller skiljer sig från kundkortet. */
+  const faltMarkering = (falt: MotpartsFalt): React.ReactNode => {
+    if (!koppling) {
+      if (falt === 'org-nr' && idNummerForslag.length > 0) {
+        return (
+          <span className="flex items-center gap-1.5 text-xs font-normal text-slate-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            Numret finns redan i kundregistret. Koppla kunden ovan.
+          </span>
+        )
+      }
+      return undefined
+    }
+    if (skiljerSig(koppling, falt, wizardData[falt])) {
+      const orig = koppling.kundkort[falt].trim()
+      return (
+        <span className="flex items-start gap-1.5 text-xs font-normal text-slate-300 break-words">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-[5px] shrink-0" />
+          <span>Skiljer sig från kundkortet{orig ? `: ${orig}` : ', där det är tomt'}. Gäller bara {isContract ? 'avtalet' : 'offerten'}.</span>
+        </span>
+      )
+    }
+    if (koppling.arvda.includes(falt)) {
+      return (
+        <span className="flex items-center gap-1.5 text-xs font-normal text-slate-400">
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+          Ärvt från huvudkontoret
+        </span>
+      )
+    }
+    return undefined
+  }
 
   /** Snyggar till ett kontaktfält när det lämnas. */
   const snyggaTillFalt = (falt: KontaktFalt) => () => {
@@ -812,6 +1004,7 @@ export default function OneflowContractCreator() {
       if (currentStep === begoneStep || currentStep === counterpartyStep) {
         setWizardData(prev => snyggaTillKontakt(prev))
       }
+      const slapptes = currentStep === counterpartyStep && kontrolleraIdNummer(wizardData['org-nr'], true)
 
       // Om vi är på steg 2 (mallval) och har valt en offertmall,
       // hoppa över steg 3 (avtalspart) eftersom den väljs automatiskt
@@ -820,7 +1013,12 @@ export default function OneflowContractCreator() {
         if (template && template.category) {
           setWizardData(prev => ({ ...prev, partyType: template.category as 'company' | 'individual' }))
         }
-        nextStepNumber = 4 // Hoppa över steg 3 (avtalspart) → direkt till BeGone Info
+        nextStepNumber = begoneStep // Hoppa över steg 3 (avtalspart) → direkt till BeGone Info
+      }
+
+      // Kundgruppen kom från kundkortet: steget hoppas över (det går att öppna i stegraden)
+      if (nextStepNumber === customerGroupStep && kundgruppFranKortet && !slapptes) {
+        nextStepNumber = customerGroupStep + 1
       }
 
       if (nextStepNumber === reviewStep) setFromReview(false)
@@ -833,10 +1031,14 @@ export default function OneflowContractCreator() {
     if (currentStep > 1) {
       let prevStepNumber = currentStep - 1
 
-      // Om vi kommer tillbaka från BeGone Info (steg 4 för offert) och har en offertmall vald,
+      // Om vi kommer tillbaka från BeGone Info (offert) och har en offertmall vald,
       // hoppa tillbaka till steg 2 (mallval)
-      if (currentStep === 4 && wizardData.documentType === 'offer' && wizardData.selectedTemplate) {
+      if (currentStep === begoneStep && wizardData.documentType === 'offer' && wizardData.selectedTemplate) {
         prevStepNumber = 2
+      }
+      // Kundgruppen från kundkortet hoppas över även bakåt
+      if (prevStepNumber === customerGroupStep && kundgruppFranKortet) {
+        prevStepNumber = customerGroupStep - 1
       }
 
       setCurrentStep(prevStepNumber)
@@ -853,6 +1055,7 @@ export default function OneflowContractCreator() {
     if (currentStep === begoneStep || currentStep === counterpartyStep) {
       setWizardData(prev => snyggaTillKontakt(prev))
     }
+    if (currentStep === counterpartyStep) kontrolleraIdNummer(wizardData['org-nr'], true)
     setFromReview(false)
     setCurrentStep(reviewStep)
   }
@@ -876,14 +1079,18 @@ export default function OneflowContractCreator() {
   const harRabatt = rabattRader.length > 0
   const rabattUtanMotivering = rabattRader.some(r => !r.labor_for_item_id && !(r.discount_motivation ?? '').trim())
 
+  // Avtal på ett huvudkontor med enheter: omfattningen måste väljas
+  const saknarOmfattning = harEnhetsval(koppling, isContract) &&
+    (koppling!.omfattning === null || (koppling!.omfattning === 'valda' && koppling!.valdaEnheter.length === 0))
+
   const canProceed = () => {
     // Steg 1-3 är samma för alla
     if (currentStep === 1) return wizardData.documentType !== ''
     if (currentStep === 2) return wizardData.selectedTemplate !== ''
     if (currentStep === 3) return true // Partytype har default
 
-    // Steg 4 är Kundgrupp (bara för avtal) eller BeGone Info (för offerter)
-    if (isContract && currentStep === 4) return wizardData.customer_group_id !== null
+    // Kundgrupp (bara för avtal)
+    if (currentStep === customerGroupStep) return wizardData.customer_group_id !== null
 
     // BeGone Info
     if (currentStep === begoneStep) return !!(wizardData.anstalld && wizardData['e-post-anstlld'] && (wizardData.documentType === 'offer' || wizardData.avtalslngd))
@@ -897,6 +1104,7 @@ export default function OneflowContractCreator() {
         if (!wizardData.foretag.trim()) return false
         if (!wizardData['org-nr'].trim()) return false
       }
+      if (saknarOmfattning) return false
       return true
     }
 
@@ -918,7 +1126,7 @@ export default function OneflowContractCreator() {
   }
 
   const getValidationHint = (): string => {
-    if (isContract && currentStep === 4) {
+    if (currentStep === customerGroupStep) {
       if (!wizardData.customer_group_id) return 'Välj en kundgrupp'
       return ''
     }
@@ -933,6 +1141,7 @@ export default function OneflowContractCreator() {
         return 'Fyll i e-postadress'
       if (!isValidEmail(wizardData['e-post-kontaktperson']))
         return 'Ange en giltig e-postadress'
+      if (saknarOmfattning) return 'Välj vilka enheter avtalet omfattar'
       return ''
     }
     if (currentStep === productsStep) {
@@ -1046,7 +1255,7 @@ export default function OneflowContractCreator() {
     return { rows, serviceTotal, articleCost, mb, serviceCount: rows.length }
   }, [wizardData.prefillServices, wizardData.selectedArticles, wizardData.draftItems, wizardData.draftPriceAssignments])
 
-  const kontrollPunkter = useMemo(() => kontrolleraAvtal({
+  const avtalsKontroll = useMemo(() => kontrolleraAvtal({
     dokumentTyp: wizardData.documentType,
     partTyp: wizardData.partyType,
     foretag: wizardData.foretag,
@@ -1062,6 +1271,10 @@ export default function OneflowContractCreator() {
       ? (wizardData.prefillServices?.length ?? 0)
       : wizardData.draftItems.filter(i => i.item_type === 'service').length,
   }), [wizardData])
+  // Kundkopplingen: ett huvudkontor med enheter kräver att omfattningen är vald
+  const kontrollPunkter = saknarOmfattning
+    ? [...avtalsKontroll, { niva: 'rod' as const, text: 'Välj vilka enheter avtalet omfattar', avsnitt: 'motpart' as const }]
+    : avtalsKontroll
   const kontrollStoppar = harStopp(kontrollPunkter)
 
   const avsnittSteg: Record<KontrollAvsnitt, number> = {
@@ -1181,6 +1394,10 @@ export default function OneflowContractCreator() {
           senderName: wizardData.anstalld,
           selectedProducts: convertedProducts,
           customerGroupId: wizardData.customer_group_id,
+          // Befintlig kund: servern kontrollerar kunden och enheterna, sparar
+          // customer_id och urvalet (contracts.site_ids / covers_all_sites).
+          // Omfattningen skrivs till contract_sites först vid signering.
+          ...kopplingForApi(wizardData.kundKoppling, isContract),
           // Portalens avtalsvillkor — sparas på contracts-raden, skickas
           // ALDRIG vidare till Oneflow (kunden ser dem inte).
           noticePeriodMonths:
@@ -1401,21 +1618,20 @@ export default function OneflowContractCreator() {
   // --- Steginnehåll -------------------------------------------------------
 
   const stepHeadings = (): [string, string] => {
-    if (isContract && currentStep === 4) return ['Kundgrupp', 'Styr prislista och hur kunden följs upp. Kundnumret tilldelas vid signering.']
-    const logicalStep = isContract && currentStep >= 5 ? currentStep - 1 : currentStep
-    switch (logicalStep) {
-      case 1: return ['Vad ska du skapa?', 'Välj om kunden ska få ett avtalsförslag eller en offert.']
-      case 2: return ['Välj mall', `Mallen styr ${isContract ? 'avtalets' : 'offertens'} fasta text i Oneflow.`]
-      case 3: return ['Vem är avtalspart?', 'Företag eller privatperson.']
-      case 4: return isContract
+    switch (currentKey) {
+      case 'kundgrupp': return ['Kundgrupp', 'Styr prislista och hur kunden följs upp. Kundnumret tilldelas vid signering.']
+      case 'dokument': return ['Vad ska du skapa?', 'Välj om kunden ska få ett avtalsförslag eller en offert.']
+      case 'mall': return ['Välj mall', `Mallen styr ${isContract ? 'avtalets' : 'offertens'} fasta text i Oneflow.`]
+      case 'avtalspart': return ['Vem är avtalspart?', 'Företag eller privatperson.']
+      case 'begone': return isContract
         ? ['Avtalstid och ansvarig', 'Vem som står på avtalet från Begone, och hur länge det gäller.']
         : ['Ansvarig', 'Vem som står på offerten från Begone.']
-      case 5: return ['Motpart', `Kundens uppgifter som de står i ${isContract ? 'avtalet' : 'offerten'}.`]
-      case 6: return ['Tjänster och pris', 'Det kunden betalar, och artiklarna som ingår internt.']
-      case 7: return isContract
+      case 'motpart': return ['Motpart', `Välj en befintlig kund eller fyll i en ny. Uppgifterna gäller som de står i ${isContract ? 'avtalet' : 'offerten'}.`]
+      case 'tjanster': return ['Tjänster och pris', 'Det kunden betalar, och artiklarna som ingår internt.']
+      case 'innehall': return isContract
         ? ['Avtalsobjekt', 'Vad som ingår, med kundens egna ord.']
         : ['Offertinnehåll', 'Vad arbetet omfattar, med kundens egna ord.']
-      case 8: return [
+      case 'granska': return [
         isContract ? 'Granska avtalet' : 'Granska offerten',
         `Så här kommer ${isContract ? 'avtalet' : 'offerten'} att se ut för kunden. Ändra tar dig till rätt steg och tillbaka hit.`,
       ]
@@ -1423,9 +1639,14 @@ export default function OneflowContractCreator() {
     }
   }
 
-  // Rendera kundgruppsteget (bara för avtal, steg 4)
+  // Rendera kundgruppsteget (bara för avtal)
   const renderCustomerGroupStep = () => (
     <>
+      {kundgruppFranKortet && (
+        <InfoRuta ikon={<Info className="w-5 h-5" />}>
+          Förvald från kundkortet. Steget hoppas över när kunden har en kundgrupp, men du kan välja en annan här.
+        </InfoRuta>
+      )}
       {groupsLoading && (
         <div className="py-8">
           <LoadingSpinner text="Laddar kundgrupper…" />
@@ -1498,20 +1719,12 @@ export default function OneflowContractCreator() {
   }
 
   const renderStepContent = () => {
-    // Steg 1-3 är samma för alla
-    // Steg 4 för avtal = Kundgrupp, steg 4 för offert = BeGone Info (case 4 nedan)
-    // Steg 5+ hanteras med variablerna begoneStep, counterpartyStep etc.
+    // Steget väljs på nyckel (CONTRACT_STEPS/OFFER_STEPS), aldrig på nummer
+    switch (currentKey) {
+      case 'kundgrupp':
+        return renderCustomerGroupStep()
 
-    // Kundgruppsteg (bara vid avtal, steg 4)
-    if (isContract && currentStep === 4) return renderCustomerGroupStep()
-
-    // Mappa till logiskt steg-nummer (för offer-baserade case-satser)
-    // Offer: 1,2,3,4(begone),5(motpart),6(prod),7(avtal),8(review)
-    // Contract: 1,2,3,4(kundgrupp->hanterat ovan),5(begone),6(motpart),7(prod),8(avtal),9(review)
-    const logicalStep = isContract && currentStep >= 5 ? currentStep - 1 : currentStep
-
-    switch (logicalStep) {
-      case 1:
+      case 'dokument':
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
             <ValKort
@@ -1533,7 +1746,7 @@ export default function OneflowContractCreator() {
           </div>
         )
 
-      case 2:
+      case 'mall':
         return (
           <div role="radiogroup" aria-label="Mall" className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {availableTemplates.map(template => {
@@ -1560,7 +1773,7 @@ export default function OneflowContractCreator() {
           </div>
         )
 
-      case 3:
+      case 'avtalspart':
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
             <ValKort
@@ -1582,7 +1795,7 @@ export default function OneflowContractCreator() {
           </div>
         )
 
-      case 4:
+      case 'begone':
         return (
           <div className={`${CARD_CLASS} p-6 sm:p-7 grid grid-cols-1 sm:grid-cols-2 gap-[22px]`}>
             <Falt etikett="Ansvarig från BeGone" ikon={<User className="w-[18px] h-[18px]" />}>
@@ -1662,18 +1875,30 @@ export default function OneflowContractCreator() {
           </div>
         )
 
-      case 5: {
+      case 'motpart': {
         const isCompany = wizardData.partyType === 'company'
         const epost = wizardData['e-post-kontaktperson']
         const epostFel = !!epost && !isValidEmail(epost)
         return (
           <div className="flex flex-col gap-4">
+            <AvtalsKundVal
+              koppling={koppling}
+              isContract={isContract}
+              partyType={wizardData.partyType}
+              forslag={idNummerForslag}
+              bortkoppladInfo={bortkoppladInfo}
+              kopplar={kopplar}
+              onValj={id => { void kopplaKund(id, 'ersatt') }}
+              onKopplaBort={() => slappKoppling(null)}
+              onBytPart={bytAvtalspart}
+              onOmfattning={andraOmfattning}
+            />
             <div className={`${CARD_CLASS} px-6 py-6 sm:px-7 flex flex-col gap-[18px]`}>
               {isCompany ? (
                 <>
                   <KortRubrik ikon={<Building2 className="w-5 h-5 text-emerald-300" />} ruta={IKON_TON.gron.ruta} titel="Bolaget" />
                   <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-[18px]">
-                    <Falt etikett="Företagsnamn" ikon={<Building2 className="w-[18px] h-[18px]" />}>
+                    <Falt etikett="Företagsnamn" ikon={<Building2 className="w-[18px] h-[18px]" />} under={faltMarkering('foretag')}>
                       <input
                         className={FALT_INPUT}
                         value={wizardData.foretag}
@@ -1682,12 +1907,12 @@ export default function OneflowContractCreator() {
                         placeholder="Företaget AB"
                       />
                     </Falt>
-                    <Falt etikett="Org.nr" ikon={<FileText className="w-[18px] h-[18px]" />}>
+                    <Falt etikett="Org.nr" ikon={<FileText className="w-[18px] h-[18px]" />} under={faltMarkering('org-nr')}>
                       <input
                         className={FALT_INPUT}
                         value={wizardData['org-nr']}
-                        onChange={e => updateWizardData('org-nr', e.target.value)}
-                        onBlur={snyggaTillFalt('org-nr')}
+                        onChange={e => andraIdNummer(e.target.value)}
+                        onBlur={e => { snyggaTillFalt('org-nr')(); kontrolleraIdNummer(e.target.value, true) }}
                         placeholder="556123-4567"
                       />
                     </Falt>
@@ -1697,7 +1922,7 @@ export default function OneflowContractCreator() {
                 <>
                   <KortRubrik ikon={<User className="w-5 h-5 text-orange-300" />} ruta={IKON_TON.orange.ruta} titel="Privatpersonen" />
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
-                    <Falt etikett="Namn" ikon={<User className="w-[18px] h-[18px]" />}>
+                    <Falt etikett="Namn" ikon={<User className="w-[18px] h-[18px]" />} under={faltMarkering('Kontaktperson')}>
                       <input
                         className={FALT_INPUT}
                         value={wizardData.Kontaktperson}
@@ -1706,12 +1931,12 @@ export default function OneflowContractCreator() {
                         placeholder="Förnamn Efternamn"
                       />
                     </Falt>
-                    <Falt etikett="Personnummer" ikon={<FileText className="w-[18px] h-[18px]" />}>
+                    <Falt etikett="Personnummer" ikon={<FileText className="w-[18px] h-[18px]" />} under={faltMarkering('org-nr')}>
                       <input
                         className={FALT_INPUT}
                         value={wizardData['org-nr']}
-                        onChange={e => updateWizardData('org-nr', e.target.value)}
-                        onBlur={snyggaTillFalt('org-nr')}
+                        onChange={e => andraIdNummer(e.target.value)}
+                        onBlur={e => { snyggaTillFalt('org-nr')(); kontrolleraIdNummer(e.target.value, true) }}
                         placeholder="ÅÅÅÅMMDD-XXXX"
                       />
                     </Falt>
@@ -1726,7 +1951,7 @@ export default function OneflowContractCreator() {
                 : <KortRubrik ikon={<Phone className="w-5 h-5 text-emerald-300" />} ruta={IKON_TON.gron.ruta} titel="Kontaktuppgifter" />}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
                 {isCompany && (
-                  <Falt etikett="Namn" ikon={<User className="w-[18px] h-[18px]" />}>
+                  <Falt etikett="Namn" ikon={<User className="w-[18px] h-[18px]" />} under={faltMarkering('Kontaktperson')}>
                     <input
                       className={FALT_INPUT}
                       value={wizardData.Kontaktperson}
@@ -1736,7 +1961,7 @@ export default function OneflowContractCreator() {
                     />
                   </Falt>
                 )}
-                <Falt etikett="Telefon" ikon={<Phone className="w-[18px] h-[18px]" />}>
+                <Falt etikett="Telefon" ikon={<Phone className="w-[18px] h-[18px]" />} under={faltMarkering('telefonnummer-kontaktperson')}>
                   <input
                     type="tel"
                     className={FALT_INPUT}
@@ -1754,7 +1979,7 @@ export default function OneflowContractCreator() {
                       <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
                       Ogiltig e-postadress
                     </span>
-                  ) : undefined}
+                  ) : faltMarkering('e-post-kontaktperson')}
                 >
                   <input
                     type="email"
@@ -1771,9 +1996,12 @@ export default function OneflowContractCreator() {
                   tillagg="valfritt"
                   ikon={<FileText className="w-[18px] h-[18px]" />}
                   under={
-                    <span className="text-xs font-normal text-slate-400">
-                      {isContract ? 'Lämnas det tomt fyller kunden i det vid signering.' : 'Lämnas det tomt används e-posten ovan.'}
-                    </span>
+                    <>
+                      <span className="text-xs font-normal text-slate-400">
+                        {isContract ? 'Lämnas det tomt fyller kunden i det vid signering.' : 'Lämnas det tomt används e-posten ovan.'}
+                      </span>
+                      {faltMarkering('e-post-faktura')}
+                    </>
                   }
                 >
                   <input
@@ -1786,7 +2014,7 @@ export default function OneflowContractCreator() {
                   />
                 </Falt>
               </div>
-              <Falt etikett="Utförande adress" ikon={<MapPin className="w-[18px] h-[18px]" />}>
+              <Falt etikett="Utförande adress" ikon={<MapPin className="w-[18px] h-[18px]" />} under={faltMarkering('utforande-adress')}>
                 <input
                   className={FALT_INPUT}
                   value={wizardData['utforande-adress']}
@@ -1800,7 +2028,7 @@ export default function OneflowContractCreator() {
         )
       }
 
-      case 6: {
+      case 'tjanster': {
         const hasCaseLink = !!wizardData.case_id
         return (
           <div className={`${CARD_CLASS} p-4 sm:p-6`}>
@@ -1852,7 +2080,7 @@ export default function OneflowContractCreator() {
         )
       }
 
-      case 7: {
+      case 'innehall': {
         const length = wizardData.agreementText.length
         const forLang = length > AVTALSOBJEKT_MAX_TECKEN
         const andel = Math.min(100, (length / AVTALSOBJEKT_MAX_TECKEN) * 100)
@@ -1934,7 +2162,7 @@ export default function OneflowContractCreator() {
         )
       }
 
-      case 8:
+      case 'granska':
         return renderReview()
 
       default:
@@ -1976,6 +2204,14 @@ export default function OneflowContractCreator() {
               <span className="text-xs font-bold text-slate-400 tracking-[0.06em] uppercase">Kund</span>
               {andra(counterpartyStep)}
             </div>
+            {koppling ? (
+              <KopplingsRad koppling={koppling} isContract={isContract} />
+            ) : (
+              <p className="flex gap-2.5 items-start text-[15px] text-slate-300">
+                <span className="w-2 h-2 rounded-full mt-[7px] shrink-0 bg-slate-500" />
+                {isContract ? 'Ny kund. Kunden läggs upp när avtalet signeras.' : 'Ingen befintlig kund är kopplad.'}
+              </p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4">
               {isCompany && <PappersFalt etikett="Företag">{tomt(wizardData.foretag)}</PappersFalt>}
               <PappersFalt etikett={isCompany ? 'Org.nr' : 'Personnummer'}>{tomt(wizardData['org-nr'])}</PappersFalt>
@@ -2324,19 +2560,27 @@ export default function OneflowContractCreator() {
   const visaSammanfattning = phase === 'wizard' && !isReview
   const kundgruppNamn = customerGroups.find(g => g.id === wizardData.customer_group_id)?.name
   const avtalslangdText = formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet)
+  const kopplingAntal = koppling ? koppling.levandeAvtal[avtalspartRad(koppling).id] : undefined
   const sammanfattning: Array<{ namn: string; text: string; klar: boolean }> = [
     { namn: 'Dokument', text: isContract ? 'Avtalsförslag' : 'Offert', klar: maxReachedStep > 1 },
     { namn: 'Mall', text: selectedTemplate?.name ?? '', klar: !!selectedTemplate },
     { namn: 'Avtalspart', text: isPrivate ? 'Privatperson' : 'Företag', klar: maxReachedStep > 3 },
+    { namn: 'Motpart', text: motpartNamn, klar: !!motpartNamn.trim() },
+    {
+      namn: 'Kund',
+      text: koppling
+        ? `Kopplad till ${kopplingsText(koppling, isContract)}${kopplingAntal ? `. Har redan ${kopplingAntal} levande avtal` : ''}`
+        : 'Ny kund',
+      klar: !!koppling || maxReachedStep > counterpartyStep,
+    },
     ...(isContract ? [
-      { namn: 'Kundgrupp', text: kundgruppNamn ?? '', klar: !!kundgruppNamn },
+      { namn: 'Kundgrupp', text: kundgruppNamn ? `${kundgruppNamn}${kundgruppFranKortet ? ', från kundkortet' : ''}` : '', klar: !!kundgruppNamn },
       {
         namn: 'Avtalstid',
         text: `${avtalslangdText}${wizardData.begynnelsedag ? ` från ${wizardData.begynnelsedag}` : ''}`,
         klar: maxReachedStep > begoneStep && !!avtalslangdText,
       },
     ] : []),
-    { namn: 'Motpart', text: motpartNamn, klar: !!motpartNamn.trim() },
     {
       namn: isContract ? 'Årspremie' : 'Pris',
       text: `${fmtSEK(prisData.serviceTotal)} exkl. moms`,
@@ -2366,7 +2610,7 @@ export default function OneflowContractCreator() {
               <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${r.klar ? 'bg-[#20c58f]' : 'bg-slate-700'}`} />
               <span className="flex flex-col gap-px min-w-0">
                 <span className="text-xs text-slate-500">{r.namn}</span>
-                <span className={`text-sm truncate ${r.klar ? 'font-semibold text-white' : 'text-slate-500'}`} title={r.klar ? r.text : undefined}>
+                <span className={`text-sm ${r.namn === 'Kund' ? 'break-words' : 'truncate'} ${r.klar ? 'font-semibold text-white' : 'text-slate-500'}`} title={r.klar ? r.text : undefined}>
                   {r.klar ? r.text : 'Inte ifyllt än'}
                 </span>
               </span>
@@ -2435,7 +2679,7 @@ export default function OneflowContractCreator() {
           </div>
           {phase === 'wizard' && (
             <AnimatedProgressBar
-              steps={STEPS}
+              steps={STEPS.map(s => s.key === 'kundgrupp' && kundgruppFranKortet ? { ...s, undertext: 'Från kundkortet' } : s)}
               currentStep={currentStep}
               onStepClick={handleStepClick}
               maxReachedStep={maxReachedStep}

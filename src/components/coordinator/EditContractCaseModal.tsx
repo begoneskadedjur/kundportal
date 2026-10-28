@@ -1164,6 +1164,8 @@ export default function EditContractCaseModal({
       pestType: formData.pest_type,
       // Add case_id for webhook linking
       case_id: caseData?.id,
+      // Ärendets kund kopplas direkt i guiden
+      customer_id: caseData?.customer_id ?? null,
       // Avtalsärenden lagrar billing-rader med case_type='contract'
       caseType: 'contract',
       // Ärendets tjänster/artiklar — styr om wizarden får hoppa förbi produktsteget

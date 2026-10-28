@@ -10,12 +10,15 @@ export type OneflowRolePrefix = '/admin' | '/koordinator' | '/technician' | '/sa
 
 /** Minsta kunddata som behövs för förifyllning. Fälten följer customers-tabellen. */
 export interface PrefillCustomer {
+  /** Kundens id: guiden kopplar kunden direkt (Motpart, 3.100.0) */
+  id?: string | null
   company_name?: string | null
   organization_number?: string | null
   contact_person?: string | null
   contact_email?: string | null
   contact_phone?: string | null
   contact_address?: string | null
+  billing_email?: string | null
   price_list_id?: string | null
   customer_group_id?: string | null
 }
@@ -56,6 +59,9 @@ export function buildPrefillFromCustomer(customer: PrefillCustomer, documentType
     'utforande-adress': customer.contact_address || '',
     foretag: individual ? '' : customer.company_name || '',
     'org-nr': customer.organization_number || '',
+    ...(customer.billing_email ? { 'e-post-faktura': customer.billing_email } : {}),
+    // Guiden kopplar kunden och fyller luckor (t.ex. enhetens ärvda uppgifter) från kundkortet
+    ...(customer.id ? { customer_id: customer.id } : {}),
     ...(customer.price_list_id ? { selectedPriceListId: customer.price_list_id } : {}),
     ...(customer.customer_group_id ? { customer_group_id: customer.customer_group_id } : {}),
     // Gå direkt till mallvalet

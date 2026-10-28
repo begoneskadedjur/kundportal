@@ -5,6 +5,7 @@
 // databasen; klienten skriver bara människans aktiviteter (anteckning, samtal, mejl, möte).
 
 import { supabase } from '../lib/supabase'
+import { kundSokVillkor } from '../shared/kundSok'
 import type { Lead, LeadContact, LeadUpdate } from '../types/database'
 import type {
   LeadAktivitet,
@@ -172,17 +173,13 @@ export class LeadService {
 
   /** Kunder att koppla för hand: namn, org.nr eller kundnummer (aktiva, högst 8). */
   static async sokKunder(q: string): Promise<{ id: string; company_name: string; organization_number: string | null; customer_number: number | null }[]> {
-    const t = q.trim()
-    if (t.length < 2) return []
-    const siffror = t.replace(/\D/g, '')
-    const villkor = [`company_name.ilike.%${t.replace(/[%,()]/g, ' ')}%`]
-    if (siffror.length >= 6) villkor.push(`organization_number.ilike.%${siffror.slice(0, 6)}%`)
-    if (/^\d{1,6}$/.test(t)) villkor.push(`customer_number.eq.${t}`)
+    const villkor = kundSokVillkor(q)
+    if (!villkor) return []
     const { data, error } = await supabase
       .from('customers')
       .select('id, company_name, organization_number, customer_number')
       .eq('is_active', true)
-      .or(villkor.join(','))
+      .or(villkor)
       .order('company_name')
       .limit(8)
     if (error) fel(error, 'Kunderna kunde inte sökas')

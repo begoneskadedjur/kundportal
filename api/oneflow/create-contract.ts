@@ -2,6 +2,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../_lib/auth'
+import {
+  arUuid, jamforIdNummer, kundensIdNummer, valideraKundOchOmfattning, type KopplingsKund,
+} from '../../src/shared/avtalsKundKoppling'
+import { identityNumberVariants } from '../../src/shared/contractSigning'
 // Node.js 18+ har inbyggd fetch
 
 interface ContractRequestBody {
@@ -54,6 +58,14 @@ interface ContractRequestBody {
   }>
   // Kundgrupp-ID (vid avtal)
   customerGroupId?: string | null
+  // Befintlig kund vald i guiden (3.100.0). Kontrolleras här och sparas som
+  // contracts.customer_id. Urvalet gäller bara avtal på ett huvudkontor med
+  // enheter: siteIds sparas i contracts.site_ids och blir contract_sites vid
+  // signering (api/_lib/contractSigning.ts setUpContractMap), coversAllSites
+  // sparas som contracts.covers_all_sites.
+  customerId?: string | null
+  siteIds?: string[] | null
+  coversAllSites?: boolean | null
   // Portalens avtalsvillkor — sparas på contracts, skickas ALDRIG till Oneflow
   noticePeriodMonths?: number | null
   billingFrequency?: string | null
@@ -337,7 +349,10 @@ export default async function handler(
     customerGroupId,
     noticePeriodMonths,
     billingFrequency,
-    draftItems
+    draftItems,
+    customerId: valdKundId,
+    siteIds,
+    coversAllSites
   } = req.body as ContractRequestBody
 
   // Validera användaren
@@ -384,6 +399,51 @@ export default async function handler(
         return res.status(409).json({ message: 'Rabatten väntar på godkännande', code: 'discount_pending' })
       }
     }
+  }
+
+  // Befintlig kund från guiden: kontrolleras INNAN något skapas i Oneflow, så
+  // att ett fel aldrig lämnar ett utkast efter sig. Kunden ska finnas och vara
+  // aktiv, enheterna höra till kunden och org.nr stämma med kundkortet (enhet
+  // utan eget jämförs mot huvudkontorets).
+  let kopplad: { customerId: string; siteIds: string[] | null; coversAllSites: boolean } | null = null
+  if (valdKundId !== undefined && valdKundId !== null && valdKundId !== '') {
+    if (!arUuid(valdKundId)) {
+      return res.status(400).json({ message: 'Ogiltigt kund-id' })
+    }
+    const db = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!)
+    const { data: kundRad } = await db
+      .from('customers')
+      .select('id, is_active, parent_customer_id, site_type, organization_number')
+      .eq('id', valdKundId)
+      .maybeSingle()
+    const kund = (kundRad as KopplingsKund | null) ?? null
+    const arAvtal = documentType !== 'offer'
+    const begartUrval = arAvtal ? (Array.isArray(siteIds) ? siteIds.filter(arUuid) : []) : []
+    const [{ data: urvalRader }, { data: enhetRader }, { data: foralder }] = await Promise.all([
+      begartUrval.length > 0
+        ? db.from('customers').select('id, is_active, parent_customer_id').in('id', begartUrval)
+        : Promise.resolve({ data: [] as KopplingsKund[] }),
+      db.from('customers').select('id').eq('parent_customer_id', valdKundId).eq('is_active', true).limit(1),
+      kund?.parent_customer_id
+        ? db.from('customers').select('organization_number').eq('id', kund.parent_customer_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ])
+    const svar = valideraKundOchOmfattning(
+      kund,
+      arAvtal ? { coversAllSites: !!coversAllSites, siteIds: Array.isArray(siteIds) ? siteIds : null } : {},
+      (urvalRader ?? []) as KopplingsKund[],
+      (enhetRader ?? []).length > 0
+    )
+    if (!svar.ok) {
+      return res.status(400).json({ message: svar.fel, detail: svar.fel })
+    }
+    const kundensNr = kundensIdNummer(kund!, foralder as { organization_number?: string | null } | null)
+    const angivetNr = recipient?.organization_number || contractData?.['org-nr'] || ''
+    if (jamforIdNummer(angivetNr, kundensNr) === 'annat') {
+      const fel = 'Org.nr stämmer inte med den valda kunden. Koppla bort kunden eller rätta numret.'
+      return res.status(400).json({ message: fel, detail: fel })
+    }
+    kopplad = { customerId: valdKundId, siteIds: svar.siteIds, coversAllSites: svar.coversAllSites }
   }
 
   const giltigtLeadId = typeof leadId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId) ? leadId : null
@@ -617,6 +677,18 @@ export default async function handler(
       sent_organization_number: recipient.organization_number || contractData?.['org-nr'] || null,
     }
 
+    // Vald kund: kopplingen och urvalet sparas direkt. Webhooken skriver aldrig
+    // över customer_id (saveOrUpdateContract) och rör inte site_ids eller
+    // covers_all_sites. contract_sites skrivs först vid signering, så att ett
+    // utkast som tas bort eller ett org.nr som ändras inte lämnar omfattning efter sig.
+    if (kopplad) {
+      upsertData.customer_id = kopplad.customerId
+      if (documentType !== 'offer') {
+        upsertData.site_ids = kopplad.siteIds
+        upsertData.covers_all_sites = kopplad.coversAllSites
+      }
+    }
+
     // Portalens avtalsvillkor (uppsägningstid + faktureringsintervall).
     // Endast för avtal, och de skickas aldrig vidare till Oneflow — de styr
     // uppsägningsbevakning och avtalsfakturering i portalen.
@@ -643,17 +715,23 @@ export default async function handler(
       console.log(`✅ Kontrakt-metadata sparad för ${createdContract.id} (source_id: ${caseId || 'ingen'})`)
     }
 
-    // Identifiera och koppla kund för offerten
-    let customerId = null
-    if (documentType === 'offer' || documentType === 'contract') {
-      // Sök efter befintlig kund - prioritet: org.nr > email > företagsnamn
-      if (recipient.organization_number) {
-        const { data: customerByOrg } = await supabase
+    // Identifiera och koppla kund. Vald kund i guiden går före och gissas aldrig.
+    // Utan vald kund: org.nr (alla skrivsätt, huvudkontor först, sedan äldst) →
+    // e-post → företagsnamn. Inget .single(): org.nr, e-post och namn är inte
+    // unika (multisite-enheter delar bolag) och .single() gav fel vid flera träffar.
+    let customerId: string | null = kopplad?.customerId ?? null
+    if (!kopplad && (documentType === 'offer' || documentType === 'contract')) {
+      const varianter = identityNumberVariants(recipient.organization_number)
+      if (varianter.length > 0) {
+        const { data: orgTraffar } = await supabase
           .from('customers')
-          .select('id')
-          .eq('organization_number', recipient.organization_number)
-          .single()
-        if (customerByOrg) customerId = customerByOrg.id
+          .select('id, site_type')
+          .in('organization_number', varianter)
+          .order('created_at', { ascending: true })
+          .limit(10)
+        const rader = (orgTraffar ?? []) as Array<{ id: string; site_type: string | null }>
+        const vald = rader.find(c => c.site_type === 'huvudkontor') ?? rader[0]
+        if (vald) customerId = vald.id
       }
 
       if (!customerId && recipient.email) {
@@ -661,7 +739,9 @@ export default async function handler(
           .from('customers')
           .select('id')
           .eq('contact_email', recipient.email)
-          .single()
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle()
         if (customerByEmail) customerId = customerByEmail.id
       }
 
@@ -670,11 +750,13 @@ export default async function handler(
           .from('customers')
           .select('id')
           .eq('company_name', recipient.company_name)
-          .single()
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle()
         if (customerByName) customerId = customerByName.id
       }
 
-      // Koppla kund till kontraktet om hittad
+      // Koppla kund till kontraktet om hittad (vald kund sparades redan i upserten)
       if (customerId) {
         const { error: customerLinkError } = await supabase
           .from('contracts')

@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.100.0',
+    date: '2026-10-28',
+    title: 'Välj befintlig kund när du skapar avtal eller offert',
+    items: [
+      { kind: 'nyhet', text: 'I steget Motpart kan du söka fram en befintlig kund på namn, org.nr eller kundnummer. Uppgifterna fylls i från kundkortet och går att ändra för just det här dokumentet, kundkortet ändras inte. Skriver du ett org.nr som redan finns föreslås kunden.' },
+      { kind: 'nyhet', text: 'För kunder med enheter väljer du om avtalet gäller hela verksamheten, bara huvudkontoret eller utvalda enheter, eller lägger avtalet på en enskild enhet. Valet blir avtalets omfattning när kunden signerat.' },
+      { kind: 'andring', text: 'Motpart kommer nu före Kundgrupp i avtal. Har kunden redan en kundgrupp väljs den automatiskt och steget hoppas över, men det går att öppna och ändra.' },
+      { kind: 'buggfix', text: 'En kund sätts inte längre som inaktiv när ett av dess avtal avslutas i Oneflow om kunden har andra avtal som fortfarande gäller.' },
+    ],
+  },
+  {
     version: '3.99.0',
     date: '2026-10-27',
     title: 'Fakturan visar var jobbet gjordes',
