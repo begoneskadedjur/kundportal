@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.107.0',
+    date: '2026-10-28',
+    title: 'Avtalsfakturor visar om avtalet är kontrollerat',
+    items: [
+      { kind: 'nyhet', text: 'Under kundnamnet i Fakturering, fliken Avtalskunder, står Kontrollerat, Ändrat efter kontroll eller Ej kontrollerat. Håll muspekaren över för att se vad som är kontrollerat: premien mot det signerade avtalet, Fortnox-kortet, perioden och att inget är fakturerat tidigare.' },
+      { kind: 'nyhet', text: 'Filtret Alla, Kontrollerade och Ej kontrollerade och rutan Varav kontrollerade gör det lätt att godkänna de kontrollerade fakturorna först.' },
+      { kind: 'nyhet', text: 'Fakturan visar samma sak överst. Ändras premien, faktureringen eller kundnumret efter kontrollen står det vad som ändrades, och Kontrollera igen öppnar avtalskartan.' },
+      { kind: 'nyhet', text: 'I avtalskartan finns knappen Markera som kontrollerat för den som gått igenom ett avtal mot avtalet och Fortnox. 17 avtal är markerade från genomgången 2026-10-28.' },
+    ],
+  },
+  {
     version: '3.105.2',
     date: '2026-10-28',
     title: 'Rätt personnummer och adress från offerter',
