@@ -4,6 +4,7 @@
 import { buildCustomerArticleSpec, appendCustomerArticleSpec } from '../types/caseBilling'
 import { supabase } from '../lib/supabase'
 import { InvoiceDeliveryService } from './invoiceDeliveryService'
+import { PremiumReviewService } from './premiumReviewService'
 import type {
   Invoice,
   InvoiceWithItems,
@@ -746,6 +747,9 @@ export class InvoiceService {
     // Ingen faktura godkänns utan bekräftad fakturaväg (src/shared/invoiceDelivery.ts).
     // Kastar InvoiceDeliveryError med text till användaren.
     await InvoiceDeliveryService.assertInvoiceDeliverable(id)
+    // Avtalsfaktura för avtal gjort direkt i Oneflow: premien ska vara bekräftad
+    // i avtalskartan först (src/shared/premiumReview.ts, beslut 2026-10-28).
+    await PremiumReviewService.assertInvoicePremiumConfirmed(id)
     // Fakturans rabatter godkänns på raderna först (kräver rabattansvarig när
     // det finns väntande rabatt, annars inget). Utan detta stod raderna kvar
     // med requires_approval och en omgenererad faktura blev pending igen.

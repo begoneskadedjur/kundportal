@@ -34,6 +34,14 @@ export function isOurChainContract(c: { created_by_email?: string | null }): boo
   return !!(c.created_by_email && c.created_by_email.trim())
 }
 
+/**
+ * Notisen på ett avtal utanför vår kedja vars premie räknats ur Oneflows
+ * produkttabell (contracts.premium_review_note). Spärren och bekräftelsen
+ * finns i src/shared/premiumReview.ts. Beslut 2026-10-28.
+ */
+export const PREMIUM_REVIEW_NOTE =
+  'Premien är uträknad ur Oneflows produkttabell. Stäm av mot avtalet och bekräfta.'
+
 // --- Premien -----------------------------------------------------------------
 
 /**

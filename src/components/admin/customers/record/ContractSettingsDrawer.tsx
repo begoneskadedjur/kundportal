@@ -133,6 +133,7 @@ export interface ContractSettingsDrawerProps {
   planEntries: PremiumPlanEntry[]
   onLinkFortnox?: (period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null; kind?: string }) => void
   onSavePremium?: (input: { annualValue: number | null; billingFrequency: string | null; billingAnchorMonth: number | null }) => Promise<void>
+  onConfirmPremium?: () => Promise<void>
   onAddPremiumEvent?: (input: { eventType: 'step_up' | 'indexation' | 'adjustment'; effectiveFrom: string; annualValue: number; note: string | null }) => Promise<void>
   // Referenser
   coveredLocations: RecordCustomer[]
@@ -810,6 +811,7 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
               planEntries={p.planEntries}
               onLinkFortnox={p.onLinkFortnox}
               onSavePremium={p.onSavePremium}
+              onConfirmPremium={p.onConfirmPremium}
               onAddPremiumEvent={p.onAddPremiumEvent}
             />
             <div className="mt-4 pt-3 border-t border-slate-700 text-[12px] text-slate-400">

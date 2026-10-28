@@ -707,6 +707,16 @@ export type Database = {
           /** Avtalets namn, satt av användaren. Tomt = avtalstypen. Skrivs aldrig av synk. */
           display_name?: string | null
 
+          /**
+           * Premien är uträknad ur Oneflows produkttabell (avtal gjort direkt i
+           * Oneflow) och ska bekräftas innan avtalsfakturan godkänns. 2026-10-28.
+           */
+          premium_needs_review?: boolean
+          premium_review_note?: string | null
+          premium_confirmed_at?: string | null
+          premium_confirmed_by?: string | null
+          premium_confirmed_by_name?: string | null
+
           created_at: string
           updated_at: string
         }

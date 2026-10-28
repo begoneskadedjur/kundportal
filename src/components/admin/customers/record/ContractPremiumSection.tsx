@@ -13,6 +13,8 @@
 
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
+import { PREMIUM_REVIEW_NOTE } from '../../../../shared/premiumReview'
 import DateField from '../../../ui/DateField'
 import {
   BILLING_FREQUENCY_LABEL,
@@ -131,6 +133,8 @@ interface Props {
   /** Koppla en Fortnox-faktura till en passerad period utan faktura */
   onLinkFortnox?: (period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null; kind?: string }) => void
   onSavePremium?: (input: { annualValue: number | null; billingFrequency: string | null; billingAnchorMonth: number | null }) => Promise<void>
+  /** Bekräfta premie uträknad ur Oneflows produkttabell (contracts.premium_needs_review) */
+  onConfirmPremium?: () => Promise<void>
   onAddPremiumEvent?: (input: {
     eventType: 'step_up' | 'indexation' | 'adjustment'
     effectiveFrom: string
@@ -189,6 +193,7 @@ export default function ContractPremiumSection({
   ink,
   archived,
   onSavePremium,
+  onConfirmPremium,
   onAddPremiumEvent,
   invoiceMode,
   planEntries,
@@ -201,6 +206,22 @@ export default function ContractPremiumSection({
   const [editing, setEditing] = useState(settings)
   const [stepForm, setStepForm] = useState<null | { eventType: 'step_up' | 'indexation' }>(null)
   const [saving, setSaving] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  // Premie att bekräfta: avtal gjort direkt i Oneflow (src/shared/premiumReview.ts).
+  // Knappen bara för den som får ändra premien (samma villkor som redigeringen).
+  const needsReview = contract.premium_needs_review === true
+  const canConfirm = needsReview && !archived && !!onSavePremium && !!onConfirmPremium
+  const confirm = async () => {
+    if (!onConfirmPremium) return
+    setConfirming(true)
+    try {
+      await onConfirmPremium()
+    } catch {
+      // Felet visas av anroparen
+    } finally {
+      setConfirming(false)
+    }
+  }
 
   const [annualInput, setAnnualInput] = useState(settings && annualInForce != null ? String(annualInForce) : '')
   const [freqInput, setFreqInput] = useState(settings ? (contract.billing_frequency ?? 'annual') : '')
@@ -290,6 +311,27 @@ export default function ContractPremiumSection({
                 ? `faktureras ${frequencyLabel.toLowerCase()}${anchor ? ` · ${MONTHS[anchor - 1]}` : ''}`
                 : ''}
           </span>
+        </div>
+      )}
+
+      {needsReview && (
+        <div className="flex items-start gap-2 py-1.5 border-b border-dotted font-sans text-[12px]" style={rowStyle}>
+          <span className="mt-[5px] w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" aria-hidden />
+          <span className="flex-1" style={{ color: ink.secondary }}>
+            {contract.premium_review_note || PREMIUM_REVIEW_NOTE} Avtalsfakturan godkänns inte förrän premien är bekräftad.
+          </span>
+          {canConfirm && (
+            <button
+              type="button"
+              onClick={() => void confirm()}
+              disabled={confirming}
+              className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-[#fff] bg-[#20c58f] rounded-lg px-2.5 py-1 hover:brightness-110 disabled:opacity-50 flex-shrink-0"
+              title="Premien stämmer med avtalet"
+            >
+              {confirming ? <Loader2 className="w-3 h-3 animate-spin" /> : <Icon name="allman.bock" size={16} />}
+              Bekräfta premien
+            </button>
+          )}
         </div>
       )}
 

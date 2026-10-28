@@ -38,6 +38,7 @@ import {
   isOurChainContract,
   pickContractService,
   premiumExclVatFromOneflow,
+  PREMIUM_REVIEW_NOTE,
   selectSourceRowsCoveredByContract,
   type ContractServiceCandidate,
   type PremiumRow,
@@ -386,6 +387,13 @@ export async function processSignedContract(
     // Saknas premien sätts den till Oneflow-beloppet, annars lämnas den
     if (premium && currentAnnual == null) {
       updates.annual_value = premium
+      // Avtal gjorda direkt i Oneflow: premien är uträknad ur produkttabellen och
+      // ska bekräftas av en människa innan den faktureras (beslut 2026-10-28)
+      if (!ourChain) {
+        updates.premium_needs_review = true
+        updates.premium_review_note = PREMIUM_REVIEW_NOTE
+        report.notes.push(`Premien ${kr(premium)} är uträknad ur Oneflows produkttabell. Bekräfta den i avtalskartan innan avtalsfakturan godkänns.`)
+      }
     }
     const months = parseContractLength(str(contract.contract_length))
     const effectivePremium = (updates.annual_value as number | undefined) ?? currentAnnual ?? premium

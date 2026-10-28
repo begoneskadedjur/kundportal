@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.102.0',
+    date: '2026-10-28',
+    title: 'Premie från avtal gjorda direkt i Oneflow bekräftas',
+    items: [
+      { kind: 'buggfix', text: 'Avtal som gjorts direkt i Oneflow kunde få fel årspremie när mallen har en dold priskolumn, till exempel Anlos 2 som fick 23 960 kr i stället för avtalets 27 960 kr. Nu räknas premien på den priskolumn som syns i avtalet, efter rabatt.' },
+      { kind: 'nyhet', text: 'Premien från ett sådant avtal markeras med Premien är uträknad ur Oneflows produkttabell. Avtalsfakturan går inte att godkänna eller skicka förrän någon stämt av premien och tryckt Bekräfta premien i avtalskartan. Avtal från portalens wizard berörs inte.' },
+      { kind: 'buggfix', text: 'Ett avtals värde nollas inte längre när Oneflow skickar en uppdatering som saknar pris.' },
+    ],
+  },
+  {
     version: '3.101.0',
     date: '2026-10-28',
     title: 'Avtalskunder får sitt kundnummer från Fortnox',

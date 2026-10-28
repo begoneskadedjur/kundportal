@@ -36,6 +36,8 @@ import {
 import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
 import { InvoiceService } from '../../../services/invoiceService'
+import { PremiumReviewService } from '../../../services/premiumReviewService'
+import { PREMIUM_REVIEW_BLOCK_MESSAGE } from '../../../shared/premiumReview'
 import { ProvisionService } from '../../../services/provisionService'
 import type { CommissionPost } from '../../../types/provision'
 import { FortnoxService } from '../../../services/fortnoxService'
@@ -225,6 +227,25 @@ export default function InvoiceDetailModal({
     }
     fetch()
   }, [invoice?.customer_id, invoice?.invoice_type])
+
+  // Premie att bekräfta (src/shared/premiumReview.ts): avtal gjorda direkt i
+  // Oneflow spärrar avtalsfakturan tills premien bekräftats i avtalskartan
+  const [unconfirmedPremiumIds, setUnconfirmedPremiumIds] = useState<string[]>([])
+  const premiumCheckId = invoice?.id ?? null
+  const premiumCheckType = invoice?.invoice_type ?? null
+  const premiumCheckStatus = invoice?.status ?? null
+  useEffect(() => {
+    if (!isOpen || !premiumCheckId || premiumCheckType !== 'contract') {
+      setUnconfirmedPremiumIds([])
+      return
+    }
+    let cancelled = false
+    PremiumReviewService.getUnconfirmedContractIdsForInvoice(premiumCheckId)
+      .then(ids => { if (!cancelled) setUnconfirmedPremiumIds(ids) })
+      .catch(err => { console.warn('[InvoiceDetailModal] Premiekontrollen misslyckades:', err) })
+    return () => { cancelled = true }
+  }, [isOpen, premiumCheckId, premiumCheckType, premiumCheckStatus])
+  const premiumUnconfirmed = unconfirmedPremiumIds.length > 0
 
   // Ad-hoc/avtalsfakturor har case_type = null (constraint tillåter bara null/private/business),
   // men deras ärende är ett contract-ärende. Härled 'contract' så ärendekontext,
@@ -603,6 +624,10 @@ export default function InvoiceDetailModal({
       toast.error(deliveryEval.message ?? 'Fakturavägen är inte bekräftad')
       return
     }
+    if (premiumUnconfirmed) {
+      toast.error(PREMIUM_REVIEW_BLOCK_MESSAGE, { duration: 10000 })
+      return
+    }
 
     setApproving(true)
     const approverName = profile?.display_name || profile?.technicians?.name || profile?.email || 'Okänd'
@@ -641,6 +666,8 @@ export default function InvoiceDetailModal({
       if (error instanceof InvoiceDeliveryError) {
         toast.error(error.message)
         setDeliveryReloadKey(k => k + 1)
+      } else if (error instanceof Error && error.message === PREMIUM_REVIEW_BLOCK_MESSAGE) {
+        toast.error(error.message, { duration: 10000 })
       } else {
         toast.error('Kunde inte godkänna fakturan')
       }
@@ -714,6 +741,21 @@ export default function InvoiceDetailModal({
     if (invoice.fortnox_document_number) {
       toast.error(`Fakturan finns redan i Fortnox (nr ${invoice.fortnox_document_number}). Använd Synka för att hämta dess status.`)
       return
+    }
+    // Avtalsfaktura med obekräftad premie (avtal gjort direkt i Oneflow)
+    // skickas inte. Läses färskt så att en bekräftelse i kartan släpper direkt.
+    if (invoice.invoice_type === 'contract') {
+      try {
+        const unconfirmed = await PremiumReviewService.getUnconfirmedContractIdsForInvoice(invoice.id)
+        setUnconfirmedPremiumIds(unconfirmed)
+        if (unconfirmed.length > 0) {
+          toast.error(PREMIUM_REVIEW_BLOCK_MESSAGE, { duration: 10000 })
+          return
+        }
+      } catch (err) {
+        toast.error(`Kunde inte kontrollera avtalets premie: ${err instanceof Error ? err.message : String(err)}`)
+        return
+      }
     }
     setSendingToFortnox(true)
     try {
@@ -1255,6 +1297,9 @@ export default function InvoiceDetailModal({
   const showBlockers = !!invoice && ['pending_approval', 'ready'].includes(invoice.status)
   const blockers: { label: string; severe?: boolean }[] = []
   if (showBlockers && invoice) {
+    if (premiumUnconfirmed) {
+      blockers.push({ label: 'premien är inte bekräftad i avtalskartan', severe: true })
+    }
     if (deliveryEval && !deliveryEval.ok) {
       blockers.push({ label: 'fakturavägen är inte bekräftad', severe: true })
     }
@@ -1456,6 +1501,21 @@ export default function InvoiceDetailModal({
               </div>
             ) : invoice ? (
               <div className="p-4 space-y-4">
+                {/* Premie att bekräfta: avtal gjort direkt i Oneflow. Spärrar
+                    Godkänn och Skapa utkast tills premien bekräftats i kartan. */}
+                {premiumUnconfirmed && invoice.status !== 'cancelled' && (
+                  <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                    <span className="mt-1.5 w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" aria-hidden />
+                    <div>
+                      <div className="text-sm font-medium text-amber-400">Premien är inte bekräftad</div>
+                      <p className="text-xs text-amber-300/80 mt-0.5">
+                        {PREMIUM_REVIEW_BLOCK_MESSAGE}
+                        {unconfirmedPremiumIds.length > 1 ? ` Gäller ${unconfirmedPremiumIds.length} av fakturans avtal.` : ''}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Varning om inaktuella fakturarader */}
                 {staleInfo?.stale && (
                   <div className="flex items-center justify-between gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
@@ -2254,9 +2314,11 @@ export default function InvoiceDetailModal({
               {invoice.status === 'pending_approval' && (
                 <button
                   onClick={handleApprove}
-                  disabled={approving || !profile?.can_approve_invoices || (!!deliveryEval && !deliveryEval.ok)}
+                  disabled={approving || !profile?.can_approve_invoices || (!!deliveryEval && !deliveryEval.ok) || premiumUnconfirmed}
                   title={!profile?.can_approve_invoices
                     ? 'Endast faktureringsansvarig kan godkänna'
+                    : premiumUnconfirmed
+                    ? PREMIUM_REVIEW_BLOCK_MESSAGE
                     : deliveryEval && !deliveryEval.ok
                       ? deliveryEval.message ?? 'Fakturavägen är inte bekräftad'
                       : undefined}
@@ -2271,9 +2333,11 @@ export default function InvoiceDetailModal({
               {(invoice.status === 'pending_approval' || invoice.status === 'ready') && (
                 <button
                   onClick={() => handleSendToFortnox()}
-                  disabled={sendingToFortnox || invoice.status === 'pending_approval' || (!!deliveryEval && !deliveryEval.ok)}
+                  disabled={sendingToFortnox || invoice.status === 'pending_approval' || (!!deliveryEval && !deliveryEval.ok) || premiumUnconfirmed}
                   title={invoice.status === 'pending_approval'
                     ? 'Låst tills fakturan godkänts av faktureringsansvarig'
+                    : premiumUnconfirmed
+                    ? PREMIUM_REVIEW_BLOCK_MESSAGE
                     : deliveryEval && !deliveryEval.ok
                       ? deliveryEval.message ?? 'Fakturavägen är inte bekräftad'
                       : undefined}

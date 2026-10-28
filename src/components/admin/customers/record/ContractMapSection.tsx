@@ -51,6 +51,8 @@ import { daysUntilEnd, isTerminatedButRunning } from '../../../../utils/contract
 import { terminationLastDay } from '../../../../shared/scheduleHorizon'
 import { buildRenewalPrefill } from '../../../../utils/contractRenewalPrefill'
 import { ContractScopeService, FrameworkAgreementService } from '../../../../services/contractScopeService'
+import { PremiumReviewService } from '../../../../services/premiumReviewService'
+import { useAuth } from '../../../../contexts/AuthContext'
 import { useFrameworkAgreements } from '../../../../hooks/useFrameworkAgreements'
 import ContractStamp from './ContractStamp'
 import DateField from '../../../ui/DateField'
@@ -249,6 +251,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const { root, units, contracts, additions, billingItems, premiumEvents, contractSites, cases, contractEvents, inspections, schedules } =
     data
   const navigate = useNavigate()
+  const { profile } = useAuth()
   // Aktiv personal — säljaren väljs ur registret, aldrig som fritext.
   // Avtalen bar redan 21 unika namn mot 12 i personalregistret.
   const { technicians } = useTechnicians()
@@ -1124,12 +1127,31 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     }
   }
 
+  const confirmerName = () => profile?.display_name || profile?.technicians?.name || profile?.email || null
+
+  // Premie att bekräfta (src/shared/premiumReview.ts): släpper spärren på avtalsfakturan
+  const confirmPremium = async (contract: RecordContract) => {
+    try {
+      await PremiumReviewService.confirmPremium(contract.id, profile?.id ?? null, confirmerName())
+      toast.success(`Premien är bekräftad för ${contractDisplayName(contract)}.`)
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte bekräfta premien')
+      throw err
+    }
+  }
+
   const savePremium = async (
     contract: RecordContract,
     input: { annualValue: number | null; billingFrequency: string | null; billingAnchorMonth: number | null }
   ) => {
     try {
       await ContractScopeService.setPremium(contract.id, input)
+      // Premie att bekräfta: att ändra premien i kartan är en bekräftelse
+      const prevAnnual = contract.annual_value == null ? null : Number(contract.annual_value)
+      if (contract.premium_needs_review && input.annualValue != null && input.annualValue > 0 && Math.round(input.annualValue) !== prevAnnual) {
+        await PremiumReviewService.confirmPremium(contract.id, profile?.id ?? null, confirmerName())
+      }
       toast.success(
         input.annualValue
           ? `Årspremie ${formatKr(input.annualValue)} sparad för ${contractDisplayName(contract)}.`
@@ -2929,6 +2951,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               locations={locations}
               dropZone={drag?.overContractId === c.id ? drag.overZone : undefined}
               onSavePremium={(input) => savePremium(c, input)}
+              onConfirmPremium={() => confirmPremium(c)}
               onAddPremiumEvent={(input) => addPremiumEvent(c, input)}
               onSaveTerm={(input) => saveTerm(c, input)}
               onSaveInvoiceReference={(input) => saveInvoiceReference(c, input)}
@@ -3323,6 +3346,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               planEntries={planEntriesByContract.get(c.id) ?? []}
               onLinkFortnox={(period) => openLinkFortnox(c, period)}
               onSavePremium={(input) => savePremium(c, input)}
+              onConfirmPremium={() => confirmPremium(c)}
               onAddPremiumEvent={(input) => addPremiumEvent(c, input)}
               coveredLocations={coveredLocationsFor(c)}
               onSaveInvoiceReference={(input) => saveInvoiceReference(c, input)}
@@ -4442,6 +4466,8 @@ interface PaperProps {
   dropZone?: DropZone
   /** § 6 Premie och fakturering */
   onSavePremium?: (input: { annualValue: number | null; billingFrequency: string | null; billingAnchorMonth: number | null }) => Promise<void>
+  /** Bekräfta premie uträknad ur Oneflows produkttabell */
+  onConfirmPremium?: () => Promise<void>
   onAddPremiumEvent?: (input: {
     eventType: 'step_up' | 'indexation' | 'adjustment'
     effectiveFrom: string
@@ -4547,6 +4573,7 @@ function PaperContract({
   locations,
   dropZone,
   onSavePremium,
+  onConfirmPremium,
   onAddPremiumEvent,
   onSaveTerm,
   onSaveInvoiceReference,
@@ -5259,6 +5286,7 @@ function PaperContract({
           ink={ink}
           archived={archived}
           onSavePremium={onSavePremium}
+          onConfirmPremium={onConfirmPremium}
           onAddPremiumEvent={onAddPremiumEvent}
           invoiceMode={invoiceMode}
           planEntries={planEntries}

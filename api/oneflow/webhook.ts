@@ -7,6 +7,7 @@ import { refreshTemplates, isKnownTemplate, contractTypeOf, getKnownTemplateIds 
 import { processSignedContract } from '../_lib/contractSigning'
 import { isLiveContract, LIVE_CONTRACT_STATUSES, type ContractLifecycleFields } from '../../src/utils/contractLifecycle'
 import { classifyOneflowBillingField } from '../../src/shared/invoiceDelivery'
+import { oneflowProductsValue, wizardProductsValue } from '../../src/shared/oneflowProductValue'
 import {
   caseStatusForDocument,
   documentEventText,
@@ -123,6 +124,8 @@ interface ContractInsertData {
   organization_number?: string | null
   agreement_text?: string | null
   total_value?: number | null
+  /** Wizardens beräkning (price_1 x antal); används i stället för total_value på wizardens avtal. Sparas inte. */
+  wizard_total_value?: number | null
   selected_products?: any
   billing_email?: string | null
   billing_address?: string | null
@@ -499,20 +502,16 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
   )
   const counterParticipant = counterParty?.participants?.[0]
 
-  // Beräkna totalt värde från produkter
-  let totalValue = 0
+  // Beräkna totalt värde från produkter (src/shared/oneflowProductValue.ts).
+  // Avtal gjorda direkt i Oneflow: den priskolumn som syns, efter rabatt,
+  // gånger antal. Wizardens avtal räknas som förut (wizard_total_value),
+  // eftersom wizardens ROT-offerter har avdraget i den dolda kolumnen.
+  const productValue = oneflowProductsValue(details.product_groups)
+  const totalValue = productValue.total
+  const wizardTotalValue = wizardProductsValue(details.product_groups)
   console.log('💰 Beräknar produktvärde:')
-  if (details.product_groups) {
-    for (const group of details.product_groups) {
-      console.log(`  Produktgrupp: ${group.name || 'Namnlös'}`)
-      for (const product of group.products) {
-        const price = parseFloat(product.price_1?.amount?.amount || '0')
-        const quantity = product.quantity?.amount || 1
-        const productTotal = price * quantity
-        console.log(`    - ${product.name}: ${price} kr x ${quantity} = ${productTotal} kr`)
-        totalValue += productTotal
-      }
-    }
+  for (const r of productValue.rows) {
+    console.log(`    - ${r.name}: ${r.unitPrice} kr (${r.priceKey}, lista ${r.listPrice}) x ${r.quantity} = ${r.total} kr`)
   }
   console.log(`  💰 Totalt värde: ${totalValue} kr`)
 
@@ -552,6 +551,7 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     // Avtal/Offert-detaljer  
     agreement_text: agreementParts.join('\n\n'),
     total_value: totalValue > 0 ? totalValue : null,
+    wizard_total_value: wizardTotalValue > 0 ? wizardTotalValue : null,
     selected_products: details.product_groups || null,
     
     // Fakturering
@@ -647,7 +647,7 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
     // Kontrollera om kontraktet redan finns
     const { data: existingContract, error: checkError } = await supabase
       .from('contracts')
-      .select('id, status, source_id, source_type')
+      .select('id, status, source_id, source_type, created_by_email')
       .eq('oneflow_contract_id', contractData.oneflow_contract_id)
       .single()
 
@@ -668,8 +668,14 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
         source_type,
         notice_period_months,
         billing_frequency,
+        wizard_total_value,
         ...webhookData
       } = contractData as any
+
+      // Värdet: wizardens avtal räknas som förut, övriga på synlig priskolumn.
+      // Ett värde som inte går att räkna ut nollar aldrig det som redan finns.
+      if (existingContract.created_by_email) webhookData.total_value = wizard_total_value ?? null
+      if (webhookData.total_value == null) delete webhookData.total_value
 
       // Kundkopplingen sätts av signeringen och wizarden, aldrig av Oneflow:
       // parsningen ger alltid null och får inte koppla loss avtalet från kunden
@@ -700,7 +706,7 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
       // Skapa nytt kontrakt
       const { error: insertError } = await supabase
         .from('contracts')
-        .insert([contractData])
+        .insert([(({ wizard_total_value: _w, ...rest }) => rest)(contractData)])
 
       if (insertError) {
         throw insertError
