@@ -52,4 +52,28 @@ export const kundIcons = {
       <path d="M12 11v5 M12 7.6v.2" />
     </>
   ),
+  // Kontrollerat avtal: avtalsdokument med bock i ring (avtalet stämt mot
+  // signerat avtal och Fortnox). Godkänd i skissen Kontrollerade avtalsfakturor 2026-10-28.
+  'kund.avtal-kontrollerat': (
+    <>
+      <path d="M13.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4.5" />
+      <path d="M13.5 3v5h5" />
+      <path d="M18.5 8v4" />
+      <path d="M8.5 11.5h5M8.5 15h3" />
+      <circle cx="17" cy="17.5" r="4" />
+      <path d="M15.2 17.6l1.3 1.3 2.4-2.6" />
+    </>
+  ),
+  // Ändrat efter kontrollen: avtalsdokument med utropstecken i ring. Samma skiss.
+  'kund.avtal-andrat': (
+    <>
+      <path d="M13.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4.5" />
+      <path d="M13.5 3v5h5" />
+      <path d="M18.5 8v4" />
+      <path d="M8.5 11.5h5M8.5 15h3" />
+      <circle cx="17" cy="17.5" r="4" />
+      <path d="M17 15.6v2.2" />
+      <circle cx="17" cy="19.6" r=".5" fill="currentColor" stroke="none" />
+    </>
+  ),
 } satisfies Record<`kund.${string}`, ReactNode>

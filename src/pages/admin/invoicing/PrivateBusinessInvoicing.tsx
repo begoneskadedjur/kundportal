@@ -22,9 +22,18 @@ import { InvoiceDeliveryError } from '../../../services/invoiceDeliveryService'
 import type { Invoice, InvoiceStatus, InvoiceFilters } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
 import InvoiceDetailModal from '../../../components/admin/invoicing/InvoiceDetailModal'
+import { ContractReviewMark } from '../../../components/admin/invoicing/ContractReviewMark'
+import { ContractReviewService, type InvoiceReviewInfo } from '../../../services/contractReviewService'
 
 type InvoiceTabType = 'private-business' | 'contract' | 'adhoc'
 type QueueFilter = 'pending_approval' | 'ready' | 'overdue' | null
+// Kontrollerat avtal (src/shared/contractReview.ts): filtret i fliken Avtalskunder
+type ReviewFilter = 'alla' | 'ok' | 'ej'
+const REVIEW_FILTERS: { id: ReviewFilter; label: string }[] = [
+  { id: 'alla', label: 'Alla' },
+  { id: 'ok', label: 'Kontrollerade' },
+  { id: 'ej', label: 'Ej kontrollerade' },
+]
 
 interface Props {
   invoiceType?: InvoiceTabType
@@ -82,6 +91,12 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
   const [showArchive, setShowArchive] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
 
+  // Kontrollerat avtal: läget per faktura (bara fliken Avtalskunder)
+  const showReview = invoiceType === 'contract'
+  const [reviewByInvoice, setReviewByInvoice] = useState<Map<string, InvoiceReviewInfo>>(new Map())
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('alla')
+  const isReviewedOk = (inv: Invoice) => reviewByInvoice.get(inv.id)?.state === 'ok'
+
   // Månadsgruppering (endast för contract/adhoc)
   const groupByMonth = invoiceType === 'contract' || invoiceType === 'adhoc'
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set())
@@ -113,13 +128,20 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
 
   const currentMonthName = new Date().toLocaleDateString('sv-SE', { month: 'long' })
 
-  // Synlig lista: aktivt cellfilter vinner, annars arbetslägen (arkiv bakom toggle)
-  const visibleInvoices = (() => {
+  // Varav kontrollerade: bland de som kräver godkännande
+  const pendingReviewedCount = pendingApprovalInvoices.filter(isReviewedOk).length
+
+  // Synlig lista: aktivt cellfilter vinner, annars arbetslägen (arkiv bakom toggle).
+  // Filtret Kontrollerade / Ej kontrollerade läggs ovanpå i fliken Avtalskunder.
+  const matchesReviewFilter = (inv: Invoice) =>
+    !showReview || reviewFilter === 'alla' || (reviewFilter === 'ok' ? isReviewedOk(inv) : !isReviewedOk(inv))
+  const queueVisibleInvoices = (() => {
     if (queueFilter === 'overdue') return invoices.filter(isRowOverdue)
     if (queueFilter) return invoices.filter(i => i.status === queueFilter)
     if (!showArchive) return invoices.filter(isWorkInvoice)
     return invoices
   })()
+  const visibleInvoices = queueVisibleInvoices.filter(matchesReviewFilter)
   const archivedCount = invoices.filter(i => !isWorkInvoice(i)).length
 
   // Auto-expandera aktuell månad när data laddats
@@ -146,7 +168,7 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
   // Rensa markeringar när vyn byts – markerade rader ska aldrig vara osynliga
   useEffect(() => {
     setSelectedIds([])
-  }, [queueFilter, showArchive])
+  }, [queueFilter, showArchive, reviewFilter])
 
   // Gruppera synliga fakturor per YYYY-MM baserat på billing_period_start
   const groupedInvoices = groupByMonth
@@ -200,6 +222,13 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
 
       setInvoices(invoicesData)
       setSelectedIds([])
+
+      // Kontrollerat avtal: läses vid sidan av, ett fel här stoppar inte listan
+      if (invoiceType === 'contract') {
+        ContractReviewService.getInvoiceReviewStates(invoicesData as Array<Invoice & { contract_id?: string | null }>)
+          .then(setReviewByInvoice)
+          .catch(err => console.warn('[Fakturering] Avtalskontrollen kunde inte läsas:', err))
+      }
 
       // Slå upp ärendenummer för fakturor kopplade till ärenden
       const byTable: Record<'private_cases' | 'business_cases' | 'cases', string[]> = {
@@ -415,6 +444,11 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
               ))}
             </div>
           )}
+          {showReview && (
+            <div>
+              <ContractReviewMark review={reviewByInvoice.get(invoice.id)} />
+            </div>
+          )}
         </td>
         <td className={`px-3 py-2 text-xs tabular-nums ${rowOverdue ? 'text-red-400' : 'text-slate-400'}`}>
           {formatInvoiceDate(invoice.created_at)}
@@ -504,6 +538,17 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
           warnColor="amber"
           hint={oldestPendingDate ? `äldsta väntar sedan ${oldestPendingDate}` : undefined}
         />
+        {/* Kontrollerat avtal: antal bland de som kräver godkännande, ej filter */}
+        {showReview && (
+          <div className="flex-1 min-w-0 px-4 py-2.5 border-b-2 border-b-transparent">
+            <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Varav kontrollerade</div>
+            <div className="tabular-nums">
+              <span className="text-lg font-bold text-[#20c58f]">{pendingReviewedCount}</span>
+              <span className="text-xs font-medium text-slate-400"> av {pendingApprovalInvoices.length}</span>
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5 truncate">avtalet stämt mot avtal och Fortnox</div>
+          </div>
+        )}
         <QueueCell
           filterKey="ready"
           label="Redo för Fortnox"
@@ -529,7 +574,24 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
       </div>
 
       {/* Sökrad: sök vänster · Arkiv-toggle · uppdatera · Till Fortnox höger */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        {showReview && (
+          <div role="group" aria-label="Visa" className="inline-flex border border-slate-700 rounded-lg overflow-hidden">
+            {REVIEW_FILTERS.map(f => (
+              <button
+                key={f.id}
+                type="button"
+                aria-pressed={reviewFilter === f.id}
+                onClick={() => setReviewFilter(f.id)}
+                className={`px-3 py-1.5 text-xs border-r border-slate-700 last:border-r-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#20c58f] ${
+                  reviewFilter === f.id ? 'bg-slate-800 text-white font-medium' : 'bg-transparent text-slate-400 hover:text-white'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
@@ -614,7 +676,7 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
           <div className="text-center py-8 text-slate-400">
             <FileEdit className="w-10 h-10 mx-auto mb-2 opacity-50" />
             <p className="text-sm">
-              {queueFilter || showArchive || searchTerm
+              {queueFilter || showArchive || searchTerm || (showReview && reviewFilter !== 'alla')
                 ? 'Inga fakturor hittades'
                 : 'Inget i arbetskön just nu'}
             </p>

@@ -717,6 +717,15 @@ export type Database = {
           premium_confirmed_by?: string | null
           premium_confirmed_by_name?: string | null
 
+          /**
+           * Kontrollerat avtal (2026-10-28): avtalet är stämt mot signerat avtal
+           * och Fortnox. review_snapshot är ReviewSnapshot ur src/shared/contractReview.ts.
+           */
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+          review_snapshot?: Record<string, unknown> | null // JSONB
+
           created_at: string
           updated_at: string
         }

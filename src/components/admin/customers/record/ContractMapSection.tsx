@@ -52,6 +52,7 @@ import { terminationLastDay } from '../../../../shared/scheduleHorizon'
 import { buildRenewalPrefill } from '../../../../utils/contractRenewalPrefill'
 import { ContractScopeService, FrameworkAgreementService } from '../../../../services/contractScopeService'
 import { PremiumReviewService } from '../../../../services/premiumReviewService'
+import { ContractReviewService, type ContractReviewInfo } from '../../../../services/contractReviewService'
 import { useAuth } from '../../../../contexts/AuthContext'
 import { useFrameworkAgreements } from '../../../../hooks/useFrameworkAgreements'
 import ContractStamp from './ContractStamp'
@@ -1128,6 +1129,33 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   }
 
   const confirmerName = () => profile?.display_name || profile?.technicians?.name || profile?.email || null
+
+  // Kontrollerat avtal (src/shared/contractReview.ts): läget per papper, en fråga
+  // per omladdning. Bilden jämförs med nuläget, så ändringar syns direkt.
+  const [reviewByContract, setReviewByContract] = useState<Map<string, ContractReviewInfo>>(new Map())
+  const [reviewReloadKey, setReviewReloadKey] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    ContractReviewService.getReviewStates(papers.map((c) => c.id))
+      .then((m) => {
+        if (!cancelled) setReviewByContract(m)
+      })
+      .catch((err) => console.warn('[Avtalskarta] Avtalskontrollen kunde inte läsas:', err))
+    return () => {
+      cancelled = true
+    }
+  }, [papers, premiumEvents, root, reviewReloadKey])
+
+  const markReviewed = async (contract: RecordContract) => {
+    try {
+      await ContractReviewService.markReviewed(contract.id, { profileId: profile?.id ?? null, name: confirmerName() })
+      toast.success(`${contractDisplayName(contract)} är markerat som kontrollerat.`)
+      setReviewReloadKey((k) => k + 1)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte markera avtalet som kontrollerat')
+      throw err
+    }
+  }
 
   // Premie att bekräfta (src/shared/premiumReview.ts): släpper spärren på avtalsfakturan
   const confirmPremium = async (contract: RecordContract) => {
@@ -2952,6 +2980,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               dropZone={drag?.overContractId === c.id ? drag.overZone : undefined}
               onSavePremium={(input) => savePremium(c, input)}
               onConfirmPremium={() => confirmPremium(c)}
+              review={reviewByContract.get(c.id) ?? null}
+              onMarkReviewed={() => markReviewed(c)}
               onAddPremiumEvent={(input) => addPremiumEvent(c, input)}
               onSaveTerm={(input) => saveTerm(c, input)}
               onSaveInvoiceReference={(input) => saveInvoiceReference(c, input)}
@@ -4468,6 +4498,9 @@ interface PaperProps {
   onSavePremium?: (input: { annualValue: number | null; billingFrequency: string | null; billingAnchorMonth: number | null }) => Promise<void>
   /** Bekräfta premie uträknad ur Oneflows produkttabell */
   onConfirmPremium?: () => Promise<void>
+  /** Kontrollerat avtal: läget och knappen Markera som kontrollerat (§ 6) */
+  review?: ContractReviewInfo | null
+  onMarkReviewed?: () => Promise<void>
   onAddPremiumEvent?: (input: {
     eventType: 'step_up' | 'indexation' | 'adjustment'
     effectiveFrom: string
@@ -4574,6 +4607,8 @@ function PaperContract({
   dropZone,
   onSavePremium,
   onConfirmPremium,
+  review,
+  onMarkReviewed,
   onAddPremiumEvent,
   onSaveTerm,
   onSaveInvoiceReference,
@@ -5287,6 +5322,8 @@ function PaperContract({
           archived={archived}
           onSavePremium={onSavePremium}
           onConfirmPremium={onConfirmPremium}
+          review={review}
+          onMarkReviewed={onMarkReviewed}
           onAddPremiumEvent={onAddPremiumEvent}
           invoiceMode={invoiceMode}
           planEntries={planEntries}

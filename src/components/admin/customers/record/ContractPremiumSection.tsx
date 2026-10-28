@@ -15,6 +15,8 @@ import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Icon } from '../../../icons/Icon'
 import { PREMIUM_REVIEW_NOTE } from '../../../../shared/premiumReview'
+import { reviewDateKey } from '../../../../shared/contractReview'
+import type { ContractReviewInfo } from '../../../../services/contractReviewService'
 import DateField from '../../../ui/DateField'
 import {
   BILLING_FREQUENCY_LABEL,
@@ -135,6 +137,10 @@ interface Props {
   onSavePremium?: (input: { annualValue: number | null; billingFrequency: string | null; billingAnchorMonth: number | null }) => Promise<void>
   /** Bekräfta premie uträknad ur Oneflows produkttabell (contracts.premium_needs_review) */
   onConfirmPremium?: () => Promise<void>
+  /** Kontrollerat avtal (src/shared/contractReview.ts): läget och vem/när */
+  review?: ContractReviewInfo | null
+  /** Markera som kontrollerat. Samma behörighet som att ändra premien. */
+  onMarkReviewed?: () => Promise<void>
   onAddPremiumEvent?: (input: {
     eventType: 'step_up' | 'indexation' | 'adjustment'
     effectiveFrom: string
@@ -194,6 +200,8 @@ export default function ContractPremiumSection({
   archived,
   onSavePremium,
   onConfirmPremium,
+  review,
+  onMarkReviewed,
   onAddPremiumEvent,
   invoiceMode,
   planEntries,
@@ -222,6 +230,25 @@ export default function ContractPremiumSection({
       setConfirming(false)
     }
   }
+
+  // Kontrollerat avtal: knappen bara för den som får ändra premien
+  const [marking, setMarking] = useState(false)
+  const canMarkReviewed = !archived && !!onSavePremium && !!onMarkReviewed
+  const reviewKind = review?.state ?? 'ej'
+  const markReviewed = async () => {
+    if (!onMarkReviewed) return
+    setMarking(true)
+    try {
+      await onMarkReviewed()
+    } catch {
+      // Felet visas av anroparen
+    } finally {
+      setMarking(false)
+    }
+  }
+  const reviewedWho = review?.reviewedAt
+    ? `${reviewDateKey(review.reviewedAt)}${review.reviewedByName ? ` av ${review.reviewedByName}` : ''}`
+    : null
 
   const [annualInput, setAnnualInput] = useState(settings && annualInForce != null ? String(annualInForce) : '')
   const [freqInput, setFreqInput] = useState(settings ? (contract.billing_frequency ?? 'annual') : '')
@@ -311,6 +338,51 @@ export default function ContractPremiumSection({
                 ? `faktureras ${frequencyLabel.toLowerCase()}${anchor ? ` · ${MONTHS[anchor - 1]}` : ''}`
                 : ''}
           </span>
+        </div>
+      )}
+
+      {/* Kontrollerat avtal: stämt mot signerat avtal och Fortnox. Spärrar ingenting. */}
+      {!settings && (review !== undefined || canMarkReviewed) && (
+        <div className="flex items-start gap-2 py-1.5 border-b border-dotted font-sans text-[12px]" style={rowStyle}>
+          <span
+            className="mt-px flex-shrink-0"
+            style={{ color: reviewKind === 'ok' ? ink.positive : reviewKind === 'andrad' ? ink.warn : ink.muted }}
+          >
+            <Icon name={reviewKind === 'ok' ? 'kund.avtal-kontrollerat' : reviewKind === 'andrad' ? 'kund.avtal-andrat' : 'dok.avtal'} size={16} />
+          </span>
+          <span className="flex-1 min-w-0" style={{ color: ink.secondary }}>
+            {reviewKind === 'ok' ? (
+              <>
+                <b style={{ color: ink.positive }}>Kontrollerat</b>
+                {reviewedWho ? ` ${reviewedWho}` : ''}
+              </>
+            ) : reviewKind === 'andrad' ? (
+              <>
+                <b style={{ color: ink.warn }}>Ändrat efter kontrollen</b>
+                {reviewedWho ? ` · senast kontrollerat ${reviewedWho}` : ''}
+                <span className="block">
+                  {(review?.changes ?? []).map((c) => (
+                    <span key={c} className="block">{c}</span>
+                  ))}
+                </span>
+              </>
+            ) : (
+              <span style={{ color: ink.muted }}>Ej kontrollerat mot signerat avtal och Fortnox</span>
+            )}
+          </span>
+          {canMarkReviewed && reviewKind !== 'ok' && (
+            <button
+              type="button"
+              onClick={() => void markReviewed()}
+              disabled={marking}
+              className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold rounded-lg px-2.5 py-1 border hover:brightness-110 disabled:opacity-50 flex-shrink-0"
+              style={{ borderColor: ink.rule, color: ink.primary }}
+              title="Premie, period och kundnummer stämmer med signerat avtal och Fortnox"
+            >
+              {marking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Icon name="kund.avtal-kontrollerat" size={16} />}
+              Markera som kontrollerat
+            </button>
+          )}
         </div>
       )}
 

@@ -38,6 +38,9 @@ import { supabase } from '../../../lib/supabase'
 import { InvoiceService } from '../../../services/invoiceService'
 import { PremiumReviewService } from '../../../services/premiumReviewService'
 import { PREMIUM_REVIEW_BLOCK_MESSAGE } from '../../../shared/premiumReview'
+import { ContractReviewService, type InvoiceReviewInfo } from '../../../services/contractReviewService'
+import { ContractReviewBanner } from './ContractReviewMark'
+import { Icon } from '../../icons/Icon'
 import { ProvisionService } from '../../../services/provisionService'
 import type { CommissionPost } from '../../../types/provision'
 import { FortnoxService } from '../../../services/fortnoxService'
@@ -246,6 +249,31 @@ export default function InvoiceDetailModal({
     return () => { cancelled = true }
   }, [isOpen, premiumCheckId, premiumCheckType, premiumCheckStatus])
   const premiumUnconfirmed = unconfirmedPremiumIds.length > 0
+
+  // Kontrollerat avtal (src/shared/contractReview.ts): grön eller gul ruta
+  // överst i avtalsfakturan. Spärrar ingenting.
+  const [contractReview, setContractReview] = useState<InvoiceReviewInfo | null>(null)
+  useEffect(() => {
+    if (!isOpen || !premiumCheckId || premiumCheckType !== 'contract') {
+      setContractReview(null)
+      return
+    }
+    let cancelled = false
+    ContractReviewService.getInvoiceReview(premiumCheckId)
+      .then(r => { if (!cancelled) setContractReview(r) })
+      .catch(err => { console.warn('[InvoiceDetailModal] Avtalskontrollen kunde inte läsas:', err) })
+    return () => { cancelled = true }
+  }, [isOpen, premiumCheckId, premiumCheckType, premiumCheckStatus])
+
+  // Kontrollera igen: öppnar avtalskartan i en ny flik. Kontrollen görs där,
+  // mot avtalet, av den som får ändra premien. Fakturan och kön ligger kvar.
+  const openContractMapForReview = () => {
+    const target = contractReview?.contracts.find(c => c.state === 'andrad') ?? contractReview?.contracts[0]
+    const customerId = target?.customerId ?? invoice?.customer_id ?? null
+    if (!customerId) return
+    const base = window.location.pathname.startsWith('/koordinator') ? '/koordinator' : '/admin'
+    window.open(`${base}/befintliga-kunder/${customerId}?tab=avtalskarta`, '_blank', 'noopener')
+  }
 
   // Ad-hoc/avtalsfakturor har case_type = null (constraint tillåter bara null/private/business),
   // men deras ärende är ett contract-ärende. Härled 'contract' så ärendekontext,
@@ -1501,6 +1529,11 @@ export default function InvoiceDetailModal({
               </div>
             ) : invoice ? (
               <div className="p-4 space-y-4">
+                {/* Kontrollerat avtal: grön eller gul ruta, spärrar ingenting */}
+                {invoice.invoice_type === 'contract' && invoice.status !== 'cancelled' && (
+                  <ContractReviewBanner review={contractReview} />
+                )}
+
                 {/* Premie att bekräfta: avtal gjort direkt i Oneflow. Spärrar
                     Godkänn och Skapa utkast tills premien bekräftats i kartan. */}
                 {premiumUnconfirmed && invoice.status !== 'cancelled' && (
@@ -2310,6 +2343,18 @@ export default function InvoiceDetailModal({
                 <span className="text-[11px] text-slate-500 whitespace-nowrap">
                   Godkänd av {invoice.approved_by_name} · {invoice.approved_at.slice(0, 10)}
                 </span>
+              )}
+              {/* Kontrollerat avtal ändrat efter kontrollen: öppna avtalskartan */}
+              {invoice.invoice_type === 'contract' && contractReview?.state === 'andrad' && invoice.status !== 'cancelled' && (
+                <button
+                  type="button"
+                  onClick={openContractMapForReview}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-sm text-slate-200 rounded-lg transition-colors"
+                  title="Öppnar avtalskartan i en ny flik. Stäm av avtalet och markera det som kontrollerat där."
+                >
+                  <Icon name="kund.avtal-kontrollerat" size={16} />
+                  Kontrollera igen
+                </button>
               )}
               {invoice.status === 'pending_approval' && (
                 <button
