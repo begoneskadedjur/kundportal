@@ -45,6 +45,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.104.0',
+    date: '2026-10-28',
+    title: 'Avtalets summa i Oneflow räknar med antal',
+    items: [
+      { kind: 'buggfix', text: 'I fyra avtalsmallar räknade Oneflow ihop priserna utan antal, så ett avtal med 5 fällor à 5 592 kr kunde visa summan 5 592 kr för kunden. Nu skapar portalen avtal och offerter så att summan alltid är pris gånger antal, med rabatten synlig per rad. Gäller nya dokument från Skapa avtal eller offert.' },
+    ],
+  },
+  {
+    version: '3.103.1',
+    date: '2026-10-28',
+    title: 'Hela stationskontrollen syns i steget Arbetet',
+    items: [
+      { kind: 'buggfix', text: 'Stationskontrollen i steget Arbetet hade en egen scrollyta som var högre än ärendefönstret, så botten gick inte att nå. Nu scrollar kontrollen med resten av ärendet och hela kontrollen syns.' },
+    ],
+  },
+  {
     version: '3.103.0',
     date: '2026-10-28',
     title: 'Guider för avtalsförslag och offerter',

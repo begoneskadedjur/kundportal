@@ -3434,7 +3434,7 @@ export default function EditContractCaseModal({
             {/* Arbetet, stationskontroll: samma kontroll som /technician/inspection/:id.
                 Monteras när steget öppnats första gången och hålls sedan monterad. */}
             {isInspection && caseData?.id && (
-              <div className={stegLage && aktivtSteg === 'arbete' ? '-mx-4 h-[70dvh] min-h-[420px] border-y border-slate-700/50' : 'hidden'}>
+              <div className={stegLage && aktivtSteg === 'arbete' ? '-mx-4 border-y border-slate-700/50' : 'hidden'}>
                 {arbeteBesokt && (
                   <Suspense fallback={<p className="p-4 text-sm text-slate-400">Laddar stationskontrollen...</p>}>
                     <StationInspectionPanel

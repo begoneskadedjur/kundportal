@@ -6,7 +6,7 @@
 // - embedded = false (standard): exakt samma DOM, klasser och beteende som
 //   routen /technician/inspection/:caseId alltid haft. StationInspectionModule
 //   är ett tunt skal som skickar in caseId och navigate(-1).
-// - embedded = true: inuti en modal eller ett steg. Höjden följer containern,
+// - embedded = true: inuti en modal eller ett steg. Värdens scrollyta bär innehållet,
 //   överläggen renderas via portal till document.body ovanför portalens Modal
 //   (usePortal ger z-index 9999), window.confirm ersätts av en egen dialog och
 //   beforeComplete körs innan klarmarkering.
@@ -1961,7 +1961,9 @@ export default function StationInspectionPanel({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className={embedded ? 'h-full min-h-0 overflow-y-auto overscroll-contain' : 'min-h-[calc(100vh-3.5rem)]'}
+      /* Inbäddad: ingen egen scrollyta. Värdens scrollyta bär hela kontrollen så att
+         botten alltid nås; sidhuvudet fastnar mot värdens överkant. */
+      className={embedded ? 'pb-4' : 'min-h-[calc(100vh-3.5rem)]'}
     >
       {/* Sidhuvud: bara rubrik och förlopp är sticky. Kommentar, sammanställning
           och områdesväxeln scrollar med sidan, annars täcker sidhuvudet större
