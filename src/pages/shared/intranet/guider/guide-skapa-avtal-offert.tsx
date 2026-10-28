@@ -1,6 +1,6 @@
 // src/pages/shared/intranet/guider/guide-skapa-avtal-offert.tsx
-// Guidemodul: Skapa och skicka en offert eller ett avtal (tekniker, nya arbetsvyn,
-// telefon och dator).
+// Guidemodul: Skapa och skicka en offert (tekniker, nya arbetsvyn, telefon och dator).
+// Avtalsförslaget har en egen guide: guide-skapa-avtalsforslag.
 //
 // Efterbildning av:
 //   SkapaArk          Skapa > Vad vill du göra? > Avtal eller offert (/technician/oneflow)
@@ -16,6 +16,7 @@
 //                     Ändra i wizarden, Spara som utkast
 //     bekräftelsen    Offerten är skickad, Skickat för granskning
 //   CaseServiceSelector  Tjänster & fakturarader, Inga tjänster tillagda än, Lägg till tilläggstjänst
+//   Motpart         rutan Befintlig kund (AvtalsKundVal, 3.100.0), ritad i _avtalsforslag.tsx
 // Mallnamnen kommer från OFFER_TEMPLATES. Portalens tankstreck i namnen skrivs här med komma.
 // Påhittad kund, ingenting skickas.
 
@@ -27,13 +28,14 @@ import { Markor, Notis, OvningRam, type OvningSvar } from '../skarmkit'
 import { NyGrupp, NyRad, NySkarm, useGuideEnhet } from '../skarmkit/nyvy'
 import type { GuideModul } from './registry'
 import { Knapp, SkapaArket, ingenMk, mkFor, type Mk, type Tryck } from './_nyvy_salja'
+import { BefintligKund, type Sok } from './_avtalsforslag'
 
 // --- Data ---
 
 const KUND = 'Familjen Exempel'
 const TEL = '070-123 45 67'
 const EPOST = 'familjen@exempel.se'
-const TJANST = 'Bekämpning av getingbo'
+const TJANST = 'Sanering Geting'
 const PRIS = '2 750 kr'
 const FORSLAG = `Tjänster som ingår:\n\n- ${TJANST}`
 const MALL_PRIVAT = '8919037'
@@ -51,9 +53,10 @@ interface Lage {
   tjanst: boolean
   valjare: boolean
   text: boolean
+  sok: Sok
 }
 
-const BAS: Lage = { vy: 'start', typ: 'contract', mall: null, namn: false, tel: false, epost: false, tjanst: false, valjare: false, text: false }
+const BAS: Lage = { vy: 'start', typ: 'contract', mall: null, namn: false, tel: false, epost: false, tjanst: false, valjare: false, text: false, sok: 'tom' }
 const IFYLLD: Lage = { ...BAS, typ: 'offer', mall: MALL_PRIVAT, namn: true, tel: true, epost: true, tjanst: true, text: true }
 
 const STEGEN: { vy: Vy; namn: string }[] = [
@@ -211,7 +214,8 @@ function Innehall({ l, tryck, mk }: { l: Lage; tryck: Tryck; mk: Mk }) {
     case 'motpart':
       return (
         <>
-          <StegRubrik nr={idx} rubrik="Motpart" text="Kundens uppgifter som de står i offerten." />
+          <StegRubrik nr={idx} rubrik="Motpart" text="Välj en befintlig kund eller fyll i en ny. Uppgifterna gäller som de står i offerten." />
+          <div className="mb-1.5"><BefintligKund avtal={false} kopplad={false} sok={l.sok} sokText={l.sok === 'ingen' ? KUND : undefined} tryck={tryck} mk={mk} /></div>
           <div className="grid gap-1.5 rounded-xl border border-slate-700 bg-slate-900 p-2">
             <p className="text-[11px] font-semibold text-white">Privatpersonen</p>
             <div className="grid grid-cols-2 gap-1.5">
@@ -365,7 +369,7 @@ function Wizard({ l, tryck, mk }: { l: Lage; tryck: Tryck; mk: Mk }) {
   return (
     <div className="-m-2.5 flex h-[calc(100%+20px)] min-h-[360px] flex-col">
       <Band l={l} procent={procent} tryck={tryck} />
-      <div className="min-h-0 flex-1 overflow-hidden bg-slate-950/40 p-2.5"><Innehall l={l} tryck={tryck} mk={mk} /></div>
+      <div className="min-h-0 flex-1 overflow-y-auto bg-slate-950/40 p-2.5"><Innehall l={l} tryck={tryck} mk={mk} /></div>
       {visaLista && (
         <div className="flex flex-none items-center justify-between gap-1.5 border-t border-slate-700 bg-slate-900/90 px-2.5 py-1.5">
           <Knapp id="tillbaka" text="Tillbaka" tryck={tryck} mk={mk} />
@@ -408,6 +412,7 @@ const VISNING: { lage: Lage; markera: string }[] = [
   { lage: BAS, markera: 'skapa-knapp' },
   { lage: { ...BAS, vy: 'ark' }, markera: 'skapa:Avtal eller offert' },
   { lage: { ...BAS, vy: 'dokument' }, markera: 'typ:offer' },
+  { lage: { ...BAS, typ: 'offer', mall: MALL_PRIVAT, vy: 'motpart' }, markera: 'sok' },
   { lage: { ...IFYLLD, vy: 'innehall' }, markera: 'nasta' },
   { lage: { ...IFYLLD, vy: 'granska' }, markera: 'skapa-pdf' },
   { lage: { ...IFYLLD, vy: 'pdf' }, markera: 'skicka' },
@@ -443,7 +448,7 @@ const FEL: Record<string, string> = {
   'f:faktura': 'E-post för faktura kan kunden fylla i vid signeringen. Fyll i namn, telefon och e-post.',
   'f:ansvarig': 'Ditt namn står redan här. Tryck Nästa.',
   'f:ansvarig-epost': 'Din e-post står redan här. Tryck Nästa.',
-  'tj:inspektion': 'Uppdraget gäller getingboet. Välj Bekämpning av getingbo.',
+  'tj:inspektion': 'Uppdraget gäller getingboet. Välj Sanering Geting.',
   textruta: 'Du kan skriva egen text här. Enklast är Skriv förslag från tjänsterna.',
   'pdf-yta': 'Det här är Oneflows PDF. Ser den rätt ut skickar du med knappen under.',
   andra: 'Tillbaka och ändra tar bort utkastet. Allt stämmer, så skicka i stället.',
@@ -495,11 +500,12 @@ function Ovning() {
         } else miss('Välj en mall och tryck Nästa.')
         return
       case 'begone':
-        if (id === 'nasta') { ga('motpart'); tips2('Motpart', 'Fyll i namn, telefon och e-post. Tryck på fälten.') }
+        if (id === 'nasta') { ga('motpart'); tips2('Motpart', 'Sök först om kunden redan finns. Tryck i sökfältet under Befintlig kund.') }
         else miss('Tryck Nästa.')
         return
       case 'motpart':
-        if (id === 'f:namn') { ga('motpart', { namn: true }); tips2('Namnet är ifyllt', 'Fyll i telefon och e-post.') }
+        if (id === 'sok') { ga('motpart', { sok: 'ingen' }); tips2('Ingen kund hittades', `${KUND} finns inte i kundregistret. Fyll i en ny kund nedan: namn, telefon och e-post.`) }
+        else if (id === 'f:namn') { ga('motpart', { namn: true }); tips2('Namnet är ifyllt', 'Fyll i telefon och e-post.') }
         else if (id === 'f:tel') { ga('motpart', { tel: true }); tips2('Telefonen är ifylld', 'Bra, då kan du ringa om kunden inte signerar.') }
         else if (id === 'f:epost') { ga('motpart', { epost: true }); tips2('E-posten är ifylld', 'Offerten skickas dit. Tryck Nästa när allt är ifyllt.') }
         else if (id === 'nasta') {
@@ -509,7 +515,7 @@ function Ovning() {
         } else miss('Fyll i namn, telefon och e-post.')
         return
       case 'tjanster':
-        if (id === 'lagg-till') { ga('tjanster', { valjare: true }); tips2('Sök tjänsten', 'Välj Bekämpning av getingbo i listan.') }
+        if (id === 'lagg-till') { ga('tjanster', { valjare: true }); tips2('Sök tjänsten', 'Välj Sanering Geting i listan.') }
         else if (id === 'tj:geting') { ga('tjanster', { tjanst: true, valjare: false }); tips2('Tjänsten är tillagd', `${TJANST}, ${PRIS}. Tryck Nästa.`) }
         else if (id === 'nasta') {
           if (!l.tjanst) miss('Det står Lägg till minst en tjänst. Tryck Lägg till tilläggstjänst.')

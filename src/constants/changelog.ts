@@ -47,6 +47,15 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '3.102.0',
     date: '2026-10-28',
+    title: 'Guider för avtalsförslag och offerter',
+    items: [
+      { kind: 'nyhet', text: 'Ny guide i handboken: Skapa och skicka ett avtalsförslag, för tekniker och för kontoret och säljarna. Den visar Befintlig kund med enheter, ny kund med kundgrupp och att inget skickas förrän du har sett Oneflows PDF.' },
+      { kind: 'andring', text: 'Teknikernas offertguide heter nu Skapa och skicka en offert. Den visar Befintlig kund i Motpart och förklarar ROT och RUT i offerten.' },
+    ],
+  },
+  {
+    version: '3.102.0',
+    date: '2026-10-28',
     title: 'Premie från avtal gjorda direkt i Oneflow bekräftas',
     items: [
       { kind: 'buggfix', text: 'Avtal som gjorts direkt i Oneflow kunde få fel årspremie när mallen har en dold priskolumn, till exempel Anlos 2 som fick 23 960 kr i stället för avtalets 27 960 kr. Nu räknas premien på den priskolumn som syns i avtalet, efter rabatt.' },
