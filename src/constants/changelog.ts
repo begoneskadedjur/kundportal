@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.108.2',
+    date: '2026-10-29',
+    title: 'Frånvarorutan går att klicka i',
+    items: [
+      { kind: 'buggfix', text: 'Klick i den nya frånvarorutan i Schema gick igenom till schemat bakom. Nu går det att ändra, spara och ta bort, och frågan om att flytta en gruppfrånvaro går att svara på.' },
+    ],
+  },
+  {
     version: '3.108.1',
     date: '2026-10-29',
     title: 'Ärenden och frånvaro ritas inte ovanpå varandra',

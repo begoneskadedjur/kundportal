@@ -283,7 +283,7 @@ export default function FranvaroModal({ isOpen, onClose, onSaved, technicians, a
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center">
+      <div className="fixed inset-0 z-[120] pointer-events-auto flex items-end sm:items-center justify-center">
         <div className="absolute inset-0 bg-slate-950/70" aria-hidden="true" onClick={() => { if (!sparar) onClose() }} />
         <section
           role="dialog"
@@ -533,7 +533,7 @@ export function FranvaroFlyttaDialog({ fraga, onAlla, onBaraEn, onAvbryt, sparar
   if (!fraga) return null
   return (
     <Portal>
-      <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[120] pointer-events-auto flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-slate-950/60" aria-hidden="true" onClick={onAvbryt} />
         <section role="dialog" aria-modal="true" aria-labelledby="flytta-rubrik" className="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 space-y-3 text-white">
           <div className="flex items-start gap-3">
