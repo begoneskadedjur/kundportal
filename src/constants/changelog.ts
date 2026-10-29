@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.108.1',
+    date: '2026-10-29',
+    title: 'Ärenden och frånvaro ritas inte ovanpå varandra',
+    items: [
+      { kind: 'buggfix', text: 'När ett ärende och en frånvaro låg samtidigt hos samma tekniker i Schema ritades de ovanpå varandra så att texten gick ihop. Nu delar de på raden, som två ärenden redan gjorde.' },
+    ],
+  },
+  {
     version: '3.108.0',
     date: '2026-10-29',
     title: 'Frånvaro går att ändra, flytta och dela',

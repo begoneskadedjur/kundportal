@@ -32,12 +32,16 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
   const [dropPreviewTime, setDropPreviewTime] = useState<Date | null>(null)
 
   // BerÃ¤kna lanes fÃ¶r Ã¶verlappande events
-  const laneMap = useMemo(() => assignLanes(cases), [cases])
-  // Överlappande frånvaro delar höjden i stället för att ligga på varandra
-  const absenceLanes = useMemo(
-    () => assignLanes(absences.map(a => ({ id: a.id, start_date: a.start_date, due_date: a.end_date }))),
-    [absences],
-  )
+  // Ärenden och frånvaro fördelas tillsammans, så att ett ärende som krockar
+  // med en frånvaro (t.ex. teknikermötet) delar höjden i stället för att ritas
+  // ovanpå. Nycklarna får prefix eftersom id kan krocka mellan tabellerna.
+  // Påverkar bara ritningen, inga data.
+  const lanes = useMemo(() => assignLanes([
+    ...cases.map(c => ({ id: `c:${c.id}`, start_date: c.start_date, due_date: c.due_date })),
+    ...absences.map(a => ({ id: `a:${a.id}`, start_date: a.start_date, due_date: a.end_date })),
+  ]), [cases, absences])
+  const laneMap = useMemo(() => new Map(cases.map(c => [c.id, lanes.get(`c:${c.id}`)])), [cases, lanes])
+  const absenceLanes = useMemo(() => new Map(absences.map(a => [a.id, lanes.get(`a:${a.id}`)])), [absences, lanes])
 
   function xToTime(clientX: number): Date {
     if (!rowRef.current) return new Date(currentDate)
