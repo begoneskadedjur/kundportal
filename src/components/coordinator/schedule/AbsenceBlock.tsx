@@ -1,7 +1,8 @@
 // AbsenceBlock.tsx — Frånvaro-block med diagonala ränder i typens färg
 // Överlappande frånvaro delar radens höjd (lane). Frånvaro inom en dag går att
 // dra till ny tid i dagvyn (3.108.0).
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { eventX, eventWidth, clampToGrid, formatTime } from './scheduleUtils'
 import { ROW_HEIGHT } from './scheduleConstants'
 import type { ViewMode } from './ScheduleHeader'
@@ -39,6 +40,7 @@ function inomEnDag(a: Absence): boolean {
 
 export function AbsenceBlock({ absence, onClick, viewMode, weekStart, lane = 0, totalLanes = 1, gruppAntal = 0, dragbar = false }: AbsenceBlockProps) {
   const [hovered, setHovered] = useState(false)
+  const blockRef = useRef<HTMLDivElement>(null)
 
   const start = new Date(absence.start_date || absence.end_date)
   const end = new Date(absence.end_date || absence.start_date)
@@ -61,6 +63,7 @@ export function AbsenceBlock({ absence, onClick, viewMode, weekStart, lane = 0, 
 
   return (
     <div
+      ref={blockRef}
       className={`absolute rounded-md border-l-4 transition-[filter] duration-150 hover:brightness-110 ${kanDras ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
       style={{
         left: x,
@@ -97,8 +100,18 @@ export function AbsenceBlock({ absence, onClick, viewMode, weekStart, lane = 0, 
         {!isWeek && <p className="text-[10px] text-slate-400 font-mono whitespace-nowrap truncate">{startStr} till {endStr}</p>}
       </div>
 
-      {hovered && (
-        <div className="absolute left-0 bottom-full mb-2 z-50 pointer-events-none">
+      {/* Hovertext via portal som ärendeblocken (EventBlock): inuti gridden
+          klipps den av scrollytan och hamnar under tidslinjen på översta raden */}
+      {hovered && blockRef.current && createPortal(
+        <div
+          className="fixed z-[9999] pointer-events-none"
+          style={(() => {
+            const rect = blockRef.current!.getBoundingClientRect()
+            return rect.top < 200
+              ? { left: rect.left, top: rect.bottom + 8 }
+              : { left: rect.left, top: rect.top - 8, transform: 'translateY(-100%)' }
+          })()}
+        >
           <div className="w-60 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl p-3 text-xs">
             <p className="font-semibold text-white mb-1 flex items-center gap-1.5">
               <span style={{ color: typ.farg }}><Icon name={typ.ikon} size={16} /></span>
@@ -111,7 +124,8 @@ export function AbsenceBlock({ absence, onClick, viewMode, weekStart, lane = 0, 
               Klicka för att ändra{kanDras ? ', dra för att flytta' : ''}
             </p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

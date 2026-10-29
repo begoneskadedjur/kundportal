@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.108.3',
+    date: '2026-10-29',
+    title: 'Hovertexten för frånvaro syns överst i schemat',
+    items: [
+      { kind: 'buggfix', text: 'Håller du muspekaren över en frånvaro på översta raden i Schema visas texten nu under blocket, som för ärenden. Tidigare hamnade den bakom tidslinjen.' },
+    ],
+  },
+  {
     version: '3.108.2',
     date: '2026-10-29',
     title: 'Frånvarorutan går att klicka i',
