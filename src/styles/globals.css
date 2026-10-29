@@ -47,6 +47,12 @@
   z-index: 70;
 }
 
+/* DateField med portalId="modal-root" (dialoger som själva ligger i #modal-root,
+   t.ex. frånvaromodalen): containern släpper igenom klick, kalendern måste ta emot dem */
+#modal-root .react-datepicker-popper {
+  pointer-events: auto;
+}
+
 /* ============================================================
    LJUST TEMA - central mappningstabell
    Tailwind 4 kompilerar färgklasser till var(--color-*), så hela

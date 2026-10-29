@@ -15,7 +15,7 @@
 import { forwardRef } from 'react'
 import DatePicker, { registerLocale } from 'react-datepicker'
 import { sv } from 'date-fns/locale'
-import { Calendar } from 'lucide-react'
+import { Calendar, Clock } from 'lucide-react'
 // Importerar react-datepickers egen CSS och lägger portalens mörka tema ovanpå
 import '../../styles/DatePickerDarkTheme.css'
 
@@ -44,6 +44,21 @@ function parseDateKey(value: string | null | undefined): Date | null {
     return Number.isNaN(d.getTime()) ? null : d
   }
   return null
+}
+
+/** 'HH:mm' → Date idag med det klockslaget (tidsläge) */
+function parseTimeKey(value: string | null | undefined): Date | null {
+  const m = /^(\d{2}):(\d{2})$/.exec(value ?? '')
+  if (!m) return null
+  const d = new Date()
+  d.setHours(Number(m[1]), Number(m[2]), 0, 0)
+  return d
+}
+
+/** Date → 'HH:mm' i lokal tid */
+function toTimeKey(date: Date | null): string {
+  if (!date) return ''
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 /** Date → 'ÅÅÅÅ-MM-DD' i lokal tid. Aldrig toISOString() — den skiftar dygn. */
@@ -95,6 +110,17 @@ export interface DateFieldProps {
    * Ersätter <input type="datetime-local">, som har samma formatproblem.
    */
   withTime?: boolean
+  /**
+   * Bara klockslag: värdet är 'HH:mm' (24 timmar, kvartar). Ersätter
+   * <input type="time">, som i engelsk Chrome visar 08:00 AM.
+   */
+  timeOnly?: boolean
+  /**
+   * Var kalendern renderas. Standard är en egen behållare i body. En dialog
+   * som själv ligger i #modal-root måste skicka 'modal-root', annars hamnar
+   * kalendern under dialogen.
+   */
+  portalId?: string
   'aria-label'?: string
 }
 
@@ -130,45 +156,49 @@ const DateField = forwardRef<DatePicker, DateFieldProps>(function DateField(
     clearable,
     monthOnly,
     withTime,
+    timeOnly,
+    portalId,
     'aria-label': ariaLabel,
   },
   ref
 ) {
+  const Ikon = timeOnly ? Clock : Calendar
   return (
     <div className="relative">
-      <Calendar
+      <Ikon
         className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none z-10"
         aria-hidden
       />
       <DatePicker
         ref={ref}
         id={id}
-        selected={parseDateKey(value)}
+        selected={timeOnly ? parseTimeKey(value) : parseDateKey(value)}
         onChange={(date) =>
           onChange(
-            monthOnly ? toMonthKey(date) : withTime ? toDateTimeKey(date) : toDateKey(date)
+            timeOnly ? toTimeKey(date) : monthOnly ? toMonthKey(date) : withTime ? toDateTimeKey(date) : toDateKey(date)
           )
         }
         locale="sv"
-        dateFormat={monthOnly ? 'yyyy-MM' : withTime ? 'yyyy-MM-dd HH:mm' : 'yyyy-MM-dd'}
+        dateFormat={timeOnly ? 'HH:mm' : monthOnly ? 'yyyy-MM' : withTime ? 'yyyy-MM-dd HH:mm' : 'yyyy-MM-dd'}
         showMonthYearPicker={monthOnly}
-        showTimeSelect={withTime}
+        showTimeSelect={withTime || timeOnly}
+        showTimeSelectOnly={timeOnly}
         timeFormat="HH:mm"
         timeIntervals={15}
         timeCaption="Tid"
         placeholderText={
           placeholder ??
-          (monthOnly ? 'ÅÅÅÅ-MM' : withTime ? 'ÅÅÅÅ-MM-DD HH:mm' : 'ÅÅÅÅ-MM-DD')
+          (timeOnly ? 'HH:mm' : monthOnly ? 'ÅÅÅÅ-MM' : withTime ? 'ÅÅÅÅ-MM-DD HH:mm' : 'ÅÅÅÅ-MM-DD')
         }
-        minDate={parseDateKey(min) ?? undefined}
-        maxDate={parseDateKey(max) ?? undefined}
+        minDate={timeOnly ? undefined : parseDateKey(min) ?? undefined}
+        maxDate={timeOnly ? undefined : parseDateKey(max) ?? undefined}
         disabled={disabled}
         required={required}
         autoFocus={autoFocus}
         isClearable={clearable}
         showPopperArrow={false}
         // Kalendern renderas i body så den aldrig klipps av modalens overflow
-        portalId="datefield-portal"
+        portalId={portalId ?? 'datefield-portal'}
         className={`${className ?? BASE_CLASS} ${ICON_SPACE_CLASS}`}
         wrapperClassName="w-full"
         aria-label={ariaLabel}

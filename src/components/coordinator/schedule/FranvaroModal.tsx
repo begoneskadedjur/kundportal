@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
 import { Icon } from '../../icons/Icon'
 import Portal from '../../ui/Portal'
+import DateField from '../../ui/DateField'
 import type { Technician } from '../../../types/database'
 import { toLocalISOStringWithOffset } from '../../../utils/dateHelpers'
 import { FRANVARO_TYPER, FRANVARO_GRUPP_TEXT, franvaroTyp, alfa, type FranvaroGrupp } from '../../../utils/franvaroTyper'
@@ -364,12 +365,11 @@ export default function FranvaroModal({ isOpen, onClose, onSaved, technicians, a
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label htmlFor="franvaro-start" className="block text-xs font-medium text-slate-400 mb-1">Första dagen</label>
-                    <input id="franvaro-start" type="date" value={startDatum} className={INPUT}
-                      onChange={e => { setStartDatum(e.target.value); if (slutDatum < e.target.value) setSlutDatum(e.target.value) }} />
+                    <DateField id="franvaro-start" value={startDatum} onChange={v => { if (v) { setStartDatum(v); if (slutDatum < v) setSlutDatum(v) } }} className={INPUT} portalId="modal-root" />
                   </div>
                   <div>
                     <label htmlFor="franvaro-slut" className="block text-xs font-medium text-slate-400 mb-1">Sista dagen</label>
-                    <input id="franvaro-slut" type="date" value={slutDatum} min={startDatum} className={INPUT} onChange={e => setSlutDatum(e.target.value)} />
+                    <DateField id="franvaro-slut" value={slutDatum} onChange={v => { if (v) setSlutDatum(v) }} className={INPUT} portalId="modal-root" min={startDatum} />
                   </div>
                 </div>
               ) : (
@@ -377,23 +377,22 @@ export default function FranvaroModal({ isOpen, onClose, onSaved, technicians, a
                   <div className="grid grid-cols-2 sm:grid-cols-[1.4fr_1fr_1fr] gap-2">
                     <div className="col-span-2 sm:col-span-1">
                       <label htmlFor="franvaro-start" className="block text-xs font-medium text-slate-400 mb-1">{annanSlutdag ? 'Startar' : 'Datum'}</label>
-                      <input id="franvaro-start" type="date" value={startDatum} className={INPUT}
-                        onChange={e => { setStartDatum(e.target.value); if (!annanSlutdag || slutDatum < e.target.value) setSlutDatum(e.target.value) }} />
+                      <DateField id="franvaro-start" value={startDatum} onChange={v => { if (v) { setStartDatum(v); if (!annanSlutdag || slutDatum < v) setSlutDatum(v) } }} className={INPUT} portalId="modal-root" />
                     </div>
                     <div>
                       <label htmlFor="franvaro-fran" className="block text-xs font-medium text-slate-400 mb-1">Från</label>
-                      <input id="franvaro-fran" type="time" step={900} value={fran} className={INPUT} onChange={e => setFran(e.target.value)} />
+                      <DateField id="franvaro-fran" value={fran} onChange={v => { if (v) setFran(v) }} className={INPUT} portalId="modal-root" timeOnly />
                     </div>
                     <div>
                       <label htmlFor="franvaro-till" className="block text-xs font-medium text-slate-400 mb-1">Till</label>
-                      <input id="franvaro-till" type="time" step={900} value={till} className={INPUT} onChange={e => setTill(e.target.value)} />
+                      <DateField id="franvaro-till" value={till} onChange={v => { if (v) setTill(v) }} className={INPUT} portalId="modal-root" timeOnly />
                     </div>
                   </div>
                   {annanSlutdag ? (
                     <div className="grid grid-cols-2 sm:grid-cols-[1.4fr_2fr] gap-2 items-end">
                       <div className="col-span-2 sm:col-span-1">
                         <label htmlFor="franvaro-slut" className="block text-xs font-medium text-slate-400 mb-1">Slutar</label>
-                        <input id="franvaro-slut" type="date" value={slutDatum} min={startDatum} className={INPUT} onChange={e => setSlutDatum(e.target.value)} />
+                        <DateField id="franvaro-slut" value={slutDatum} onChange={v => { if (v) setSlutDatum(v) }} className={INPUT} portalId="modal-root" min={startDatum} />
                       </div>
                       <button type="button" onClick={() => { setAnnanSlutdag(false); setSlutDatum(startDatum) }} className="h-10 text-left text-[13px] font-semibold text-[#20c58f]">
                         Samma dag

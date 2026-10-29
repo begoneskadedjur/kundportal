@@ -50,6 +50,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Frånvarorutan går att klicka i',
     items: [
       { kind: 'buggfix', text: 'Klick i den nya frånvarorutan i Schema gick igenom till schemat bakom. Nu går det att ändra, spara och ta bort, och frågan om att flytta en gruppfrånvaro går att svara på.' },
+      { kind: 'buggfix', text: 'Datum och tid i frånvarorutan visas alltid på svenska, ÅÅÅÅ-MM-DD och 24-timmarsklocka, även i en webbläsare på engelska.' },
     ],
   },
   {
