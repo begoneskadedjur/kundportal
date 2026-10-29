@@ -24,8 +24,9 @@ import EditContractCaseModal from '../../components/coordinator/EditContractCase
 import RonderingCaseModal from '../../components/coordinator/RonderingCaseModal'
 import EgenkontrollCaseModal from '../../components/coordinator/EgenkontrollCaseModal'
 import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal'
-import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsenceModal'
-import AbsenceDetailsModal from '../../components/admin/coordinator/AbsenceDetailsModal'
+import FranvaroModal, { FranvaroFlyttaDialog } from '../../components/coordinator/schedule/FranvaroModal'
+import { franvaroRubrik } from '../../utils/franvaroTyper'
+import { toLocalISOStringWithOffset } from '../../utils/dateHelpers'
 import PendingRequestsNotifier from '../../components/coordinator/PendingRequestsNotifier'
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat'
 import BokaIn from '../../components/coordinator/bokaIn/BokaIn'
@@ -107,7 +108,9 @@ export default function CoordinatorSchedule() {
   const [createContractPrefill, setCreateContractPrefill] = useState<{ customerId: string; siteId: string | null } | null>(null)
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false)
   const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null)
-  const [isAbsenceDetailsModalOpen, setIsAbsenceDetailsModalOpen] = useState(false)
+  // Gruppfrånvaro som dragits till ny tid: flytta alla eller bara en
+  const [absenceMove, setAbsenceMove] = useState<{ absence: Absence; start: Date; end: Date; count: number } | null>(null)
+  const [absenceMoveSaving, setAbsenceMoveSaving] = useState(false)
   const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false)
   const [isActionableDrawerOpen, setIsActionableDrawerOpen] = useState(false)
   const [actionMap, setActionMap] = useState<Record<string, CoordinatorCaseAction>>({})
@@ -630,8 +633,63 @@ export default function CoordinatorSchedule() {
   }, [fetchData, technicians])
 
   const handleAbsenceClick = useCallback((a: Absence) => {
-    setSelectedAbsence(a); setIsAbsenceDetailsModalOpen(true)
+    setSelectedAbsence(a); setIsAbsenceModalOpen(true)
   }, [])
+
+  // Uppdatera tiden på frånvarorader, lokalt först och sedan i databasen
+  const moveAbsenceRows = useCallback(async (ids: string[], start: Date, end: Date, extra: Partial<Absence> = {}) => {
+    const fields = { start_date: toLocalISOStringWithOffset(start), end_date: toLocalISOStringWithOffset(end), ...extra }
+    setAbsences(prev => prev.map(a => ids.includes(a.id) ? { ...a, ...fields } : a))
+    const { error } = await supabase.from('technician_absences').update(fields).in('id', ids)
+    if (error) throw error
+  }, [])
+
+  const handleAbsenceMoved = useCallback(async (absenceId: string, newStart: Date, technicianId: string) => {
+    const a = absences.find(x => x.id === absenceId)
+    if (!a) return
+    const duration = new Date(a.end_date).getTime() - new Date(a.start_date).getTime()
+    const newEnd = new Date(newStart.getTime() + duration)
+    if (newStart.getTime() === new Date(a.start_date).getTime() && technicianId === a.technician_id) return
+    const members = a.group_id ? absences.filter(x => x.group_id === a.group_id) : [a]
+    if (members.length > 1) {
+      setAbsenceMove({ absence: a, start: newStart, end: newEnd, count: members.length })
+      return
+    }
+    try {
+      // Enskild frånvaro kan också dras till en annan tekniker
+      await moveAbsenceRows([a.id], newStart, newEnd, technicianId !== a.technician_id ? { technician_id: technicianId } : {})
+      toast.success(`${franvaroRubrik(a)} flyttad till ${formatTime(newStart)}`)
+    } catch (err) {
+      console.error('Kunde inte flytta frånvaron:', err)
+      toast.error('Kunde inte flytta frånvaron')
+      fetchData()
+    }
+  }, [absences, moveAbsenceRows, fetchData])
+
+  const confirmAbsenceMove = useCallback(async (all: boolean) => {
+    if (!absenceMove) return
+    const { absence: a, start, end, count } = absenceMove
+    setAbsenceMoveSaving(true)
+    try {
+      if (all) {
+        const ids = absences.filter(x => x.group_id === a.group_id).map(x => x.id)
+        await moveAbsenceRows(ids, start, end)
+        toast.success(`${franvaroRubrik(a)} flyttad till ${formatTime(start)} för ${count} tekniker`)
+      } else {
+        // Raden lämnar gruppen och blir en egen frånvaro
+        await moveAbsenceRows([a.id], start, end, { group_id: null })
+        const name = technicians.find(t => t.id === a.technician_id)?.name ?? 'teknikern'
+        toast.success(`${franvaroRubrik(a)} flyttad till ${formatTime(start)} för ${name}`)
+      }
+    } catch (err) {
+      console.error('Kunde inte flytta frånvaron:', err)
+      toast.error('Kunde inte flytta frånvaron')
+      fetchData()
+    } finally {
+      setAbsenceMoveSaving(false)
+      setAbsenceMove(null)
+    }
+  }, [absenceMove, absences, moveAbsenceRows, technicians, fetchData])
 
   const handleSearchSelectCase = useCallback(async (caseId: string, caseType: SearchCaseType) => {
     try {
@@ -672,7 +730,7 @@ export default function CoordinatorSchedule() {
     setCreateContractPrefill(null)
     await fetchData()
   }
-  const handleAbsenceCreateSuccess = () => { setIsAbsenceModalOpen(false); fetchData() }
+  const handleAbsenceSaved = () => { fetchData() }
 
   // ─── Render ───
 
@@ -685,7 +743,7 @@ export default function CoordinatorSchedule() {
           onChangeDate={setCurrentDate}
           onChangeView={setViewMode}
           onCreateCase={(type) => { setSelectedCase(null); setCaseTypeForCreate(type); setIsCreateModalOpen(true) }}
-          onCreateAbsence={() => setIsAbsenceModalOpen(true)}
+          onCreateAbsence={() => { setSelectedAbsence(null); setIsAbsenceModalOpen(true) }}
           stats={{
             scheduled: filteredScheduledCases.length,
             toBook: actionableCases.length,
@@ -730,6 +788,7 @@ export default function CoordinatorSchedule() {
             onChangeView={setViewMode}
             onChangeDate={setCurrentDate}
             onCaseMoved={handleCaseMoved}
+            onAbsenceMoved={handleAbsenceMoved}
           />
         )}
       </div>
@@ -783,17 +842,27 @@ export default function CoordinatorSchedule() {
           tekniker={technicians}
         />
       )}
-      <CreateAbsenceModal
+      <FranvaroModal
         isOpen={isAbsenceModalOpen}
-        onClose={() => setIsAbsenceModalOpen(false)}
-        onSuccess={handleAbsenceCreateSuccess}
+        onClose={() => { setIsAbsenceModalOpen(false); setSelectedAbsence(null) }}
+        onSaved={handleAbsenceSaved}
         technicians={technicians}
-      />
-      <AbsenceDetailsModal
-        isOpen={isAbsenceDetailsModalOpen}
-        onClose={() => { setIsAbsenceDetailsModalOpen(false); setSelectedAbsence(null) }}
+        absences={absences}
+        cases={scheduledCases}
         absence={selectedAbsence}
-        technicianName={selectedAbsence ? technicians.find(t => t.id === selectedAbsence.technician_id)?.name : undefined}
+        defaultDate={currentDate}
+      />
+      <FranvaroFlyttaDialog
+        fraga={absenceMove ? {
+          rubrik: franvaroRubrik(absenceMove.absence),
+          nyTid: `${formatTime(absenceMove.start)} till ${formatTime(absenceMove.end)}`,
+          antal: absenceMove.count,
+          teknikerNamn: technicians.find(t => t.id === absenceMove.absence.technician_id)?.name ?? 'den här teknikern',
+        } : null}
+        onAlla={() => confirmAbsenceMove(true)}
+        onBaraEn={() => confirmAbsenceMove(false)}
+        onAvbryt={() => setAbsenceMove(null)}
+        sparar={absenceMoveSaving}
       />
       <PendingRequestsNotifier onScheduleClick={handleSchedulePendingCase} />
       <GlobalCoordinatorChat

@@ -23,6 +23,7 @@ interface ScheduleGridProps {
   onChangeView?: (mode: ViewMode) => void
   onChangeDate?: (date: Date) => void
   onCaseMoved?: (caseId: string, newStart: Date, caseData: BeGoneCaseRow, newTechnicianId?: string) => void
+  onAbsenceMoved?: (absenceId: string, newStart: Date, technicianId: string) => void
 }
 
 export function ScheduleGrid({
@@ -36,6 +37,7 @@ export function ScheduleGrid({
   onChangeView,
   onChangeDate,
   onCaseMoved,
+  onAbsenceMoved,
 }: ScheduleGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const weekStart = useMemo(() => getWeekStart(currentDate), [currentDate])
@@ -84,6 +86,13 @@ export function ScheduleGrid({
     return map
   }, [technicians, dateCases])
 
+  // Antal tekniker per frånvarogrupp (teknikermöte m.m.)
+  const gruppStorlek = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const a of absences) if (a.group_id) map.set(a.group_id, (map.get(a.group_id) ?? 0) + 1)
+    return map
+  }, [absences])
+
   // Gruppera frånvaro per tekniker, filtrerad på aktuellt datum/vecka
   const absencesByTech = useMemo(() => {
     const map = new Map<string, Absence[]>()
@@ -126,6 +135,8 @@ export function ScheduleGrid({
       <WeekGridView
         technicians={technicians}
         cases={cases}
+        absences={absences}
+        onAbsenceClick={onAbsenceClick}
         currentDate={currentDate}
         onCaseClick={onCaseClick}
         onDayClick={handleDayClick}
@@ -191,6 +202,8 @@ export function ScheduleGrid({
               onCaseClick={onCaseClick}
               onAbsenceClick={onAbsenceClick}
               onCaseMoved={onCaseMoved}
+              onAbsenceMoved={onAbsenceMoved}
+              gruppStorlek={gruppStorlek}
               viewMode={viewMode}
               weekStart={weekStart}
               allCases={dateCases}

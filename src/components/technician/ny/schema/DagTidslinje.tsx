@@ -15,6 +15,7 @@ import {
 } from './schemaLogik'
 import { ArbetsTid, VISA_ARBETSTID } from './SchemaDelar'
 import { kortidText } from './useKortid'
+import { franvaroTyp } from '../../../../utils/franvaroTyper'
 
 interface Props {
   dag: string
@@ -42,7 +43,7 @@ interface Props {
 type Rad =
   | { slag: 'besok'; t: number; b: DagBesok }
   | { slag: 'lucka'; t: number; start: Date; slut: Date }
-  | { slag: 'franvaro'; t: number; start: Date; slut: Date; orsak: string | null }
+  | { slag: 'franvaro'; t: number; start: Date; slut: Date; orsak: string | null; rubrik: string | null }
 
 /** "Solna, 18 stationer, arbetat 52 min" */
 function Underrad({ b, antal }: { b: DagBesok; antal?: number }) {
@@ -83,7 +84,7 @@ export function DagTidslinje(p: Props) {
     }
   }
   if (!fv.heldag) {
-    for (const f of fv.block) rader.push({ slag: 'franvaro', t: f.start.getTime(), start: f.start, slut: f.slut, orsak: f.orsak })
+    for (const f of fv.block) rader.push({ slag: 'franvaro', t: f.start.getTime(), start: f.start, slut: f.slut, orsak: f.orsak, rubrik: f.rubrik })
   }
   // Vid samma starttid kommer frånvaro och lucka före besöket
   const ordning = { franvaro: 0, lucka: 1, besok: 2 }
@@ -103,8 +104,8 @@ export function DagTidslinje(p: Props) {
 
       {fv.heldag && (
         <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-2xl border border-slate-700 bg-[repeating-linear-gradient(135deg,var(--color-slate-800)_0,var(--color-slate-800)_6px,var(--color-slate-700)_6px,var(--color-slate-700)_7px)] text-slate-300">
-          <Icon name="allman.kalender" size={20} />
-          <span className="text-sm font-semibold">Frånvaro hela dagen{fv.block[0]?.orsak ? `, ${fv.block[0].orsak.toLowerCase()}` : ''}</span>
+          <span style={{ color: franvaroTyp(fv.block[0]?.orsak).farg }}><Icon name={fv.block[0]?.orsak ? franvaroTyp(fv.block[0].orsak).ikon : 'allman.kalender'} size={20} /></span>
+          <span className="text-sm font-semibold">{fv.block[0]?.rubrik || 'Frånvaro'} hela dagen{fv.block[0]?.orsak && !fv.block[0]?.rubrik ? `, ${franvaroTyp(fv.block[0].orsak).kort.toLowerCase()}` : ''}</span>
         </div>
       )}
 
@@ -136,10 +137,10 @@ export function DagTidslinje(p: Props) {
               <li key={`f${r.t}`} className="grid grid-cols-[48px_1fr] gap-2.5">
                 <span className="pt-3 font-mono text-[13px] text-slate-500">{klockslag(r.start)}</span>
                 <div className="px-3.5 py-3 flex items-center gap-2.5 rounded-2xl border border-slate-700 bg-[repeating-linear-gradient(135deg,var(--color-slate-800)_0,var(--color-slate-800)_6px,var(--color-slate-700)_6px,var(--color-slate-700)_7px)] text-slate-300">
-                  <Icon name="allman.kalender" size={20} className="flex-shrink-0" />
+                  <span className="flex-shrink-0" style={{ color: franvaroTyp(r.orsak).farg }}><Icon name={r.orsak ? franvaroTyp(r.orsak).ikon : 'allman.kalender'} size={20} /></span>
                   <span className="flex flex-col">
-                    <span className="text-sm font-semibold">Frånvaro {klockslag(r.start)} till {klockslag(r.slut)}</span>
-                    {r.orsak && <span className="text-[13px] text-slate-400">{r.orsak}</span>}
+                    <span className="text-sm font-semibold">{r.rubrik || 'Frånvaro'} {klockslag(r.start)} till {klockslag(r.slut)}</span>
+                    {r.orsak && <span className="text-[13px] text-slate-400">{franvaroTyp(r.orsak).kort}</span>}
                   </span>
                 </div>
               </li>

@@ -6,6 +6,9 @@ import { CapacitySplitBars } from './CapacitySplitBars'
 import type { WorkSchedule } from '../../../types/database'
 import { TECH_COLORS, WEEK_HOUR_HEIGHT, WEEK_TIME_COL_WIDTH, WEEK_DAY_START, WEEK_DAY_END, WEEK_TOTAL_HOURS, WEEK_GRID_HEIGHT, SNAP_MINUTES } from './scheduleConstants'
 import { GridEventCard } from './GridEventCard'
+import type { Absence } from './AbsenceBlock'
+import { Icon } from '../../icons/Icon'
+import { franvaroTyp, franvaroRubrik } from '../../../utils/franvaroTyper'
 
 interface WeekGridViewProps {
   technicians: Technician[]
@@ -14,6 +17,8 @@ interface WeekGridViewProps {
   onCaseClick: (caseData: BeGoneCaseRow) => void
   onDayClick: (date: Date) => void
   onCaseMoved?: (caseId: string, newStart: Date, caseData: BeGoneCaseRow) => void
+  absences?: Absence[]
+  onAbsenceClick?: (absence: Absence) => void
 }
 
 function timeToY(date: Date): number {
@@ -51,7 +56,7 @@ function assignLanes(events: BeGoneCaseRow[]): Map<string, LaneInfo> {
   return result
 }
 
-export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onDayClick, onCaseMoved }: WeekGridViewProps) {
+export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onDayClick, onCaseMoved, absences = [], onAbsenceClick }: WeekGridViewProps) {
   const weekStart = useMemo(() => getWeekStart(currentDate), [currentDate])
   const weekDays = useMemo(() => getWeekDays(weekStart), [weekStart])
   const today = new Date()
@@ -139,6 +144,25 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
     )
   }, [cases, weekDays])
 
+  // Frånvaro per dag, en rad per grupp (teknikermöte = en rad, inte nio)
+  const absencesByDay = useMemo(() => {
+    const techIds = new Set(technicians.map(t => t.id))
+    return weekDays.map(day => {
+      const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0)
+      const dayEnd = new Date(day); dayEnd.setHours(23, 59, 59, 999)
+      const rows = new Map<string, { first: Absence; count: number }>()
+      for (const a of absences) {
+        if (!techIds.has(a.technician_id)) continue
+        if (new Date(a.start_date) > dayEnd || new Date(a.end_date) < dayStart) continue
+        const key = a.group_id || a.id
+        const r = rows.get(key)
+        if (r) r.count++
+        else rows.set(key, { first: a, count: 1 })
+      }
+      return [...rows.values()].sort((x, y) => x.first.start_date.localeCompare(y.first.start_date))
+    })
+  }, [absences, technicians, weekDays])
+
   // Scrolla till 07:30 vid mount (lite ovanför 08:00)
   useEffect(() => {
     if (scrollRef.current) {
@@ -205,6 +229,30 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                 <p className="text-[10px] text-slate-500 mt-0.5">
                   {count} {count === 1 ? 'ärende' : 'ärenden'}
                 </p>
+                {absencesByDay[i].length > 0 && (
+                  <ul className="mt-1 space-y-0.5">
+                    {absencesByDay[i].slice(0, 3).map(({ first, count: n }) => {
+                      const typ = franvaroTyp(first.reason)
+                      const namn = n > 1 ? `${n} tekniker` : (technicians.find(t => t.id === first.technician_id)?.name.split(' ')[0] ?? '')
+                      return (
+                        <li key={first.group_id || first.id}>
+                          <button
+                            type="button"
+                            onClick={e => { e.stopPropagation(); onAbsenceClick?.(first) }}
+                            className="w-full flex items-center gap-1 text-[10px] text-slate-300 hover:text-white truncate"
+                            title={`${franvaroRubrik(first)}, ${namn}`}
+                          >
+                            <span className="flex-none" style={{ color: typ.farg }}><Icon name={n > 1 ? 'bokning.team' : typ.ikon} size={16} className="w-3 h-3" /></span>
+                            <span className="truncate">{franvaroRubrik(first)} · {namn}</span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                    {absencesByDay[i].length > 3 && (
+                      <li className="text-[10px] text-slate-500">{absencesByDay[i].length - 3} till</li>
+                    )}
+                  </ul>
+                )}
               </div>
             </div>
           )

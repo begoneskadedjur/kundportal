@@ -24,6 +24,8 @@ export interface Franvaro {
   end_date: string
   reason: string | null
   notes: string | null
+  /** Rubrik på blocket, t.ex. Teknikermöte */
+  title?: string | null
 }
 
 // ─── Datum ───
@@ -168,7 +170,7 @@ export interface FranvaroDag {
   /** Frånvaron täcker hela arbetsdagen */
   heldag: boolean
   /** Frånvaron inom dagen, klippt till kalenderdagen */
-  block: { start: Date; slut: Date; orsak: string | null }[]
+  block: { start: Date; slut: Date; orsak: string | null; rubrik: string | null }[]
 }
 
 export function franvaroForDag(dag: string, franvaro: Franvaro[], ws: WorkSchedule | null): FranvaroDag {
@@ -189,6 +191,7 @@ export function franvaroForDag(dag: string, franvaro: Franvaro[], ws: WorkSchedu
       start: aStart < dagStart ? dagStart : aStart,
       slut: aSlut > dagSlut ? dagSlut : aSlut,
       orsak: a.reason ?? null,
+      rubrik: a.title?.trim() || null,
     })
   }
   return { heldag, block }

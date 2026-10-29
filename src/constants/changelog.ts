@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.108.0',
+    date: '2026-10-29',
+    title: 'Frånvaro går att ändra, flytta och dela',
+    items: [
+      { kind: 'nyhet', text: 'Klicka på en frånvaro i Schema för att ändra tid, typ och tekniker, eller ta bort den. Tidigare gick den bara att titta på.' },
+      { kind: 'nyhet', text: 'Frånvaro för flera tekniker, till exempel teknikermötet, är nu en händelse. Ändra tiden en gång så gäller den alla, och bocka ur en tekniker för att ta bort frånvaron bara för den personen.' },
+      { kind: 'nyhet', text: 'Dra en frånvaro till ny tid i dagvyn. Gäller den flera tekniker väljer du om alla eller bara en ska flyttas.' },
+      { kind: 'nyhet', text: 'Nya typer med egna färger och ikoner: Möte, Kundbesök, Bilservice, Kompledigt och Läkarbesök. Frånvaron syns nu också i veckovyn, och teknikerna ser typ och rubrik i sitt schema.' },
+    ],
+  },
+  {
     version: '3.107.0',
     date: '2026-10-28',
     title: 'Avtalsfakturor visar om avtalet är kontrollerat',

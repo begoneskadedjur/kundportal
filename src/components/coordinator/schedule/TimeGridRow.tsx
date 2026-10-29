@@ -15,12 +15,16 @@ interface TimeGridRowProps {
   onCaseClick: (caseData: BeGoneCaseRow) => void
   onAbsenceClick?: (absence: Absence) => void
   onCaseMoved?: (caseId: string, newStart: Date, caseData: BeGoneCaseRow, newTechnicianId?: string) => void
+  /** Frånvaro dragen till ny tid (dagvy) */
+  onAbsenceMoved?: (absenceId: string, newStart: Date, technicianId: string) => void
+  /** group_id → antal tekniker i gruppen */
+  gruppStorlek?: Map<string, number>
   viewMode: ViewMode
   weekStart: Date
   allCases: BeGoneCaseRow[]
 }
 
-export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absences, currentDate, onCaseClick, onAbsenceClick, onCaseMoved, viewMode, weekStart, allCases }: TimeGridRowProps) {
+export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absences, currentDate, onCaseClick, onAbsenceClick, onCaseMoved, onAbsenceMoved, gruppStorlek, viewMode, weekStart, allCases }: TimeGridRowProps) {
   const gridWidth = getGridWidth(viewMode)
   const rowRef = useRef<HTMLDivElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -29,6 +33,11 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
 
   // BerÃ¤kna lanes fÃ¶r Ã¶verlappande events
   const laneMap = useMemo(() => assignLanes(cases), [cases])
+  // Överlappande frånvaro delar höjden i stället för att ligga på varandra
+  const absenceLanes = useMemo(
+    () => assignLanes(absences.map(a => ({ id: a.id, start_date: a.start_date, due_date: a.end_date }))),
+    [absences],
+  )
 
   function xToTime(clientX: number): Date {
     if (!rowRef.current) return new Date(currentDate)
@@ -82,7 +91,9 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
 
         {/* FrÃ¥nvaro-block */}
         {absences.map(a => (
-          <AbsenceBlock key={a.id} absence={a} onClick={onAbsenceClick} viewMode={viewMode} weekStart={weekStart} />
+          <AbsenceBlock key={a.id} absence={a} onClick={onAbsenceClick} viewMode={viewMode} weekStart={weekStart}
+            lane={absenceLanes.get(a.id)?.lane} totalLanes={absenceLanes.get(a.id)?.totalLanes}
+            gruppAntal={a.group_id ? gruppStorlek?.get(a.group_id) : 0} dragbar={!!onAbsenceMoved} />
         ))}
 
         {/* Event-block med lanes */}
@@ -119,6 +130,11 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
         setDragOver(false)
         setDropPreviewX(null)
         setDropPreviewTime(null)
+        const absenceId = e.dataTransfer.getData('absenceId')
+        if (absenceId) {
+          onAbsenceMoved?.(absenceId, xToTime(e.clientX), technician.id)
+          return
+        }
         const caseId = e.dataTransfer.getData('caseId')
         if (!caseId || !onCaseMoved) return
         const caseData = allCases.find(c => c.id === caseId)
@@ -163,7 +179,9 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
 
       {/* FrÃ¥nvaro-block */}
       {absences.map(a => (
-        <AbsenceBlock key={a.id} absence={a} onClick={onAbsenceClick} viewMode={viewMode} weekStart={weekStart} />
+        <AbsenceBlock key={a.id} absence={a} onClick={onAbsenceClick} viewMode={viewMode} weekStart={weekStart}
+            lane={absenceLanes.get(a.id)?.lane} totalLanes={absenceLanes.get(a.id)?.totalLanes}
+            gruppAntal={a.group_id ? gruppStorlek?.get(a.group_id) : 0} dragbar={!!onAbsenceMoved} />
       ))}
 
       {/* Event-block med lanes */}

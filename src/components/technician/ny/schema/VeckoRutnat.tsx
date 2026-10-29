@@ -16,6 +16,16 @@ import {
 } from './schemaLogik'
 import { BelastningText, PUNKT_FARG, TON_TEXT } from './SchemaDelar'
 import { kortidKort, kortidText } from './useKortid'
+import { franvaroTyp } from '../../../../utils/franvaroTyper'
+
+/** Frånvarotypens ikon i typens färg */
+function FranvaroIkon({ orsak }: { orsak: string | null | undefined }) {
+  return (
+    <span className="flex-none" style={{ color: orsak ? franvaroTyp(orsak).farg : undefined }}>
+      <Icon name={orsak ? franvaroTyp(orsak).ikon : 'allman.kalender'} size={16} />
+    </span>
+  )
+}
 
 const TIMME_PX = 64
 
@@ -190,13 +200,13 @@ export function VeckoRutnat(p: Props) {
             >
               {fv.heldag ? (
                 <div className={`absolute inset-1 rounded-lg border border-slate-700 p-2 text-slate-300 ${RANDIG}`}>
-                  <span className="flex items-center gap-1 text-xs font-semibold"><Icon name="allman.kalender" size={16} />Frånvaro</span>
-                  {fv.block[0]?.orsak && <span className="block text-xs text-slate-400">{fv.block[0].orsak}</span>}
+                  <span className="flex items-center gap-1 text-xs font-semibold"><FranvaroIkon orsak={fv.block[0]?.orsak} />{fv.block[0]?.rubrik || 'Frånvaro'}</span>
+                  {fv.block[0]?.orsak && <span className="block text-xs text-slate-400">{franvaroTyp(fv.block[0].orsak).kort}</span>}
                 </div>
               ) : fv.block.map((f, i) => (
                 <div key={`f${i}`} className={`absolute left-1 right-1 rounded-lg border border-slate-700 p-2 overflow-hidden text-slate-300 ${RANDIG}`} style={{ top: pos(f.start), height: Math.max(24, pos(f.slut) - pos(f.start)) }}>
-                  <span className="flex items-center gap-1 text-xs font-semibold"><Icon name="allman.kalender" size={16} />Frånvaro</span>
-                  <span className="block text-xs text-slate-400">{f.orsak || `${klockslag(f.start)} till ${klockslag(f.slut)}`}</span>
+                  <span className="flex items-center gap-1 text-xs font-semibold"><FranvaroIkon orsak={f.orsak} /><span className="truncate">{f.rubrik || (f.orsak ? franvaroTyp(f.orsak).kort : 'Frånvaro')}</span></span>
+                  <span className="block text-xs text-slate-400">{klockslag(f.start)} till {klockslag(f.slut)}</span>
                 </div>
               ))}
 

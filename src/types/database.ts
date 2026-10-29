@@ -820,8 +820,12 @@ export type Database = {
           reason: string     // 'Föräldraledighet', 'Semester', 'Sjukdom', 'Övrigt', etc.
           notes: string | null
           created_at: string
+          /** Samma värde på rader som skapades tillsammans för flera tekniker */
+          group_id: string | null
+          /** Rubrik på blocket i schemat, tom = typen visas */
+          title: string | null
         }
-        Insert: Omit<Database['public']['Tables']['technician_absences']['Row'], 'id' | 'created_at'>
+        Insert: Omit<Database['public']['Tables']['technician_absences']['Row'], 'id' | 'created_at' | 'group_id' | 'title'> & { group_id?: string | null; title?: string | null }
         Update: Partial<Database['public']['Tables']['technician_absences']['Insert']>
       }
       // 🆕 ONEFLOW SYNC LOG TABELL
