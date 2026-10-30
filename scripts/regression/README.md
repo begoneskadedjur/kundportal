@@ -85,3 +85,11 @@ npx tsx --env-file=.env scripts/regression/addon-v2-prov.mts --today=2026-10-30 
 ```
 
 `plan-dump.mts` speglar inte version 2 (inget avtal har `addon_rules` satt); provet ovan använder samma delade kod som Planera fakturor.
+
+## Löpande avtal i exakt läge (datasteg 18, STRUL 1)
+
+```bash
+npx tsx --env-file=.env scripts/regression/rolling-twin.mts
+```
+
+Jämför på alla levande avtal och åtta datum `contract_next_period_start` med `nextPeriodStart` och (avtal i exakt läge) `contract_period_on` med `periodContaining`. Krav: noll skillnader, exitkod 0. Skriver också ut, som information, där `contract_next_unplanned_period` (kompletthetens "Fakturaplan") skiljer sig från planerarens bindningsfönster: funktionen kräver att perioden ryms i fönstret (`v_full`) medan planeraren använder mittpunkten, i båda lägena.

@@ -256,7 +256,7 @@ async function loadSources(ctx: RunCtx, contractId: string): Promise<Sources> {
     additionNotes: ((steps ?? []) as StepRow[])
       .filter((s) => s.event_type === 'addition' && !!s.note)
       .map((s) => ({ effective_from: s.effective_from, note: s.note as string })),
-    steps: ((steps ?? []) as StepRow[]).map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value) })),
+    steps: ((steps ?? []) as StepRow[]).map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value), event_type: s.event_type ?? null })),
     premium: rows
       .filter((r) => (r.billing_model ?? 'premium') === 'premium')
       .map((r) => ({

@@ -1006,7 +1006,7 @@ async function planInvoices(ctx: Ctx, contract: Row, customerId: string, contrac
     db.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contractId),
     db.from('payment_terms_settings').select('days_until_due').eq('category', 'contract').maybeSingle(),
   ])
-  let steps: PremiumStep[] = ((stepRows ?? []) as Row[]).map((s) => ({ effective_from: String(s.effective_from), annual_value: Number(s.annual_value) }))
+  let steps: PremiumStep[] = ((stepRows ?? []) as Row[]).map((s) => ({ effective_from: String(s.effective_from), annual_value: Number(s.annual_value), event_type: str(s.event_type) }))
   if (ctx.dryRun && steps.length <= 1) {
     // Provkörning: startsteget som det blir efter stegen ovan (inget har skrivits)
     const start = str(contract.contract_start_date) ?? str(contract.start_date)

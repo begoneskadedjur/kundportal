@@ -104,12 +104,23 @@ const asRange = (p: Pick<PlannedPeriod, 'periodStart' | 'periodEnd'>): DateRange
  * täcker perioden om den överlappar minst halva perioden. Ren överlappning
  * räckte inte: fakturan för 2026-02-16 till 2027-02-15 överlappade planens
  * 2027-02-01 med två veckor och gjorde att nästa årsfaktura aldrig föreslogs
- * (Drottningens Pizzeria 2026-09-18). I läget 'overlap' räknas andelen som
- * överlappsvakten (mot den kortare perioden).
+ * (Drottningens Pizzeria 2026-09-18). I läget 'overlap' räknas andelen av
+ * den PLANERADE perioden i hela dagar (båda ändar med), som gamla läget.
+ * Inte mot den kortare perioden: då täckte en endagsimport av ett ärende
+ * (F-502 för Heimstaden Maria 5) hela årsperioden och premien försvann ur
+ * planen (datasteg 18, STRUL 1).
  */
 export function fortnoxCovers(p: Pick<PlannedPeriod, 'periodStart' | 'periodEnd'>, ranges: DateRange[], mode: MatchMode = 'legacy'): boolean {
-  if (mode === 'overlap') return ranges.some((r) => periodOverlapShare(asRange(p), r) >= SAME_PERIOD_SHARE)
+  if (mode === 'overlap') return ranges.some((r) => plannedShareCovered(asRange(p), r) >= SAME_PERIOD_SHARE)
   return ranges.some((r) => overlapShare(p, r) >= 0.5)
+}
+
+/** Andel av den planerade perioden p som intervallet r täcker, hela dagar med båda ändar. */
+export function plannedShareCovered(p: DateRange, r: DateRange): number {
+  const from = Math.max(dayNumber(p.start), dayNumber(r.start))
+  const to = Math.min(dayNumber(p.end), dayNumber(r.end))
+  if (to < from) return 0
+  return (to - from + 1) / Math.max(daysInclusive(p), 1)
 }
 
 /**

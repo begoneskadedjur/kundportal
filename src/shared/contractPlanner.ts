@@ -60,6 +60,8 @@ export interface PlanningContract {
 export interface PremiumStep {
   effective_from: string
   annual_value: number | string
+  /** contract_premium_events.event_type; 'indexation' styr regeln i annualValueForExactPeriod */
+  event_type?: string | null
 }
 
 /**
@@ -382,6 +384,30 @@ function midpointBefore(periodStart: Date, periodEnd: Date, limit: Date): boolea
   return (periodStart.getTime() + periodEnd.getTime()) / 2 < limit.getTime()
 }
 
+/**
+ * Mittpunktsregeln för bindningsfönstret i båda lägena. Gamla läget: som
+ * midpointBefore. Exakt avtalsdag (exactStepMonths satt): perioden avgörs av
+ * motsvarande period i gamla läget, alltså samma månader räknat från den 1:a
+ * (periodens startmånad till dagen före startmånaden plus steget). Då
+ * förlänger exakt läge ett löpande avtal på samma sätt som gamla läget
+ * (förlängning, uppsägning, mittpunkt, option), bara med perioder från
+ * avtalsdagen. Utan det hamnar mittpunkten exakt på eller strax efter det
+ * rullade slutdatumet när bindningstiden inte är hela år (sex månaders
+ * bindning med årsvis fakturering: Kleberg, Bockholmen), och perioden föll
+ * bort (datasteg 18, STRUL 1).
+ */
+export function periodBeforeLimit(
+  periodStart: Date,
+  periodEnd: Date,
+  limit: Date,
+  exactStepMonths: number | null
+): boolean {
+  if (!exactStepMonths) return midpointBefore(periodStart, periodEnd, limit)
+  const legacyStart = new Date(periodStart.getFullYear(), periodStart.getMonth(), 1)
+  const legacyEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + exactStepMonths, 0)
+  return midpointBefore(legacyStart, legacyEnd, limit)
+}
+
 export function periodDivisor(freq: string | null): number {
   if (freq === 'monthly') return 12
   if (freq === 'quarterly') return 4
@@ -470,6 +496,31 @@ export function annualValueInForce(
 }
 
 /**
+ * Årsvärdet för en period i exakt läge (datasteg 18, STRUL 2). Regeln: ett
+ * indexsteg (event_type 'indexation') som börjar inom perioden och högst
+ * SNAP_MAX_DAYS dagar efter periodstart, i en halvårs- eller årsperiod,
+ * gäller från periodens start. Indexeringen hör till avtalsåret; steget
+ * daterades den 1:a efter gamla läget (AngelRekt: indexsteget 2026-03-01,
+ * avtalsdagen 15 februari). Samma gräns som snapsToPeriodStart för § 6-rader.
+ * Andra steg (start, tillägg, justering) gäller som förut från sitt datum.
+ * Gamla läget använder annualValueInForce oförändrad.
+ */
+export function annualValueForExactPeriod(
+  contract: Pick<PlanningContract, 'annual_value'>,
+  steps: PremiumStep[] | undefined,
+  periodStartIso: string,
+  periodEndIso: string
+): number {
+  if (!steps || steps.length === 0) return annualValueInForce(contract, steps, periodStartIso)
+  const adjusted = steps.map((s) =>
+    s.event_type === 'indexation' && snapsToPeriodStart(s.effective_from, periodStartIso, periodEndIso)
+      ? { ...s, effective_from: periodStartIso }
+      : s
+  )
+  return annualValueInForce(contract, adjusted, periodStartIso)
+}
+
+/**
  * Ren funktion: alla fakturaperioder för ett avtal med belopp per period.
  * Används av webben (planering, förhandsvisning, tillägg) och cronen.
  */
@@ -517,6 +568,7 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
   // uppsägning): då får perioden börja före horisonten utan att rymmas helt.
   const endIsHorizon = !win && !cutoff && !!horizonIso && (!declaredEnd || declaredEnd < effectiveEnd)
   const exactMode = isStartDayMode(contract)
+  const exactStep = exactMode ? periodStepMonths(freq) : null
   let intervals: Array<{ periodStart: Date; periodEnd: Date }>
   if (win) {
     // Bindningstid: en period hör till den bindningsperiod där största delen
@@ -529,7 +581,7 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
     const raw = exactMode
       ? exactPeriods(contract.contract_start_date as string, effectiveEnd, effectiveEnd, periodStepMonths(freq), false)
       : iterPeriodsPure(start, effectiveEnd, freq, contract.billing_anchor_month, false)
-    intervals = win.openEnded ? raw : raw.filter((r) => midpointBefore(r.periodStart, r.periodEnd, effectiveEnd))
+    intervals = win.openEnded ? raw : raw.filter((r) => periodBeforeLimit(r.periodStart, r.periodEnd, effectiveEnd, exactStep))
   } else {
     intervals = exactMode
       ? exactPeriods(contract.contract_start_date as string, effectiveEnd, effectiveEnd, periodStepMonths(freq), !endIsHorizon)
@@ -539,7 +591,7 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
   const isRenewal = (periodStart: Date, periodEnd: Date): boolean => {
     if (win) {
       if (win.openEnded) return toLocalIsoDate(periodStart) > todayIso
-      return win.renewalDue && !!currentEndDate && !midpointBefore(periodStart, periodEnd, currentEndDate)
+      return win.renewalDue && !!currentEndDate && !periodBeforeLimit(periodStart, periodEnd, currentEndDate, exactStep)
     }
     return endIsHorizon && !!declaredEnd && periodStart >= declaredEnd
   }
@@ -551,10 +603,12 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
 
   return intervals.map(({ periodStart, periodEnd }, idx) => {
     const periodStartIso = toLocalIsoDate(periodStart)
-    const annual = annualValueInForce(contract, opts.steps, periodStartIso)
+    const periodEndIso = toLocalIsoDate(periodEnd)
+    const annual = exactMode
+      ? annualValueForExactPeriod(contract, opts.steps, periodStartIso, periodEndIso)
+      : annualValueInForce(contract, opts.steps, periodStartIso)
     const amount = amountPerPeriodPure(annual, freq)
 
-    const periodEndIso = toLocalIsoDate(periodEnd)
     const equipmentRows: PlannedEquipmentRow[] = (onPremium ? yearlyLines : [])
       .filter(
         (e) =>
@@ -695,7 +749,7 @@ export function computePlannedMonthlyEquipmentPeriods(contract: PlanningContract
       ? addDays(parseLocalDate(addMonthsClampedIso(exactStart, exactK + 1)), -1)
       : new Date(cur.getFullYear(), cur.getMonth() + 1, 0)
     // Bindningstid: månaden hör dit största delen av den ligger, som premien
-    if (win && !win.openEnded && !midpointBefore(cur, periodEnd, end)) break
+    if (win && !win.openEnded && !periodBeforeLimit(cur, periodEnd, end, exactStart ? 1 : null)) break
     const rows: PlannedEquipmentRow[] = monthly
       .filter((e) => !e.billing_start_date || e.billing_start_date <= periodStartIso)
       .map((e) => {
@@ -737,7 +791,7 @@ export function computePlannedMonthlyEquipmentPeriods(contract: PlanningContract
         renewal: win
           ? win.openEnded
             ? periodStartIso > todayIsoEq
-            : win.renewalDue && !!currentEndDate && !midpointBefore(cur, periodEnd, currentEndDate)
+            : win.renewalDue && !!currentEndDate && !periodBeforeLimit(cur, periodEnd, currentEndDate, exactStart ? 1 : null)
           : false,
       })
     }

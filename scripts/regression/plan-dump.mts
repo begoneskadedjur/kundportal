@@ -326,7 +326,7 @@ function sourcesFor(contractId: string): Sources {
     stationIdsByRow.set(k, [...(stationIdsByRow.get(k) ?? []), l.station_id].sort(byStr))
   }
   return {
-    steps: st.map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value) })),
+    steps: st.map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value), event_type: s.event_type ?? null })),
     additionNotes: st.filter((s) => s.event_type === 'addition' && !!s.note).map((s) => ({ effective_from: s.effective_from, note: s.note as string })),
     premium: rows
       .filter((r) => (r.billing_model ?? 'premium') === 'premium')

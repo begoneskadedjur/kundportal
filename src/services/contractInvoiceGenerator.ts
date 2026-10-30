@@ -1054,7 +1054,7 @@ export class ContractInvoiceGenerator {
     } | null
     type StepRow = { effective_from: string; annual_value: number | string; event_type?: string | null; note?: string | null }
     return {
-      steps: ((steps ?? []) as StepRow[]).map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value) })),
+      steps: ((steps ?? []) as StepRow[]).map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value), event_type: s.event_type ?? null })),
       additionNotes: ((steps ?? []) as StepRow[])
         .filter((s) => s.event_type === 'addition' && !!s.note)
         .map((s) => ({ effective_from: s.effective_from, note: s.note as string })),

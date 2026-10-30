@@ -316,11 +316,13 @@ describe('buildContractDiff i båda lägena', () => {
     expect(buildContractDiff([period('2026-06-30', '2027-06-29')], [], { real: true, mode: 'legacy', consolidatedInvoices: [cons] })[0].action).toBe('create')
   })
 
-  it('overlap: Fortnox-importen räknas mot den kortare perioden, som vakten', () => {
+  it('overlap: Fortnox-importen räknas mot den planerade perioden, som gamla läget (STRUL 1 datasteg 18)', () => {
     const planned = [period('2027-02-01', '2028-01-31')]
     const fx = invoice('f', '2027-03-01', '2027-04-30', { invoice_number: 'F-1', is_historical: true, status: 'paid', invoice_type: 'adhoc' })
     expect(buildContractDiff(planned, [fx], { real: true, mode: 'legacy' })[0].action).toBe('create')
-    expect(buildContractDiff(planned, [fx], { real: true, mode: 'overlap' })).toEqual([])
+    expect(buildContractDiff(planned, [fx], { real: true, mode: 'overlap' })[0].action).toBe('create')
+    const year = invoice('g', '2027-02-06', '2028-02-05', { invoice_number: 'F-2', is_historical: true, status: 'paid', invoice_type: 'contract' })
+    expect(buildContractDiff(planned, [year], { real: true, mode: 'overlap' })).toEqual([])
   })
 })
 
