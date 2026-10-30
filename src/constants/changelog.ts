@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.112.0',
+    date: '2026-10-30',
+    title: 'Arbetslista på avtalskartan',
+    items: [
+      { kind: 'nyhet', text: 'Avtalskartan visar en arbetslista: vad som måste göras på kunden, på vilken enhet och vilken knapp man trycker på. Notisen tar dig direkt dit.' },
+      { kind: 'andring', text: 'Notisen, sidomenyn och Kräver åtgärd räknar allt som väntar på avtalskartan, inte bara tillägg att besluta.' },
+    ],
+  },
+  {
     version: '3.111.0',
     date: '2026-10-30',
     title: 'Tilläggsstationen hör till sitt ärende',

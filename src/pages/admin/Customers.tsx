@@ -32,6 +32,8 @@ import Select from '../../components/ui/Select'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers, type ConsolidatedCustomer } from '../../hooks/useConsolidatedCustomers'
 import { useAddonPending, findAddonPending, type AddonPendingSummary } from '../../hooks/useAddonPending'
+import { useContractWorkItems, findWorkItems } from '../../hooks/useContractWorkItems'
+import { buildWorkItemLink, sortWorkItems, type ContractWorkItem } from '../../shared/contractWorkItems'
 import { useContractMapStatus, findContractMapStatus } from '../../hooks/useContractMapStatus'
 import { useCustomerSetupExtras, setupStatusFor } from '../../hooks/useCustomerSetupStatus'
 import { SETUP_KEYS, SETUP_LABEL, type SetupKey, type SetupSummary, type SetupTarget } from '../../shared/customerSetupStatus'
@@ -42,8 +44,9 @@ import toast from 'react-hot-toast'
 // periodskifte är INTE en åtgärd — det får en egen grupp.
 // Tillägg att besluta (bara faktureringsansvariga får listan) är också en åtgärd:
 // pengar som väntar på beslut i avtalskartan.
-function requiresAction(c: ConsolidatedCustomer, addon?: AddonPendingSummary | null): boolean {
-  if (addon) return true
+// Övriga uppgifter på avtalskartan (arbetslistan, steg 10) räknas likadant.
+function requiresAction(c: ConsolidatedCustomer, addon?: AddonPendingSummary | null, work: ContractWorkItem[] = []): boolean {
+  if (addon || work.length > 0) return true
   if (c.isTerminated) {
     if (!c.effectiveEndDate) return false
     const days = Math.ceil((new Date(c.effectiveEndDate).getTime() - Date.now()) / 86_400_000)
@@ -53,9 +56,13 @@ function requiresAction(c: ConsolidatedCustomer, addon?: AddonPendingSummary | n
 }
 
 // Sorteringsdatum för "Kräver åtgärd" (närmast deadline först)
-function actionDateMs(c: ConsolidatedCustomer, addon?: AddonPendingSummary | null): number {
-  // Uppsägningar först (deadline), sedan tillägg i markeringsordning
+function actionDateMs(c: ConsolidatedCustomer, addon?: AddonPendingSummary | null, work: ContractWorkItem[] = []): number {
+  // Uppsägningar först (deadline), sedan tillägg i markeringsordning, sedan övriga uppgifter
   if (addon) return addon.first_marked_at ? new Date(addon.first_marked_at).getTime() + 1e13 : Number.MAX_SAFE_INTEGER
+  if (work.length > 0) {
+    const first = work.map((w) => w.sort_at).filter((d): d is string => !!d).sort()[0]
+    return first ? new Date(first).getTime() + 1e13 : Number.MAX_SAFE_INTEGER - 1
+  }
   const iso = c.isTerminated ? c.effectiveEndDate : c.nextRenewalDate
   return iso ? new Date(iso).getTime() : Number.MAX_SAFE_INTEGER
 }
@@ -230,6 +237,13 @@ export default function Customers() {
   const closeHelp = useCallback(() => setHelpOpen(false), [])
   const addonRows = useAddonPending()
   const addonFor = useCallback((c: ConsolidatedCustomer) => findAddonPending(addonRows, c), [addonRows])
+  // Arbetslistan på avtalskartan: huvudkundens id (multisite: huvudkontoret och enheterna)
+  const workRows = useContractWorkItems()
+  const workFor = useCallback(
+    (c: ConsolidatedCustomer) =>
+      findWorkItems(workRows, [c.id, c.headquarterCustomer?.id, ...(c.sites ?? []).map((s) => s.id)].filter((x): x is string => !!x)),
+    [workRows]
+  )
   const mapRows = useContractMapStatus()
 
   // Uppläggningens status per rad (statusikonerna)
@@ -274,7 +288,7 @@ export default function Customers() {
       organizationType: organizationTypeFilter === 'all' ? undefined : organizationTypeFilter
     })
 
-    if (quickView === 'atgard') return result.filter((c) => requiresAction(c, addonFor(c)))
+    if (quickView === 'atgard') return result.filter((c) => requiresAction(c, addonFor(c), workFor(c)))
     if (quickView === 'inkomplett') return result.filter((c) => isOpenState(setupFor(c), setupFilter))
     return result
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -311,14 +325,14 @@ export default function Customers() {
     const uppsagda: ConsolidatedCustomer[] = []
 
     for (const c of byName) {
-      if (requiresAction(c, addonFor(c))) atgard.push(c)
+      if (requiresAction(c, addonFor(c), workFor(c))) atgard.push(c)
       else if (c.isTerminated) uppsagda.push(c)
       else if (c.isPaused) pausade.push(c)
       else if (c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90) fornyelse.push(c)
       else aktiva.push(c)
     }
 
-    atgard.sort((a, b) => actionDateMs(a, addonFor(a)) - actionDateMs(b, addonFor(b)))
+    atgard.sort((a, b) => actionDateMs(a, addonFor(a), workFor(a)) - actionDateMs(b, addonFor(b), workFor(b)))
     fornyelse.sort((a, b) => (a.daysToNextRenewal ?? 9999) - (b.daysToNextRenewal ?? 9999))
 
     const sumAnnual = (rows: ConsolidatedCustomer[]) =>
@@ -331,7 +345,7 @@ export default function Customers() {
       { key: 'pausade', label: 'Pausade', rows: pausade, sum: null as number | null },
       { key: 'uppsagda', label: 'Uppsagda', rows: uppsagda, sum: null as number | null },
     ].filter(g => g.rows.length > 0)
-  }, [filteredCustomers, addonFor, quickView, setupFor, sortMode])
+  }, [filteredCustomers, addonFor, workFor, quickView, setupFor, sortMode])
 
   // Datumet som förklarar ordningen, bredvid kundnamnet
   const dateNoteFor = (c: ConsolidatedCustomer): string | null => {
@@ -408,7 +422,7 @@ export default function Customers() {
 
   // Snabbvy-counts (på hela datasetet)
   const expiringCount = consolidatedCustomers.filter(c => c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90).length
-  const atgardCount = consolidatedCustomers.filter((c) => requiresAction(c, addonFor(c))).length
+  const atgardCount = consolidatedCustomers.filter((c) => requiresAction(c, addonFor(c), workFor(c))).length
   const multisiteCount = consolidatedCustomers.filter(c => !c.isTerminated && c.organizationType === 'multisite').length
   const terminatedCount = consolidatedCustomers.filter(c => c.isTerminated).length
   // Ikonfiltret: hur många som saknar respektive del
@@ -932,9 +946,19 @@ export default function Customers() {
                         onOpenUnit={(unitId) => navigate(`${basePath}/${unitId}`)}
                         contactCount={getContactsForOrganization(org).length}
                         addonPending={addonFor(org)}
+                        workItems={workFor(org)}
                         onOpenAddons={() => {
                           const a = addonFor(org)
-                          if (a) navigate(`${basePath}/${a.root_customer_id}?tab=avtalskarta&panel=innehall`)
+                          if (a) {
+                            navigate(`${basePath}/${a.root_customer_id}?tab=avtalskarta&panel=innehall`)
+                            return
+                          }
+                          const w = sortWorkItems(workFor(org))[0]
+                          if (w) {
+                            navigate(buildWorkItemLink(basePath.replace(/\/befintliga-kunder$/, ''), w.kind, {
+                              rootId: w.root_customer_id, contractId: w.contract_id, unitId: w.unit_id,
+                            }))
+                          }
                         }}
                         onOpenEvent={(kind) => {
                           const id = peekIdFor(org)

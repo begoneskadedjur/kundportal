@@ -7,6 +7,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { Notification } from '../../types/communication';
 import NotificationItem from './NotificationItem';
 import NotificationModal from './NotificationModal';
+import { workItemLinkForCustomer } from '../../hooks/useContractWorkItems';
 import { procurementNotificationSub, procurementPortalUrl } from '../../lib/procurementPortal';
 import { leadsSidaFor } from '../admin/leads/leadLogik';
 import {
@@ -97,10 +98,11 @@ export default function NotificationBell({
         return;
       }
 
-      // Kundnotis (tillägg att besluta): rakt in i kundkortets avtalskarta
+      // Kundnotis (att göra på avtalskartan): rakt in i kundkortets avtalskarta,
+      // på kundens första uppgift i arbetslistan
       if (notification.case_type === 'customer') {
         const base = pathname.includes('/koordinator') ? '/koordinator' : '/admin';
-        window.location.href = `${base}/befintliga-kunder/${notification.case_id}?tab=avtalskarta&panel=innehall`;
+        void workItemLinkForCustomer(base, notification.case_id).then((href) => { window.location.href = href; });
         return;
       }
 

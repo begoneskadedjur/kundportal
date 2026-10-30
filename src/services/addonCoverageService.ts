@@ -100,4 +100,28 @@ export class AddonCoverageService {
     if (error) throw rpcError('addon_station_gaps', error)
     return (data as AddonCoverageGap[] | null) ?? []
   }
+
+  /**
+   * Konflikten är hanterad (arbetslistan, steg 10). Raden står kvar med
+   * resolved_at och syns inte längre i listan.
+   */
+  static async resolveConflicts(conflictIds: string[]): Promise<number> {
+    const { data, error } = await supabase.rpc('addon_coverage_conflict_resolve', { p_conflict_ids: conflictIds })
+    if (error) throw rpcError('addon_coverage_conflict_resolve', error)
+    return Number(data ?? 0)
+  }
+
+  /**
+   * Koppla stationer som sattes ut utan ärende till ett ärende (arbetslistan,
+   * steg 10). Bara stationer som saknar ärende ändras. Returnerar antal.
+   */
+  static async setStationCase(stationIds: string[], kind: AddonStationKind, caseId: string): Promise<number> {
+    const { data, error } = await supabase.rpc('addon_station_set_case', {
+      p_station_ids: stationIds,
+      p_kind: kind,
+      p_case_id: caseId,
+    })
+    if (error) throw rpcError('addon_station_set_case', error)
+    return Number(data ?? 0)
+  }
 }

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import type { ConsolidatedCustomer, CustomerSite } from '../../../hooks/useConsolidatedCustomers'
 import type { AddonPendingSummary } from '../../../hooks/useAddonPending'
+import { sortWorkItems, workItemsCountLabel, type ContractWorkItem } from '../../../shared/contractWorkItems'
 import { unitFortnoxState } from '../../../shared/fortnoxCustomerNumbers'
 import type { SetupSummary, SetupTarget } from '../../../shared/customerSetupStatus'
 import { Icon, type IconName } from '../../icons/Icon'
@@ -95,8 +96,11 @@ export interface CustomerEvent {
   tone: string
 }
 
-/** Händelsen för raden: tillägg att besluta går före, sedan uppsägning, sedan nästa period. */
-export function customerEvent(org: ConsolidatedCustomer, addon: AddonPendingSummary | null): CustomerEvent {
+/**
+ * Händelsen för raden: tillägg att besluta går före, sedan övriga uppgifter på
+ * avtalskartan (arbetslistan), sedan uppsägning, sedan nästa period.
+ */
+export function customerEvent(org: ConsolidatedCustomer, addon: AddonPendingSummary | null, work: ContractWorkItem[] = []): CustomerEvent {
   if (addon) {
     const full = `${addon.stations} ${addon.stations === 1 ? 'tilläggsstation väntar' : 'tilläggsstationer väntar'} på beslut, ${formatKr(addon.annual_kr)}/år`
       + `${addon.contracts > 1 ? ` på ${addon.contracts} avtal` : ''}`
@@ -104,6 +108,15 @@ export function customerEvent(org: ConsolidatedCustomer, addon: AddonPendingSumm
     return {
       kind: 'beslut', short: String(addon.stations), title: 'Tilläggsstationer att besluta',
       full, action: 'Tryck för att besluta', tone: 'text-amber-400',
+    }
+  }
+  if (work.length > 0) {
+    const first = sortWorkItems(work)[0]
+    const rest = work.length - 1
+    return {
+      kind: 'beslut', short: String(work.length), title: workItemsCountLabel(work.length),
+      full: first.instruction + (rest > 0 ? ` Och ${rest} till.` : ''),
+      action: 'Tryck för att öppna avtalskartan', tone: 'text-amber-400',
     }
   }
   if (org.isTerminated) {
@@ -248,6 +261,8 @@ interface Props {
   highlighted?: boolean
   /** Tilläggsstationer som väntar på beslut om fakturering (bara faktureringsansvariga får den) */
   addonPending?: AddonPendingSummary | null
+  /** Övriga uppgifter på avtalskartan (arbetslistan), bara faktureringsansvariga */
+  workItems?: ContractWorkItem[]
   /** Öppna kundens avtalskarta på Innehåll och utrustning */
   onOpenAddons?: () => void
   /** Ny period eller uppsägning: öppna kundsidan där det syns */
@@ -269,6 +284,7 @@ export default function CustomerListRow({
   actions,
   contactCount,
   addonPending = null,
+  workItems = [],
   onOpenAddons,
   onOpenEvent,
   setup = null,
@@ -297,7 +313,7 @@ export default function CustomerListRow({
 
   const isMultisite = org.organizationType === 'multisite'
   const { number } = resolveFortnoxInfo(org)
-  const event = customerEvent(org, addonPending)
+  const event = customerEvent(org, addonPending, workItems)
   const annual = org.totalAnnualValue || 0
   const contractCount = org.contractCount || 0
   const seller = org.assigned_account_manager ?? org.sales_person ?? null

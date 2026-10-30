@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
 import { Notification } from '../../types/communication';
 import NotificationItem from './NotificationItem';
+import { workItemLinkForCustomer } from '../../hooks/useContractWorkItems';
 import { procurementNotificationSub, procurementPortalUrl } from '../../lib/procurementPortal';
 import { leadsSidaFor } from '../admin/leads/leadLogik';
 import {
@@ -154,9 +155,10 @@ export default function NotificationModal({
         return;
       }
 
+      // Kundnotis (att göra på avtalskartan): kundens första uppgift i arbetslistan
       if (notification.case_type === 'customer') {
         const base = pathname.includes('/koordinator') ? '/koordinator' : '/admin';
-        navigate(`${base}/befintliga-kunder/${notification.case_id}?tab=avtalskarta&panel=innehall`);
+        void workItemLinkForCustomer(base, notification.case_id).then((href) => navigate(href));
         return;
       }
 

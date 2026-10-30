@@ -1576,11 +1576,47 @@ export class ContractScopeService {
       p_annual_price: input.unitPriceAnnual,
     })
     if (error) throw new Error(`Kunde inte synka § 5-raden: ${error.message}`)
+    // Beslutet utlöser pro rata (steg 10), bara för avtal med nya
+    // tilläggsregler. Gamla avtal går dagens väg: pro rata skapas vid
+    // utsättningen och beslutet rör den inte.
+    const { data: rules } = await supabase.from('contracts').select('addon_rules').eq('id', contractId).maybeSingle()
+    if ((rules as { addon_rules?: string | null } | null)?.addon_rules === 'v2') {
+      await this.syncProrataAfterDecision(input.unitId, input.outdoorIds, input.indoorIds)
+    }
     await this.logEvent(contractId, {
       event_type: 'billing',
       title: `Tilläggsstationer utöver avtalet: ${input.count} st ${input.stationTypeName} på ${input.unitName}`,
       detail: `${input.model === 'per_month' ? 'Per månad' : 'Per år'} · ${input.unitPriceAnnual.toLocaleString('sv-SE')} kr/år per station · egna fakturor, antal vid varje debitering`,
     })
+  }
+
+  /**
+   * Pro rata efter beslutet, ett anrop per ärende där stationerna sattes ut
+   * (placed_case_id). Stängt ärende ger ingen rad; glappet tas av nästa
+   * planering och syns i arbetslistan. Stationer utan ärende syns där som
+   * "Station utan ärende". Kastar med beslutet sparat om pro rata fallerar.
+   */
+  static async syncProrataAfterDecision(unitId: string, outdoorIds: string[], indoorIds: string[]): Promise<number> {
+    const caseIds = new Set<string>()
+    if (outdoorIds.length > 0) {
+      const { data } = await supabase.from('equipment_placements').select('placed_case_id').in('id', outdoorIds)
+      for (const r of (data ?? []) as { placed_case_id: string | null }[]) if (r.placed_case_id) caseIds.add(r.placed_case_id)
+    }
+    if (indoorIds.length > 0) {
+      const { data } = await supabase.from('indoor_stations').select('placed_case_id').in('id', indoorIds)
+      for (const r of (data ?? []) as { placed_case_id: string | null }[]) if (r.placed_case_id) caseIds.add(r.placed_case_id)
+    }
+    for (const caseId of caseIds) {
+      const { error } = await supabase.rpc('sync_addon_prorata_line', {
+        p_customer_id: unitId,
+        p_annual_price: null,
+        p_technician_id: null,
+        p_technician_name: null,
+        p_case_id: caseId,
+      })
+      if (error) throw new Error(`Beslutet är sparat men pro rata kunde inte skapas: ${error.message}`)
+    }
+    return caseIds.size
   }
 
   /**

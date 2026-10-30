@@ -8,7 +8,7 @@
 // medan man skriver. Åtta grupper, en synlig i taget, aldrig något som
 // pappret redan visar.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import {
@@ -125,6 +125,8 @@ export interface ContractSettingsDrawerProps {
   /** Nästa avtal på kunden som fortfarande har brickor att besluta */
   nextBricks?: { contractId: string; label: string; count: number } | null
   onGoNext?: () => void
+  /** Arbetslistans länk (?unit=): enhetens brickor förväljs när panelen öppnas */
+  preselectUnitId?: string | null
   unitNameOf: (unitId: string) => string
   // Fakturering
   premiumEvents: CustomerRecordData['premiumEvents']
@@ -268,6 +270,18 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
     setSelectedBricks(new Set())
     setNameDraft((contract as { display_name?: string | null }).display_name ?? '')
   }, [contract.id, (contract as { display_name?: string | null }).display_name])
+  // Bara när man kommer via arbetslistans länk: enhetens brickor är förvalda,
+  // annars aldrig förkryssat.
+  const preselectDone = useRef<string | null>(null)
+  useEffect(() => {
+    if (!p.preselectUnitId || p.bricks.length < 2) return
+    const key = `${contract.id}|${p.preselectUnitId}`
+    if (preselectDone.current === key) return
+    const keys = p.bricks.filter((br) => br.unitId === p.preselectUnitId).map(brickKeyOf)
+    if (keys.length === 0) return
+    preselectDone.current = key
+    setSelectedBricks(new Set(keys))
+  }, [contract.id, p.preselectUnitId, p.bricks])
 
   const services = content.services
   const articles = content.articles

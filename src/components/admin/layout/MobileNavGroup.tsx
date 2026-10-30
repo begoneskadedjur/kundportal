@@ -6,7 +6,7 @@ import type { NavGroup, NavItem } from './adminNavConfig'
 import { useIncidentBadge } from '../../../hooks/useIncidentBadge'
 import { useIntranetBadge } from '../../../hooks/useIntranetBadge'
 import { useTicketsBadge } from '../../../hooks/useTicketsBadge'
-import { useAddonPendingBadge } from '../../../hooks/useAddonPending'
+import { useContractWorkItemsBadge } from '../../../hooks/useContractWorkItems'
 import { useProcurementBadge } from '../../../hooks/useProcurementBadge'
 import { useWebLeadsBadge } from '../../../hooks/useWebLeadsBadge'
 import { useProcurementAccess } from '../../../hooks/useProcurementAccess'
@@ -30,7 +30,8 @@ export function MobileNavGroup({ group: groupIn, currentPath, onNavigate }: Mobi
   const incidentCount = useIncidentBadge()
   const intranetCount = useIntranetBadge()
   const ticketsCount = useTicketsBadge()
-  const addonCount = useAddonPendingBadge()
+  // Kunder med något att göra på avtalskartan (tillägg att besluta och övriga uppgifter)
+  const addonCount = useContractWorkItemsBadge()
   const procurementCount = useProcurementBadge()
   const webLeadsCount = useWebLeadsBadge()
 
