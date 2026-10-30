@@ -726,6 +726,18 @@ export type Database = {
           reviewed_by_name?: string | null
           review_snapshot?: Record<string, unknown> | null // JSONB
 
+          /**
+           * Avtalsåret på exakt avtalsdag (steg 5, 2026-10-30). NULL = perioder från
+           * den 1:a som i dag. 'start_day' = perioder från contract_start_date.
+           * Läses inte av någon kod ännu.
+           */
+          billing_anchor_mode?: 'start_day' | null
+          billing_anchor_verified_at?: string | null
+          billing_anchor_verified_by?: string | null
+          billing_anchor_verified_note?: string | null
+          /** NULL = dagens tilläggsregler, 'v2' = täckning per station och pro rata version 2. */
+          addon_rules?: 'v2' | null
+
           created_at: string
           updated_at: string
         }
@@ -2106,12 +2118,45 @@ export interface EquipmentPlacement {
   // Koppling till station_types — sätts vid skapande via kod-/namnmatchning
   // på equipment_type; null på äldre rader (läsvägarna har legacy-fallback)
   station_type_id?: string | null
+  /** Ärendet där stationen sattes ut (steg 5, läses inte ännu) */
+  placed_case_id?: string | null
   created_at: string
   updated_at: string
 }
 
 export type EquipmentPlacementInsert = Omit<EquipmentPlacement, 'id' | 'created_at' | 'updated_at' | 'placed_at' | 'status_updated_at'>
 export type EquipmentPlacementUpdate = Partial<EquipmentPlacementInsert>
+
+/**
+ * Täckt period per tilläggsstation (tabellen addon_station_coverage, steg 5
+ * 2026-10-30). En aktiv rad (released_at null) täcker sina dagar, vad källan än
+ * är; waived = efterskänkt. Läses av interna roller, skrivs bara av SECURITY
+ * DEFINER-funktioner och triggers (kommer i steg 8). Ingen kod läser den ännu.
+ */
+export type AddonCoverageSource = 'invoice' | 'prorata' | 'gap_invoice' | 'fortnox_manual' | 'waived' | 'backfill'
+
+export interface AddonStationCoverage {
+  id: string
+  station_id: string
+  station_kind: 'outdoor' | 'indoor'
+  unit_customer_id: string
+  contract_id: string | null
+  covered_from: string // ÅÅÅÅ-MM-DD
+  covered_to: string // ÅÅÅÅ-MM-DD, inklusive
+  source: AddonCoverageSource
+  invoice_id: string | null
+  invoice_item_id: string | null
+  case_billing_item_id: string | null
+  fortnox_document_number: string | null
+  invoice_cancelled_at: string | null
+  note: string | null
+  created_by: string | null
+  created_by_name: string | null
+  created_at: string
+  released_at: string | null
+  released_by: string | null
+  release_reason: string | null
+}
 
 // Extended type with relations
 export interface EquipmentPlacementWithRelations extends EquipmentPlacement {

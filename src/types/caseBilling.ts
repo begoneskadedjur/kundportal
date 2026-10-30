@@ -56,6 +56,8 @@ export interface CaseBillingItem {
   billing_start_date?: string | null
   /** Pro rata-rad för per år/månad-stationer på etableringsärendet */
   is_addon_prorata_line?: boolean | null
+  /** Pro rata-rad: stationerna raden avser (steg 5, läses inte ännu) */
+  station_ids?: string[] | null
   /**
    * "Arbetstid för att hantera tilläggen": § 6-rad på avtalet (per_year),
    * pro rata-rad på ärendet (med is_addon_prorata_line) eller intern kostnad.

@@ -226,6 +226,8 @@ export interface IndoorStation {
   status_updated_by: string | null;
   placed_at: string;
   placed_by_technician_id: string | null;
+  /** Ärendet där stationen sattes ut (steg 5, läses inte ännu) */
+  placed_case_id?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -72,6 +72,8 @@ export interface Invoice {
   fortnox_document_number: string | null
   /** Leveransadressen som skickades till Fortnox (ärendets adress), null = ingen */
   delivery_address?: string | null
+  /** Märkningen en tilläggsfaktura avser, en faktura per avtal, period, typ och märkning (steg 5, läses inte ännu) */
+  marking_key?: string | null
 }
 
 /**

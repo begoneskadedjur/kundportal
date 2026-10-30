@@ -19,7 +19,8 @@ const CONTRACT_BILLING_COLUMNS = `
   annual_value, total_contract_value, billing_frequency, billing_anchor_month,
   billing_active, billing_paused_until, contract_start_date, contract_end_date, terminated_at,
   termination_reason, notice_period_months, effective_end_date, contract_type,
-  address_label, display_order, renewal_mode
+  address_label, display_order, renewal_mode,
+  billing_anchor_mode, addon_rules
 `
 
 const ACTIVE_CONTRACT_STATUSES = ['signed', 'active'] as const

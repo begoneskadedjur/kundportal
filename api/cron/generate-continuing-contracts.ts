@@ -97,6 +97,9 @@ type ContractRow = PlanningContract & {
   template_id: string | null
   oneflow_contract_id: string | null
   display_order: number | null
+  /** Steg 5: hämtas men läses inte ännu. NULL = dagens regel. */
+  billing_anchor_mode?: string | null
+  addon_rules?: string | null
 }
 
 /** En faktura som skulle ha skapats eller fått nya tilläggsrader. */
@@ -774,7 +777,7 @@ export async function runContinuingContracts(ctx: RunCtx) {
   let contractQuery = supabase
     .from('contracts')
     .select(
-      'id, customer_id, label, contract_type, invoice_reference, diary_number, annual_value, contract_start_date, contract_end_date, terminated_at, effective_end_date, billing_frequency, billing_anchor_month, billing_active, notice_period_months, renewal_mode, status, template_id, oneflow_contract_id, display_order'
+      'id, customer_id, label, contract_type, invoice_reference, diary_number, annual_value, contract_start_date, contract_end_date, terminated_at, effective_end_date, billing_frequency, billing_anchor_month, billing_active, notice_period_months, renewal_mode, status, template_id, oneflow_contract_id, display_order, billing_anchor_mode, addon_rules'
     )
     .in('status', LIVE_STATUSES)
     .eq('type', 'contract')
