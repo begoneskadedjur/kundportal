@@ -19,7 +19,7 @@ import {
 
 /** Avtalet med det som behövs för bilden, kund och trappa inbäddade. */
 export const REVIEW_CONTRACT_SELECT =
-  'id, customer_id, oneflow_contract_id, annual_value, billing_frequency, billing_anchor_month, contract_start_date, start_date, contract_length, contract_type, display_name, reviewed_at, reviewed_by_name, review_snapshot, ' +
+  'id, customer_id, oneflow_contract_id, annual_value, billing_frequency, billing_anchor_month, billing_anchor_mode, addon_rules, contract_start_date, start_date, contract_length, contract_type, display_name, reviewed_at, reviewed_by_name, review_snapshot, ' +
   'customer:customers!contracts_customer_id_fkey(customer_number, organization_number), ' +
   'premium_events:contract_premium_events(event_type, annual_value, effective_from)'
 
@@ -30,6 +30,8 @@ export interface ReviewContractRow {
   annual_value: number | string | null
   billing_frequency: string | null
   billing_anchor_month: number | null
+  billing_anchor_mode?: string | null
+  addon_rules?: string | null
   contract_start_date: string | null
   start_date: string | null
   contract_length: string | null

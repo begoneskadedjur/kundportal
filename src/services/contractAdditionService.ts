@@ -19,7 +19,7 @@ import { supabase } from '../lib/supabase'
 import { computePlannedInvoicesPure, ContractInvoiceGenerator, type CustomerForPlanning } from './contractInvoiceGenerator'
 import { resolveContractForCustomer } from './contractResolver'
 import { LOCKED_STATUSES, matchModeFor, periodOverlapShare, SAME_PERIOD_SHARE } from '../shared/contractInvoiceMatch'
-import { addMonthsClampedIso, periodStepMonths } from '../shared/contractPeriods'
+import { addMonthsClampedIso, isStartDayMode, nextPeriodStart, periodStepMonths } from '../shared/contractPeriods'
 import { addDaysIso } from '../shared/contractPlanner'
 
 const LOCKED_INVOICE_STATUSES = ['booked', 'sent', 'paid']
@@ -137,7 +137,24 @@ export class ContractAdditionService {
     // sista period): avtal som inte sagts upp löper vidare och
     // fortsättningsperioderna genereras av cron-jobbet. Syntetisera nästa
     // periodstart genom att stega frekvensen från sista planerade.
-    if (futureStarts.length === 0 && plan.length > 0) {
+    // Exakt avtalsdag (steg 12): nästa periodstart enligt avtalets periodregel,
+    // från avtalsdagen med klampning. Gamla läget stegar från den 1:a som förut.
+    const exactDay = isStartDayMode({
+      billing_anchor_mode: (contract as { billing_anchor_mode?: string | null } | null)?.billing_anchor_mode ?? null,
+      contract_start_date: billing.contract_start_date ?? null,
+    })
+    if (futureStarts.length === 0 && plan.length > 0 && exactDay) {
+      const next = nextPeriodStart(
+        {
+          contract_start_date: billing.contract_start_date ?? null,
+          billing_frequency: billing.billing_frequency ?? null,
+          billing_anchor_month: billing.billing_anchor_month ?? null,
+          billing_anchor_mode: 'start_day',
+        },
+        todayIso
+      )
+      if (next && next > todayIso) futureStarts = [next]
+    } else if (futureStarts.length === 0 && plan.length > 0) {
       const stepMonths =
         billing.billing_frequency === 'monthly' ? 1 : billing.billing_frequency === 'quarterly' ? 3 : billing.billing_frequency === 'semi_annual' ? 6 : 12
       const lastStart = new Date(plan[plan.length - 1].periodStart)

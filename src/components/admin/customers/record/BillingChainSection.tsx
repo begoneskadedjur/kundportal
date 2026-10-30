@@ -94,7 +94,7 @@ type InvoiceKind = 'premium' | 'equipment' | 'upsell'
 function invoiceKind(inv: RecordInvoice): InvoiceKind {
   if ((inv.invoice_type ?? '') !== 'contract') return 'upsell'
   const k = inv.contract_invoice_kind ?? 'premium'
-  if (k === 'equipment' || k === 'equipment_monthly') return 'equipment'
+  if (k === 'equipment' || k === 'equipment_monthly' || k === 'equipment_gap') return 'equipment'
   return 'premium'
 }
 
@@ -102,6 +102,7 @@ const PLAN_KIND_LABEL: Record<string, string> = {
   premium: 'Årspremie',
   equipment: 'Tilläggsstationer, per år',
   equipment_monthly: 'Tilläggsstationer, per månad',
+  equipment_gap: 'Tillägg från utsättning',
 }
 
 interface Props {

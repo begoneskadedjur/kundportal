@@ -9,6 +9,9 @@ import { isLiveContract, isImportedContractRow, type ContractLifecycleFields } f
 import { customersCoveredByContract, resolveContractCandidates } from './contractResolver'
 import { ContractInvoiceGenerator } from './contractInvoiceGenerator'
 import { cancelVisitsAfterEnd, restoreVisitsAfterEnd } from './terminationVisits'
+import { ContractService } from './contractService'
+import { describePlanChange, type PlanChangePreview, type PreviewExistingInvoice } from '../shared/contractAnchorPreview'
+import type { ContractWithBilling } from '../types/database'
 
 export interface ScopeRow {
   id: string
@@ -2203,6 +2206,60 @@ export class ContractScopeService {
   }
 
   /** Skriv en händelse i avtalets logg (tidslinjen). Fel sväljs — loggen får aldrig fälla mutationen. */
+  /**
+   * Avtalsåret (steg 12, avtalsåret på avtalsdag): 'start_day' = följer
+   * avtalsdagen, null = börjar den 1:a som tidigare. Byte till avtalsdagen
+   * kräver en anteckning om hur startdatumet kontrollerades mot Oneflow och
+   * fyller kontrollmarkeringen (verified_by = profiles.id). Databasen kräver
+   * befogenheten att godkänna fakturor, loggar ändringen och lägger
+   * startdatumet i framework_overrides när avtalet har ramavtal.
+   * Fakturorna ändras inte här: kör Planera fakturor efteråt.
+   */
+  static async setBillingAnchorMode(contractId: string, mode: 'start_day' | null, note: string | null): Promise<void> {
+    const { error } = await supabase.rpc('contract_set_billing_anchor_mode', {
+      p_contract_id: contractId,
+      p_mode: mode,
+      p_note: note,
+    })
+    if (error) throw new Error(error.message || 'Kunde inte spara avtalsåret')
+  }
+
+  /** Tilläggsreglerna: 'v2' = följer premien, null = som tidigare. Samma behörighet och logg som avtalsåret. */
+  static async setAddonRules(contractId: string, rules: 'v2' | null): Promise<void> {
+    const { error } = await supabase.rpc('contract_set_addon_rules', { p_contract_id: contractId, p_rules: rules })
+    if (error) throw new Error(error.message || 'Kunde inte spara tilläggsreglerna')
+  }
+
+  /**
+   * Förhandsvisning av ett byte av avtalsår eller tilläggsregler: planerar
+   * avtalets fakturor två gånger i provläge (som det är och med bytet, bara i
+   * minnet) och beskriver skillnaden. Skriver ingenting.
+   */
+  static async previewBillingModeChange(
+    contractId: string,
+    change: { billing_anchor_mode?: 'start_day' | null; addon_rules?: 'v2' | null }
+  ): Promise<PlanChangePreview> {
+    const contract = await ContractService.getContractWithBillingById(contractId)
+    if (!contract) throw new Error('Avtalet hittades inte')
+    const customerId = contract.customer_id ?? undefined
+    const before = await ContractInvoiceGenerator.planForContract(contract, { customerId })
+    const changed = { ...contract, ...change } as ContractWithBilling
+    const after = await ContractInvoiceGenerator.planForContract(changed, { customerId })
+    const ids = Array.from(
+      new Set([...before.entries, ...after.entries].map((e) => e.existingId).filter((id): id is string => !!id))
+    )
+    let existing: PreviewExistingInvoice[] = []
+    if (ids.length > 0) {
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, billing_period_start, billing_period_end, status')
+        .in('id', ids)
+      if (error) throw new Error(`Kunde inte läsa fakturorna: ${error.message}`)
+      existing = (data ?? []) as PreviewExistingInvoice[]
+    }
+    return describePlanChange(before.entries, after.entries, existing)
+  }
+
   static async logEvent(
     contractId: string,
     event: { event_type: ContractEventType; title: string; detail?: string | null; metadata?: Record<string, unknown> }

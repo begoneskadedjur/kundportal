@@ -30,6 +30,7 @@ import { buildUpcomingInvoiceEvents, useUpcomingInvoices } from './useUpcomingIn
 import ContractTimeline from './ContractTimeline'
 import BillingChainSection from './BillingChainSection'
 import InvoiceDeliveryPanel from '../../invoicing/InvoiceDeliveryPanel'
+import AdhocGroupingRow from './AdhocGroupingRow'
 import { useAuth } from '../../../../contexts/AuthContext'
 import UnitsSection from './UnitsSection'
 import AccessAccountsSection, { countAccessPersons } from './AccessAccountsSection'
@@ -432,6 +433,16 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
             customerId={customer.id}
             canEdit={profile?.role === 'admin' || profile?.role === 'koordinator' || !!profile?.is_admin}
             actorName={profile?.display_name || profile?.email || 'Okänd'}
+            onSaved={() => onDataChanged?.()}
+          />
+        )}
+        {/* Ärendefakturering (steg 12): per ärende eller samlat per månad */}
+        {density === 'full' && (
+          <AdhocGroupingRow
+            className="mb-4"
+            customerId={customer.id}
+            value={customer.adhoc_invoice_grouping}
+            canEdit={profile?.role === 'admin' || profile?.role === 'koordinator' || !!profile?.is_admin}
             onSaved={() => onDataChanged?.()}
           />
         )}

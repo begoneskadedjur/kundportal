@@ -87,6 +87,7 @@ import {
 /** § 5 tänds två sekunder när panelen öppnas från notisen eller remsan */
 const PARA_FLASH_CLASSES = ['shadow-[inset_3px_0_0_#20c58f]', 'bg-[#20c58f]/[.04]']
 import { PAPER_GEAR_CLASS } from './paperInk'
+import { adhocGroupingOf } from '../../../../services/customerBillingService'
 import { FOLD_THRESHOLD, FoldLink, FoldSummary, foldBodyClass, usePaperFold } from './paperFold'
 import LinkFortnoxInvoiceModal, { type LinkFortnoxTarget } from './LinkFortnoxInvoiceModal'
 import AddonDropPrompt, { type AddonDecisionMode, type AddonDropPromptState, type AddonPromptBrick } from './AddonDropPrompt'
@@ -2301,6 +2302,9 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   // enhetens brickor i panelen.
   const panelFromUrl = useRef(typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('panel') : null)
   const [preselectUnitId, setPreselectUnitId] = useState<string | null>(null)
+  // Arbetslistans "Markera avtalsdag" (länk eller knapp): avtalet vars
+  // kontrollformulär öppnas direkt under Fakturering (steg 12)
+  const [anchorFocusId, setAnchorFocusId] = useState<string | null>(null)
   useEffect(() => {
     const wanted = panelFromUrl.current
     if (!wanted || papers.length === 0) return
@@ -2309,6 +2313,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     const linked = workTarget?.contractId ? papers.find((c) => c.id === workTarget.contractId) : undefined
     const target = linked ?? papers.find((c) => bricksFor(c).length > 0) ?? papers[0]
     if (linked && workTarget?.kind === 'addon_decide' && workTarget.unitId) setPreselectUnitId(workTarget.unitId)
+    if (linked && workTarget?.kind === 'anchor_verify') setAnchorFocusId(linked.id)
     setSettingsPanel({ contractId: target.id, group, tab: 'settings' })
     if (group === 'innehall') focusParaSix(target.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2443,6 +2448,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         onOpenPlan={() => void openPlanPreview()}
         onOpenAnchor={(id) => {
           const c = papers.find((x) => x.id === id)
+          setAnchorFocusId(id)
           if (c) goToMissing(c, 'fakturering')
         }}
       />
@@ -3421,6 +3427,25 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onDelete={c.template_id === 'local' ? () => setDeletePrompt(c) : undefined}
               stationCount={stationCountFor(c)}
               onOpenHistory={(tab, unitFilter) => setHistory({ contract: c, tab, unitFilter: unitFilter ?? '' })}
+              canApprove={!!profile?.can_approve_invoices}
+              focusAnchor={anchorFocusId === c.id}
+              adhoc={
+                c.contract_type === 'Avropsavtal' || c.label === 'Avropsavtal'
+                  ? {
+                      customerId: c.customer_id ?? root.id,
+                      value: adhocGroupingOf((customerById.get(c.customer_id ?? '') ?? root).adhoc_invoice_grouping),
+                      canEdit: profile?.role === 'admin' || profile?.role === 'koordinator' || !!profile?.is_admin || !!profile?.is_koordinator,
+                    }
+                  : null
+              }
+              onBillingModeChanged={async () => {
+                setAnchorFocusId(null)
+                setContentReloadKey((k) => k + 1)
+                setBillingPlansKey((k) => k + 1)
+                setWorkReloadKey((k) => k + 1)
+                await onChanged()
+              }}
+              onOpenPlan={() => void openPlanPreview()}
             />
           )
         })()}
@@ -5361,6 +5386,7 @@ function PaperContract({
           planEntries={planEntries}
           onLinkFortnox={onLinkFortnox}
           onOpenSettings={onOpenSettings ? () => onOpenSettings('fakturering') : undefined}
+          adhocGrouping={isAvrop ? adhocGroupingOf((customerById.get(contract.customer_id ?? '') ?? root).adhoc_invoice_grouping) : undefined}
         />
       </div>
 

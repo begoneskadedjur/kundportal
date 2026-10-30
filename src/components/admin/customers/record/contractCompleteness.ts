@@ -107,7 +107,13 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
     !!c.visit_frequency ||
     (followupUnits.length > 0 && followupUnits.every((u) => u.serviceMode === 'on_demand' || !!u.frequency || !!u.visitsPerYear))
   const hasPremium = isAvrop || annual > 0
-  const hasBillingTerms = isAvrop || annual <= 0 || (!!c.billing_frequency && (!!c.billing_anchor_month || c.billing_frequency === 'on_demand'))
+  // Exakt avtalsdag (billing_anchor_mode = 'start_day'): perioderna räknas
+  // från startdatumet, ankarmånaden används inte och krävs därför inte.
+  const exactDay = c.billing_anchor_mode === 'start_day'
+  const hasBillingTerms =
+    isAvrop ||
+    annual <= 0 ||
+    (!!c.billing_frequency && (exactDay ? !!c.contract_start_date : !!c.billing_anchor_month || c.billing_frequency === 'on_demand'))
   const hasTerm = !!start && !!c.notice_period_months && (!!c.contract_end_date || c.renewal_mode === 'rolling' || !c.renewal_mode)
   // Fakturaplanen är ett eget steg: villkoren kan vara satta utan att någon
   // klickat Planera fakturor. Pausad fakturering (gamla kunder som faktureras

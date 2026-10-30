@@ -7,6 +7,7 @@ import {
   reviewChecklist,
   reviewShortDate,
   reviewState,
+  anchorDayRangeText,
   type ReviewInput,
 } from './contractReview'
 
@@ -165,5 +166,40 @@ describe('format', () => {
     expect(formatReviewKr(1234567)).toBe('1 234 567 kr')
     expect(formatReviewKr(null)).toBe('ingen premie')
     expect(reviewShortDate('2026-10-28')).toBe('28 okt')
+  })
+})
+
+describe('avtalsår och tilläggsregler (steg 12)', () => {
+  const snap = buildReviewSnapshot(base)
+
+  it('bild sparad före fälten fanns räknas som oförändrad för ett gammalt avtal', () => {
+    const old = JSON.parse(JSON.stringify(snap)) as Record<string, unknown>
+    delete old.billing_anchor_mode
+    delete old.addon_rules
+    expect(reviewState(parseReviewSnapshot(old), buildReviewSnapshot(base))).toEqual({ state: 'ok', changes: [] })
+  })
+
+  it('byte till avtalsdagen och tillbaka listas', () => {
+    const exact = buildReviewSnapshot(withContract({ billing_anchor_mode: 'start_day' }))
+    expect(reviewState(snap, exact)).toEqual({ state: 'andrad', changes: ['Avtalsåret ändrades till avtalsdagen'] })
+    expect(reviewState(exact, snap).changes).toEqual(['Avtalsåret ändrades till att börja den 1:a'])
+  })
+
+  it('tilläggsreglerna listas', () => {
+    const v2 = buildReviewSnapshot(withContract({ addon_rules: 'v2' }))
+    expect(reviewState(snap, v2).changes).toEqual(['Tilläggsreglerna ändrades till att följa premien'])
+    expect(reviewState(v2, snap).changes).toEqual(['Tilläggsreglerna ändrades tillbaka till som tidigare'])
+  })
+
+  it('checklistan säger avtalsdagen i exakt läge', () => {
+    const s = buildReviewSnapshot(withContract({ billing_anchor_mode: 'start_day', contract_start_date: '2026-06-30' }))
+    expect(reviewChecklist(s, { variant: 'lang', today: '2026-10-28' })[2]).toBe('Fakturaperioden följer avtalsdagen, 30 juni till 29 juni')
+    expect(reviewChecklist(snap, { variant: 'lang', today: '2026-10-28' })[2]).toBe('Fakturaperioden följer avtalsåret, oktober till september')
+  })
+
+  it('avtalsårets text klampar som periodregeln', () => {
+    expect(anchorDayRangeText('2026-01-01')).toBe('1 januari till 31 december')
+    expect(anchorDayRangeText('2024-02-29')).toBe('29 februari till 27 februari')
+    expect(anchorDayRangeText('2025-11-25')).toBe('25 november till 24 november')
   })
 })

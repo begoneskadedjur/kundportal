@@ -35,6 +35,13 @@ export interface ReviewSnapshot {
   organization_number: string | null
   contract_type: string | null
   display_name: string | null
+  /**
+   * Avtalsåret: 'start_day' = följer avtalsdagen, null = börjar den 1:a.
+   * Saknas i bilder sparade före 3.113.0 och läses då som null.
+   */
+  billing_anchor_mode?: string | null
+  /** Tilläggsreglerna: 'v2' = följer premien, null = som tidigare */
+  addon_rules?: string | null
 }
 
 type Num = number | string | null | undefined
@@ -49,6 +56,8 @@ export interface ReviewInput {
     contract_length?: string | null
     contract_type?: string | null
     display_name?: string | null
+    billing_anchor_mode?: string | null
+    addon_rules?: string | null
   }
   premiumEvents?: ReadonlyArray<{ event_type: string; annual_value: Num; effective_from: string }> | null
   customer?: { customer_number?: Num; organization_number?: string | null } | null
@@ -122,6 +131,25 @@ function lengthLabel(v: string | null): string {
   return /^\d+$/.test(v) ? `${v} år` : v
 }
 
+/** "2026-06-30" -> "30 juni" */
+export function anchorDayText(startIso: string): string {
+  const m = Number(startIso.slice(5, 7))
+  const d = Number(startIso.slice(8, 10))
+  return `${d} ${MONTHS[m - 1] ?? ''}`.trim()
+}
+
+/**
+ * Avtalsårets första och sista dag som text: start 2026-06-30 ger
+ * "30 juni till 29 juni", start 2026-01-01 ger "1 januari till 31 december".
+ * Klampning som periodregeln: start 2024-02-29 ger "29 februari till 27 februari".
+ */
+export function anchorDayRangeText(startIso: string): string {
+  const [y, m, d] = startIso.slice(0, 10).split('-').map(Number)
+  const last = new Date(y + 1, m, 0).getDate()
+  const end = new Date(y + 1, m - 1, Math.min(d, last) - 1)
+  return `${d} ${MONTHS[m - 1]} till ${end.getDate()} ${MONTHS[end.getMonth()]}`
+}
+
 function monthLabel(m: number | null): string {
   return m && m >= 1 && m <= 12 ? MONTHS[m - 1] : 'avtalsstarten'
 }
@@ -176,6 +204,8 @@ export function buildReviewSnapshot(input: ReviewInput): ReviewSnapshot {
     organization_number: org ? org.replace(/\D/g, '') || null : null,
     contract_type: text(c.contract_type ?? null),
     display_name: text(c.display_name ?? null),
+    billing_anchor_mode: text(c.billing_anchor_mode ?? null),
+    addon_rules: text(c.addon_rules ?? null),
   }
 }
 
@@ -203,6 +233,8 @@ export function parseReviewSnapshot(raw: unknown): ReviewSnapshot | null {
     organization_number: (r.organization_number as string | null) ?? null,
     contract_type: (r.contract_type as string | null) ?? null,
     display_name: (r.display_name as string | null) ?? null,
+    billing_anchor_mode: (r.billing_anchor_mode as string | null) ?? null,
+    addon_rules: (r.addon_rules as string | null) ?? null,
   }
 }
 
@@ -297,6 +329,20 @@ export function reviewState(snapshot: ReviewSnapshot | null | undefined, current
   if ((s.display_name ?? null) !== (c.display_name ?? null)) {
     changes.push('Avtalets namn ändrades')
   }
+  if ((s.billing_anchor_mode ?? null) !== (c.billing_anchor_mode ?? null)) {
+    changes.push(
+      c.billing_anchor_mode === 'start_day'
+        ? 'Avtalsåret ändrades till avtalsdagen'
+        : 'Avtalsåret ändrades till att börja den 1:a'
+    )
+  }
+  if ((s.addon_rules ?? null) !== (c.addon_rules ?? null)) {
+    changes.push(
+      c.addon_rules === 'v2'
+        ? 'Tilläggsreglerna ändrades till att följa premien'
+        : 'Tilläggsreglerna ändrades tillbaka till som tidigare'
+    )
+  }
 
   return changes.length > 0 ? { state: 'andrad', changes } : { state: 'ok', changes: [] }
 }
@@ -339,7 +385,10 @@ export function reviewChecklist(
       ? `Fortnox-kort ${s.customer_number} stämmer med namn och org.nr`
       : 'Fortnox-kortet stämmer med namn och org.nr'
   )
-  if (lang) {
+  if (lang && s.billing_anchor_mode === 'start_day' && s.contract_start_date) {
+    rows.push(`Fakturaperioden följer avtalsdagen, ${anchorDayRangeText(s.contract_start_date)}`)
+    rows.push('Ingen period är fakturerad tidigare')
+  } else if (lang) {
     const startMonth = s.contract_start_date ? Number(s.contract_start_date.slice(5, 7)) : null
     const anchor = s.billing_anchor_month ?? startMonth
     if (anchor && anchor >= 1 && anchor <= 12) {

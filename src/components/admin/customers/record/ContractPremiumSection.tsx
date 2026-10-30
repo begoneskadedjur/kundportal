@@ -26,6 +26,8 @@ import {
   type RecordContract,
 } from '../../../../hooks/useCustomerRecord'
 import { todayKey } from '../../../../utils/contractLifecycle'
+import { isStartDayMode, nextPeriodStart } from '../../../../shared/contractPeriods'
+import { anchorDayText } from '../../../../shared/contractReview'
 import { PANEL_INPUT_CLASS, PAPER_GEAR_CLASS, PAPER_INPUT_CLASS, PAPER_LINK_CLASS, type PaperInk, type SectionMode } from './paperInk'
 
 type PremiumEvent = CustomerRecordData['premiumEvents'][number]
@@ -54,11 +56,28 @@ const EVENT_LABEL: Record<string, string> = {
  * i. Utan frekvens eller startdatum finns ingen nästa faktura att visa.
  */
 export function nextInvoicePeriodStart(
-  contract: Pick<RecordContract, 'billing_frequency' | 'billing_anchor_month' | 'contract_start_date' | 'start_date' | 'contract_end_date'>,
+  contract: Pick<RecordContract, 'billing_frequency' | 'billing_anchor_month' | 'contract_start_date' | 'start_date' | 'contract_end_date'> & {
+    billing_anchor_mode?: string | null
+  },
   today: string = todayKey()
 ): string | null {
   const start = contract.contract_start_date ?? contract.start_date
   if (!start || !contract.billing_frequency || contract.billing_frequency === 'on_demand') return null
+  // Exakt avtalsdag (steg 12): samma periodregel som planeraren och SQL,
+  // perioderna börjar på avtalsdagen. Gamla läget nedan är oförändrat.
+  if (isStartDayMode({ billing_anchor_mode: contract.billing_anchor_mode ?? null, contract_start_date: contract.contract_start_date })) {
+    const next = nextPeriodStart(
+      {
+        contract_start_date: contract.contract_start_date,
+        billing_frequency: contract.billing_frequency,
+        billing_anchor_month: contract.billing_anchor_month ?? null,
+        billing_anchor_mode: contract.billing_anchor_mode ?? null,
+      },
+      today
+    )
+    if (!next || (contract.contract_end_date && next > contract.contract_end_date)) return null
+    return next
+  }
   const stepMonths =
     contract.billing_frequency === 'monthly'
       ? 1
@@ -151,6 +170,8 @@ interface Props {
   mode?: SectionMode
   /** Kugghjulet i rubriken: öppna panelen på Fakturering */
   onOpenSettings?: () => void
+  /** Avropsavtal: hur kundens ärenden faktureras (customers.adhoc_invoice_grouping). Saknas = raden visas inte. */
+  adhocGrouping?: 'per_case' | 'monthly_batch'
 }
 
 /** Nästa faktura, tillägg och luckor ur fakturaplanen. Delas av § 6 och pulsen. */
@@ -192,6 +213,21 @@ export function premiumSummary(input: {
 
 export const PREMIUM_MONTHS = MONTHS
 
+/**
+ * "årsvis · avtalsdag 30 juni" i exakt läge, annars "årsvis · juli" som
+ * tidigare (eller bara frekvensen när ankarmånad saknas).
+ */
+function billingCadenceText(
+  contract: Pick<RecordContract, 'contract_start_date'> & { billing_anchor_mode?: string | null },
+  frequencyLabel: string,
+  anchor: number | null
+): string {
+  if (contract.billing_anchor_mode === 'start_day' && contract.contract_start_date) {
+    return `${frequencyLabel.toLowerCase()} · avtalsdag ${anchorDayText(contract.contract_start_date)}`
+  }
+  return `${frequencyLabel.toLowerCase()}${anchor ? ` · ${MONTHS[anchor - 1]}` : ''}`
+}
+
 export default function ContractPremiumSection({
   contract,
   premiumEvents,
@@ -208,6 +244,7 @@ export default function ContractPremiumSection({
   onLinkFortnox,
   mode = 'paper',
   onOpenSettings,
+  adhocGrouping,
 }: Props) {
   const settings = mode === 'settings'
   const inputClass = settings ? PANEL_INPUT_CLASS : PAPER_INPUT_CLASS
@@ -335,7 +372,7 @@ export default function ContractPremiumSection({
             {paused
               ? (pausedUntil ? `fakturering pausad till ${pausedUntil}` : 'fakturering pausad tills vidare')
               : frequencyLabel
-                ? `faktureras ${frequencyLabel.toLowerCase()}${anchor ? ` · ${MONTHS[anchor - 1]}` : ''}`
+                ? `faktureras ${billingCadenceText(contract, frequencyLabel, anchor)}`
                 : ''}
           </span>
         </div>
@@ -423,11 +460,21 @@ export default function ContractPremiumSection({
             <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
             <span className="font-sans text-[12px] tabular-nums" style={{ color: frequencyLabel ? ink.secondary : ink.warn }}>
               {frequencyLabel
-                ? `${frequencyLabel.toLowerCase()}${anchor ? ` · ${MONTHS[anchor - 1]}` : ''}`
+                ? billingCadenceText(contract, frequencyLabel, anchor)
                 : 'villkor saknas'}
               {frequencyLabel ? (invoiceMode === 'consolidated' ? ' · på kundens samlingsfaktura' : ' · egen faktura') : ''}
             </span>
           </div>
+          {!settings && adhocGrouping && (
+            <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
+              <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle} />
+              <span className="font-semibold">Ärenden faktureras</span>
+              <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
+              <span className="font-sans text-[12px]" style={{ color: ink.secondary }}>
+                {adhocGrouping === 'monthly_batch' ? 'samlat per månad' : 'per ärende'}
+              </span>
+            </div>
+          )}
           {/* Nästa faktura står på pappret: fel syns på skärmen, inte hos
               kunden. Raderna (som Fortnox får dem) finns i panelen. Talet
               kommer ur fakturaplaneraren på riktiga data, aldrig egen räkning. */}
@@ -508,7 +555,9 @@ export default function ContractPremiumSection({
               </button>
             )}
             <span className="ml-auto text-[10.5px]" style={{ color: ink.muted }}>
-              Perioder börjar den 1:a i ankarmånaden.
+              {isStartDayMode({ billing_anchor_mode: contract.billing_anchor_mode ?? null, contract_start_date: contract.contract_start_date })
+                ? 'Perioder börjar på avtalsdagen, ankarmånaden används inte.'
+                : 'Perioder börjar den 1:a i ankarmånaden.'}
             </span>
           </div>
         </div>

@@ -35,7 +35,16 @@ export interface CustomerContractView {
     next_visit_at: string | null
   }>
   contract_year_start: string
-  premium: { annual_value: number | string | null; billing_frequency: string | null; billing_anchor_month: number | null; next_invoice: string | null }
+  premium: {
+    annual_value: number | string | null
+    billing_frequency: string | null
+    billing_anchor_month: number | null
+    next_invoice: string | null
+    /** 'start_day' = avtalsåret följer avtalsdagen (finns sedan 3.113.0) */
+    billing_anchor_mode?: string | null
+    /** Avtalsdagen (startdatumet) i exakt läge, annars null */
+    anchor_day?: string | null
+  }
   agreement_text: string | null
   account_manager: string | null
 }
@@ -174,7 +183,17 @@ export function CustomerContractPaperView({ view, embedded = false }: { view: Cu
       </Para>
 
       {prem.annual_value != null && (
-        <Para no="§ 4" title="Premie och fakturering" right={prem.billing_anchor_month ? `faktureras i ${MONTHS[prem.billing_anchor_month - 1]}` : undefined}>
+        <Para
+          no="§ 4"
+          title="Premie och fakturering"
+          right={
+            prem.billing_anchor_mode === 'start_day' && prem.anchor_day
+              ? `faktureras på avtalsdagen ${Number(prem.anchor_day.slice(8, 10))} ${MONTHS[Number(prem.anchor_day.slice(5, 7)) - 1]}`
+              : prem.billing_anchor_month
+                ? `faktureras i ${MONTHS[prem.billing_anchor_month - 1]}`
+                : undefined
+          }
+        >
           <Row no="4.1" label="Årspremie" value={<b style={{ color: INK.primary }}>{kr(prem.annual_value)}/år</b>} />
           <Row no="4.2" label="Faktureras" value={`${prem.billing_frequency ? BILLING[prem.billing_frequency] ?? prem.billing_frequency : ''}${prem.next_invoice ? ` · nästa ${dateSv(prem.next_invoice)}` : ''}`} />
         </Para>

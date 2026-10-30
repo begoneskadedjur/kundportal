@@ -21,6 +21,7 @@ const KIND_LABEL: Record<string, string> = {
   premium: 'Årspremie',
   equipment: 'Tilläggsstationer, per år',
   equipment_monthly: 'Tilläggsstationer, per månad',
+  equipment_gap: 'Tillägg från utsättning',
 }
 
 function periodLabel(start: string, end: string) {

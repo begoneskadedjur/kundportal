@@ -411,6 +411,12 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
     if (typeLabel) subParts.push({ key: 'type', text: typeLabel })
     if (invoice.organization_number) subParts.push({ key: 'org', mono: true, text: invoice.organization_number })
     if (invoice.rot_rut_type) subParts.push({ key: 'rotrut', text: invoice.rot_rut_type })
+    // Avtalsfakturor (steg 12): glappfakturan får egen typ, märkningen (Er referens) syns
+    if (invoice.invoice_type === 'contract') {
+      const kind = (invoice as Invoice & { contract_invoice_kind?: string | null }).contract_invoice_kind
+      if (kind === 'equipment_gap') subParts.push({ key: 'kind', text: 'Tillägg från utsättning' })
+      if (invoice.invoice_marking) subParts.push({ key: 'marking', text: `ref ${invoice.invoice_marking}` })
+    }
 
     return (
       <tr key={invoice.id} className="group hover:bg-slate-800/40">

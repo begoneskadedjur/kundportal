@@ -5,6 +5,8 @@ import {
   ChevronDown, ChevronRight, CalendarDays, FileSignature
 } from 'lucide-react'
 import { BILLING_FREQUENCY_CONFIG, type BillingFrequency } from '../../../types/contractBilling'
+import { upcomingImportPeriods } from '../../../shared/importBillingPreview'
+import { toLocalIsoDate } from '../../../shared/contractPlanner'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Select from '../../ui/Select'
@@ -145,28 +147,6 @@ function Field({
   )
 }
 
-/** Beräkna nästa N fakturadatum baserat på ankarmånad och frekvens */
-function getNextBillingDates(anchorMonth: number, frequency: BillingFrequency, count: number): string[] {
-  const config = BILLING_FREQUENCY_CONFIG[frequency]
-  if (!config || frequency === 'on_demand') return []
-  const intervalMonths = config.months
-  const today = new Date()
-  const dates: string[] = []
-  let year = today.getFullYear()
-  let month = anchorMonth
-
-  // Hitta nästa ankarmånad som är >= idag
-  while (dates.length < count) {
-    const d = new Date(year, month - 1, 1)
-    if (d >= today) {
-      dates.push(d.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' }))
-    }
-    month += intervalMonths
-    if (month > 12) { month -= 12; year++ }
-    if (year > today.getFullYear() + 3) break
-  }
-  return dates.slice(0, count)
-}
 
 const formatAmount = (n: number) =>
   new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(n)
@@ -454,8 +434,19 @@ export default function ImportCustomerByOrgnrModal({
     })
   }
 
+  // Samma periodregel som Planera fakturor (steg 12, avtalsåret på avtalsdag)
   const nextBillingDates = preview
-    ? getNextBillingDates(preview.billing_anchor_month, preview.billing_frequency, 4)
+    ? upcomingImportPeriods(
+        {
+          contract_start_date: activeContract?.contract_start_date ?? preview.contract_start_date,
+          contract_end_date: activeContract?.contract_end_date ?? preview.contract_end_date,
+          annual_value: activeContract?.annual_value ?? preview.annual_value,
+          billing_frequency: preview.billing_frequency,
+          billing_anchor_month: preview.billing_anchor_month,
+        },
+        toLocalIsoDate(new Date()),
+        4
+      )
     : []
 
   return (
@@ -959,9 +950,12 @@ export default function ImportCustomerByOrgnrModal({
                 <div>
                   <label className="text-xs font-medium text-slate-400 mb-1 block">Kommande faktureringar</label>
                   {nextBillingDates.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {nextBillingDates.map((d, i) => (
-                        <span key={i} className="text-xs px-2 py-0.5 bg-[#20c58f]/10 border border-[#20c58f]/30 text-[#20c58f] rounded-full">{d}</span>
+                    <div className="space-y-0.5">
+                      {nextBillingDates.map((p) => (
+                        <div key={p.periodStart} className="flex items-center gap-1.5 text-xs text-slate-300 tabular-nums">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#20c58f] flex-shrink-0" aria-hidden />
+                          <span>{p.periodStart} t.o.m. {p.periodEnd}</span>
+                        </div>
                       ))}
                     </div>
                   ) : (

@@ -40,6 +40,9 @@ import ContractTermSection, { termWatch } from './ContractTermSection'
 import ContractPriceListSection from './ContractPriceListSection'
 import { billingModelOf, isAddonLabourLine, MODEL_LABEL, siteOf, type BillingModel } from './ContractEquipmentSection'
 import { useContractContent } from './ContractContentSection'
+import ContractBillingModePanel from './ContractBillingModePanel'
+import AddonCoveragePanel from './AddonCoveragePanel'
+import type { AdhocInvoiceGrouping } from '../../../../services/customerBillingService'
 import { useAvropCatalog } from './ContractPriceListSection'
 import type { HistoryTab } from './ContractHistoryModal'
 import type { UnitFollowup } from './ContractMapSection'
@@ -148,6 +151,17 @@ export interface ContractSettingsDrawerProps {
   onTerminate?: () => void
   onReactivate?: () => void
   onDelete?: () => void
+  // Avtalsår, tilläggsregler och täckning (steg 12, avtalsåret på avtalsdag)
+  /** profiles.can_approve_invoices: byter avtalsår och tilläggsregler, registrerar och efterskänker täckning */
+  canApprove?: boolean
+  /** Arbetslistans Markera avtalsdag: kontrollformuläret öppet direkt */
+  focusAnchor?: boolean
+  /** Avropsavtal: ärendefaktureringen på kundraden som äger avtalet */
+  adhoc?: { customerId: string; value: AdhocInvoiceGrouping; canEdit: boolean } | null
+  /** Efter byte av avtalsår, tilläggsregler, ärendefakturering eller täckning */
+  onBillingModeChanged?: () => void | Promise<void>
+  /** Öppna Planera fakturor (efter bytet) */
+  onOpenPlan?: () => void
   // Puls
   stationCount: { outdoor: number; indoor: number; addon: number } | null
   onOpenHistory: (tab: HistoryTab, unitFilter?: string) => void
@@ -804,9 +818,22 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                 )}
               </>
             )}
+            <AddonCoveragePanel
+              contractId={contract.id}
+              unitIds={Array.from(new Set([...(contract.customer_id ? [contract.customer_id] : []), ...p.followup.units.map((u) => u.unitId)]))}
+              unitNameOf={p.unitNameOf}
+              canApprove={!!p.canApprove}
+              archived={archived}
+              reloadKey={p.contentReloadKey}
+              onChanged={p.onBillingModeChanged}
+            />
             <div className="mt-4 pt-3 border-t border-slate-700">
               <H5>Tilläggen faktureras</H5>
-              <p className="text-[12px] text-slate-300">Egen faktura i samband med avtalets årsfaktura. Tilläggen löper med avtalet och slutar när avtalet slutar.</p>
+              <p className="text-[12px] text-slate-300">
+                {contract.addon_rules === 'v2'
+                  ? 'Med premiens perioder, en faktura per enhetens referenskod. Utan premie årsvis på avtalsdagen. Tilläggen löper med avtalet och slutar när avtalet slutar.'
+                  : 'Egen faktura i samband med avtalets årsfaktura. Tilläggen löper med avtalet och slutar när avtalet slutar.'}
+              </p>
             </div>
           </div>
         )
@@ -831,6 +858,16 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
             <div className="mt-4 pt-3 border-t border-slate-700 text-[12px] text-slate-400">
               Faktureras {p.invoiceMode === 'consolidated' ? 'på kundens samlingsfaktura, som egen rad' : 'på egen faktura'}. Samlingsfakturan styrs av gemet ovanför pappren.
             </div>
+            <ContractBillingModePanel
+              contract={contract}
+              archived={archived}
+              canApprove={!!p.canApprove}
+              oneflowUrl={p.oneflowUrl}
+              adhoc={p.adhoc ?? null}
+              focusAnchor={p.focusAnchor}
+              onChanged={p.onBillingModeChanged ?? (() => undefined)}
+              onOpenPlan={p.onOpenPlan}
+            />
           </div>
         )
       case 'referenser':

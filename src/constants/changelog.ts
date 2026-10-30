@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.113.0',
+    date: '2026-10-30',
+    title: 'Avtalsåret kan följa avtalsdagen',
+    items: [
+      { kind: 'nyhet', text: 'I avtalskartan kan avtalsåret följa avtalsdagen, till exempel 30 juni till 29 juni, i stället för den 1:a. Du ser vilka utkast som får nya datum innan du sparar.' },
+      { kind: 'nyhet', text: 'Varje tilläggsstation visar betald till och med, även för manuella Fortnox-fakturor och efterskänkta debiteringar.' },
+      { kind: 'andring', text: 'Kundkortet och avtalskartan visar om ärenden faktureras per ärende eller samlat per månad.' },
+      { kind: 'buggfix', text: 'Kundens avtalsblad i kundportalen visar avtalet igen. Det föll på ett fel i prislistan.' },
+    ],
+  },
+  {
     version: '3.112.0',
     date: '2026-10-30',
     title: 'Arbetslista på avtalskartan',
