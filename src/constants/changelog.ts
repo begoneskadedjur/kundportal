@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.110.0',
+    date: '2026-10-30',
+    title: 'Skydd mot dubbla avtalsfakturor',
+    items: [
+      { kind: 'andring', text: 'Systemet stoppar nu en avtalsfaktura som skulle täcka samma period som en annan. Felet visas med vilken faktura som redan finns.' },
+    ],
+  },
+  {
     version: '3.109.0',
     date: '2026-10-30',
     title: 'Befintliga kunder sorteras på nyast',
