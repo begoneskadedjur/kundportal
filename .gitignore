@@ -64,3 +64,6 @@ scripts/data/procurement/cn/
 
 # Google Ads: original från Gemini committas inte
 docs/begone-se/ads/bilder/original/
+
+# Regressionsdumpar (kunddata, versionshanteras inte)
+scripts/regression/out/
