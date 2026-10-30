@@ -23,6 +23,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { requireCronSecret } from '../_lib/cronAuth'
 import { withCronLog } from '../_lib/cronLogger'
+// Täckningsnyckeln (typ + månad) och Fortnox-täckningen delas med generatorn
+// och signeringen: src/shared/contractInvoiceMatch.ts
+import { coveredByFortnox, periodKey } from '../../src/shared/contractInvoiceMatch'
 import {
   computePlannedEquipmentPeriods,
   computePlannedMonthlyEquipmentPeriods,
@@ -289,12 +292,6 @@ function buildRows(contract: ContractRow, sources: Sources, p: PlannedPeriod): R
   return rows
 }
 
-/** Täckningsnyckel: fakturatyp + periodstart. Diffen är alltid per typ. */
-function periodKey(kind: string | null | undefined, periodStart: string): string {
-  // Nyckel per MÅNAD: importerade fakturor bär avtalets startdag, planen den 1:a
-  return `${kind ?? 'premium'}|${periodStart.slice(0, 7)}`
-}
-
 /** Perioder som redan har faktura (per avtal, samlat eller Fortnox-import) på kunden, per fakturatyp. */
 async function loadCoveredPeriods(customerId: string): Promise<{
   perContract: Map<string, Set<string>>
@@ -347,10 +344,6 @@ async function loadCoveredPeriods(customerId: string): Promise<{
     perContract.set(cKey, set)
   }
   return { perContract, consolidated, fortnoxRanges }
-}
-
-function coveredByFortnox(p: PlannedPeriod, ranges: Array<{ kind: string; start: string; end: string }>): boolean {
-  return ranges.some((r) => r.kind === (p.kind ?? 'premium') && p.periodStart <= r.end && p.periodEnd >= r.start)
 }
 
 async function generateInvoiceNumber(): Promise<string> {

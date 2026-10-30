@@ -38,6 +38,8 @@
 
     // Delad periodmatematik för årspremiefakturor (generate-continuing-contracts)
     "src/shared/contractPlanner.ts",
+    // Matchningen planerade perioder mot befintliga fakturor (cronen, signeringen)
+    "src/shared/contractInvoiceMatch.ts",
 
     // Avtalsvärde ur Oneflows produkttabell, synlig priskolumn (webhook, synkar, import)
     "src/shared/oneflowProductValue.ts",

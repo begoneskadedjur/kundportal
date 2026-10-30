@@ -14,9 +14,11 @@
 // läser § 6-raderna som de ligger. Alla RPC-anrop går via rpcRead() som bara
 // släpper igenom läsande funktioner.
 //
-// Matchningen är en trogen kopia av koden i src/ och api/ (den är inte
-// exporterad och src/ får inte ändras i steg 1). Varje kopia anger exakt
-// vilken funktion och vilka rader den speglar, mot main f19104e1.
+// Matchningen (buildDiff, monthKey, periodKey, Fortnox-täckningen och
+// statusgrupperna) importeras sedan steg 2 från src/shared/contractInvoiceMatch.ts,
+// samma kod som generatorn, cronen och signeringen kör. Övriga delar är
+// trogna kopior av koden i src/ och api/; varje kopia anger vilken funktion
+// och vilka rader den speglar, mot main f19104e1.
 
 process.env.TZ = 'Europe/Stockholm'
 
@@ -42,6 +44,15 @@ import {
   type PlanningContract,
   type PremiumStep,
 } from '../../src/shared/contractPlanner.ts'
+import {
+  buildContractDiff,
+  coveredByFortnox,
+  EDITABLE_STATUSES,
+  LOCKED_STATUSES,
+  monthKey,
+  periodKey,
+  type ContractDiffEntry,
+} from '../../src/shared/contractInvoiceMatch.ts'
 
 // ---------------------------------------------------------------------------
 // Argument och miljö
@@ -328,26 +339,11 @@ function sourcesFor(contractId: string): Sources {
 // Generatorns matchning (Planera fakturor)
 // ---------------------------------------------------------------------------
 
-// contractInvoiceGenerator.ts rad 269 till 270
-const LOCKED_STATUSES = new Set(['booked', 'sent', 'paid'])
-const EDITABLE_STATUSES = new Set(['draft', 'pending_approval', 'ready'])
-
-/** contractInvoiceGenerator.ts monthKey, rad 317 till 319 */
-function monthKey(iso: string): string {
-  return iso.slice(0, 7)
-}
-
-type GenEntry = {
-  action: string
-  planned?: PlannedPeriod
-  existingId?: string
-  existingStatus?: string
-  existingAmount?: number
-  existingSubtotal?: number
-  reason?: string
-  existingFortnoxNumber?: string | null
-  duplicateIds?: string[]
-}
+// Sedan steg 2 (avtalsår på exakt avtalsdag) bor matchningen i
+// src/shared/contractInvoiceMatch.ts och används direkt här: LOCKED_STATUSES,
+// EDITABLE_STATUSES, monthKey, buildContractDiff (generatorn) och periodKey,
+// coveredByFortnox (cronen).
+type GenEntry = ContractDiffEntry
 
 type ExistingInvoice = Invoice & { has_generic_items: boolean }
 
@@ -385,111 +381,13 @@ function loadConsolidatedPeriodsForContract(customerId: string, contractId: stri
   return map
 }
 
-/** contractInvoiceGenerator.buildDiff, rad 924 till 1093, ordagrant i logiken. */
+/** contractInvoiceGenerator.buildDiff: tunt anrop till den delade buildContractDiff. */
 function buildDiff(
   planned: PlannedPeriod[],
   existing: ExistingInvoice[],
   opts: { real: boolean; compareRows?: boolean; consolidatedPeriods?: Map<string, ExistingInvoice> }
 ): GenEntry[] {
-  const coveredRanges = existing
-    .filter((e) => e.is_historical === true && !!e.invoice_number && e.invoice_number.startsWith('F-') && !!e.billing_period_start && !!e.billing_period_end)
-    .map((e) => ({ start: e.billing_period_start as string, end: e.billing_period_end as string }))
-
-  const overlapShare = (p: PlannedPeriod, r: { start: string; end: string }): number => {
-    const ps = parseLocalDate(p.periodStart).getTime()
-    const pe = parseLocalDate(p.periodEnd).getTime()
-    const os = Math.max(ps, parseLocalDate(r.start).getTime())
-    const oe = Math.min(pe, parseLocalDate(r.end).getTime())
-    if (oe < os || pe <= ps) return 0
-    return (oe - os) / (pe - ps)
-  }
-  const filteredPlanned = coveredRanges.length === 0 ? planned : planned.filter((p) => !coveredRanges.some((r) => overlapShare(p, r) >= 0.5))
-
-  const contractInvoices = existing.filter((e) => e.invoice_type === 'contract' && !(e.invoice_number ?? '').startsWith('F-'))
-  const plannedByKey = new Map(filteredPlanned.map((p) => [monthKey(p.periodStart), p]))
-  const existingByKey = new Map(contractInvoices.filter((e) => e.billing_period_start).map((e) => [monthKey(e.billing_period_start as string), e]))
-
-  const entries: GenEntry[] = []
-  for (const p of filteredPlanned) {
-    const consolidated = opts.consolidatedPeriods?.get(monthKey(p.periodStart))
-    if (consolidated) {
-      entries.push({
-        action: 'consolidated',
-        planned: p,
-        existingId: consolidated.id,
-        existingStatus: consolidated.status ?? undefined,
-        existingAmount: consolidated.total_amount,
-        existingSubtotal: consolidated.subtotal,
-        reason: 'Ligger på kundens samlingsfaktura',
-      })
-      continue
-    }
-    const ex = existingByKey.get(monthKey(p.periodStart))
-    if (!ex) {
-      if (p.isHistorical) {
-        entries.push(
-          opts.real
-            ? { action: 'uncovered', planned: p, reason: 'Passerad period utan faktura i portalen. Importera från Fortnox.' }
-            : { action: 'create-historical', planned: p }
-        )
-      } else {
-        entries.push({ action: 'create', planned: p })
-      }
-      continue
-    }
-    const status = ex.status ?? 'draft'
-    if (p.isHistorical) {
-      if (!opts.real && (status !== 'paid' || !ex.is_historical)) {
-        entries.push({ action: 'backfill-historical-paid', planned: p, existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal })
-      } else {
-        entries.push({ action: 'keep', planned: p, existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal })
-      }
-      continue
-    }
-    if (LOCKED_STATUSES.has(status)) {
-      entries.push({ action: 'locked', planned: p, existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: 'Faktura redan bokförd/skickad/betald' })
-      continue
-    }
-    const amountMatches = Math.abs(Number(ex.subtotal) - p.subtotal) < 0.5
-    const needsItemsRefresh = amountMatches && ex.has_generic_items === true
-    entries.push({ action: amountMatches && !needsItemsRefresh ? 'keep' : 'update', planned: p, existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal })
-  }
-
-  const lastPlannedStart = filteredPlanned.reduce((m, p) => (p.periodStart > m ? p.periodStart : m), '')
-  for (const ex of contractInvoices) {
-    if (!ex.billing_period_start) continue
-    if (plannedByKey.has(monthKey(ex.billing_period_start))) continue
-    const status = ex.status ?? 'draft'
-    if (LOCKED_STATUSES.has(status)) {
-      entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: 'Utanför nuvarande plan men redan bokförd/skickad/betald' })
-    } else if (EDITABLE_STATUSES.has(status)) {
-      const afterPlan = !!lastPlannedStart && monthKey(ex.billing_period_start) > monthKey(lastPlannedStart)
-      entries.push({
-        action: 'delete',
-        existingId: ex.id,
-        existingStatus: status,
-        existingAmount: ex.total_amount,
-        existingSubtotal: ex.subtotal,
-        ...(afterPlan ? { reason: 'Efter nuvarande bindningstid: planeras igen dagen efter sista uppsägningsdag om avtalet inte sägs upp' } : {}),
-      })
-    } else {
-      entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: `Okänd status "${status}" - rör ej` })
-    }
-  }
-
-  const byId = new Map(contractInvoices.map((e) => [e.id, e]))
-  return entries.map((e) => {
-    if (!e.existingId) return e
-    const ex = byId.get(e.existingId)
-    if (!ex) return e
-    const key = ex.billing_period_start ? monthKey(ex.billing_period_start) : null
-    const duplicateIds = key
-      ? contractInvoices
-          .filter((o) => o.id !== ex.id && !!o.billing_period_start && monthKey(o.billing_period_start) === key && EDITABLE_STATUSES.has(o.status ?? 'draft') && !o.fortnox_document_number)
-          .map((o) => o.id)
-      : []
-    return { ...e, existingFortnoxNumber: ex.fortnox_document_number ?? null, ...(duplicateIds.length ? { duplicateIds } : {}) }
-  })
+  return buildContractDiff(planned, existing, opts)
 }
 
 // ---------------------------------------------------------------------------
@@ -816,11 +714,6 @@ function isImported(c: ContractRow): boolean {
   return c.template_id === 'imported' || (c.oneflow_contract_id ?? '').startsWith('imported-')
 }
 
-/** periodKey, rad 293 till 296 */
-function periodKey(kind: string | null | undefined, periodStart: string): string {
-  return `${kind ?? 'premium'}|${periodStart.slice(0, 7)}`
-}
-
 /** loadCoveredPeriods, rad 299 till 350 */
 function loadCoveredPeriods(customerId: string) {
   const perContract = new Map<string, Set<string>>()
@@ -854,11 +747,6 @@ function loadCoveredPeriods(customerId: string) {
     perContract.set(cKey, set)
   }
   return { perContract, consolidated, fortnoxRanges }
-}
-
-/** coveredByFortnox, rad 352 till 354 */
-function coveredByFortnox(p: PlannedPeriod, ranges: Array<{ kind: string; start: string; end: string }>): boolean {
-  return ranges.some((r) => r.kind === (p.kind ?? 'premium') && p.periodStart <= r.end && p.periodEnd >= r.start)
 }
 
 type RowSpec = { line_kind: string; quantity: number; total_price: number }

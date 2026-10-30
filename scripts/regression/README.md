@@ -20,7 +20,7 @@ Innehåll:
   - `cron`: vad `generate-continuing-contracts` skulle göra (skapas, finns, finns_per_avtal, ej_dags, inga_rader, historisk, fortnox, samlad, inom_bindning_ej_rullad) och `refresh_invoice_id` när den skulle byta tilläggsrader på ett utkast,
   - `cron_planned`: cronens period när den skiljer sig från generatorns (annars null).
 
-Matchningen är en trogen kopia av koden i `src/` och `api/` (den är inte exporterad), med rad för rad hänvisning i skriptet. Avvikelser med flit: sync-RPC:erna körs inte, fakturor ordnas på `created_at, id` (PostgREST lämnar ordningen öppen), och synth-kundernas generatorjämförelse görs på bindningsplanen.
+Matchningen (`buildContractDiff`, `monthKey`, `periodKey`, `coveredByFortnox`) importeras sedan steg 2 från `src/shared/contractInvoiceMatch.ts`, samma modul som generatorn, cronen och signeringen använder. Övriga delar (urval, källor, cronens flöde) är trogna kopior av koden i `src/` och `api/`, med rad för rad hänvisning i skriptet. Avvikelser med flit: sync-RPC:erna körs inte, fakturor ordnas på `created_at, id` (PostgREST lämnar ordningen öppen), och synth-kundernas generatorjämförelse görs på bindningsplanen.
 
 ## SQL-funktionerna
 

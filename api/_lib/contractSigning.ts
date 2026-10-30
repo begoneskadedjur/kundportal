@@ -56,7 +56,6 @@ import {
   toLocalIsoDate,
   todayLocal,
   type EquipmentLine,
-  type PlannedPeriod,
   type PlanningContract,
   type PremiumStep,
 } from '../../src/shared/contractPlanner'
@@ -68,6 +67,7 @@ import {
   toInvoiceItemRows,
   type ContractServiceItem,
 } from '../../src/shared/contractInvoiceRows'
+import { fortnoxCovers, monthKey } from '../../src/shared/contractInvoiceMatch'
 import { deriveDeliveryFromContract, type DerivedDelivery } from '../../src/shared/invoiceDelivery'
 import { tolkaIdNummer } from '../../src/shared/webLeadUppgifter'
 import { jamforIdNummer, kundensIdNummer, valideraKundOchOmfattning, type KopplingsKund } from '../../src/shared/avtalsKundKoppling'
@@ -1001,16 +1001,8 @@ async function planInvoices(ctx: Ctx, contract: Row, customerId: string, contrac
         inv.contract_id === contractId ||
         (!inv.contract_id && !inv.is_consolidated) ||
         (!!inv.is_consolidated && items.some((it) => it.contract_id === contractId))
-      if (mine) covered.add(start.slice(0, 7))
+      if (mine) covered.add(monthKey(start))
     }
-  }
-  const overlapShare = (p: PlannedPeriod, r: { start: string; end: string }) => {
-    const ps = parseLocalDate(p.periodStart).getTime()
-    const pe = parseLocalDate(p.periodEnd).getTime()
-    const os = Math.max(ps, parseLocalDate(r.start).getTime())
-    const oe = Math.min(pe, parseLocalDate(r.end).getTime())
-    if (oe < os || pe <= ps) return 0
-    return (oe - os) / (pe - ps)
   }
 
   const sources = { premiumItems, equipment, additionNotes, label, diaryNumber: str(contract.diary_number) }
@@ -1033,9 +1025,9 @@ async function planInvoices(ctx: Ctx, contract: Row, customerId: string, contrac
   }
 
   for (const p of periods) {
-    const key = p.periodStart.slice(0, 7)
+    const key = monthKey(p.periodStart)
     if (covered.has(key)) continue
-    if (fortnoxRanges.some((r) => overlapShare(p, r) >= 0.5)) continue
+    if (fortnoxCovers(p, fortnoxRanges)) continue
     if (p.isHistorical) {
       report.notes.push(`Perioden ${p.periodStart} t.o.m. ${p.periodEnd} har redan passerat utan faktura. Koppla Fortnox-fakturan eller planera den i kartan.`)
       continue
