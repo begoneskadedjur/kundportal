@@ -321,6 +321,8 @@ export interface MapSetupInput {
   notice_period_months: number | null
   visits_per_year?: number | null
   visit_frequency?: string | null
+  /** 'start_day' = avtalsåret följer avtalsdagen; fakturamånaden används då inte (steg 15) */
+  billing_anchor_mode?: string | null
 }
 
 /**
@@ -334,12 +336,91 @@ export function deriveMapSetup(c: MapSetupInput): { updates: { billing_anchor_mo
   const start = c.contract_start_date ?? c.start_date ?? null
   if (!start) missing.push('startdatum')
   if (!c.billing_frequency) missing.push('faktureringsintervall')
-  // Fakturamånad = startmånaden om inget annat sagts (Christian 2026-09-17)
-  if (!c.billing_anchor_month && c.billing_frequency && c.billing_frequency !== 'on_demand' && start) {
+  // Fakturamånad = startmånaden om inget annat sagts (Christian 2026-09-17).
+  // Följer avtalsåret avtalsdagen (steg 15) läses fakturamånaden inte och
+  // sätts därför inte heller.
+  const exact = c.billing_anchor_mode === 'start_day' && !!start
+  if (!exact && !c.billing_anchor_month && c.billing_frequency && c.billing_frequency !== 'on_demand' && start) {
     const m = Number(start.slice(5, 7))
     if (m >= 1 && m <= 12) updates.billing_anchor_month = m
   }
   if (c.notice_period_months == null) missing.push('uppsägningstid')
   if (!c.visits_per_year && !c.visit_frequency) missing.push('besöksfrekvens och schema (§ 3)')
   return { updates, missing }
+}
+
+// --- Nya avtal: avtalsdag och tilläggsregler från början (steg 15) ------------
+
+/**
+ * Avtal som signeras från och med den här dagen får avtalsdagen och de nya
+ * tilläggsreglerna direkt vid signeringen (steg 15 i
+ * docs/planer/avtalsar-exakt-arsdag-teknik.md). Avtal signerade före dagen
+ * ändras aldrig av signeringen, inte heller vid en omkörning; de ställs om i
+ * datastegen 18 och 19.
+ */
+export const NEW_CONTRACT_RULES_FROM = '2026-10-30'
+
+/** Kontrollmarkeringens anteckning när startdatumet kommer ur Oneflow vid signering */
+export const SIGNING_ANCHOR_NOTE = 'Startdatum ur Oneflow vid signering'
+
+export interface NewContractRulesInput {
+  /** Signeringsdag ÅÅÅÅ-MM-DD (contracts.signed_at, eller idag när den sätts nu) */
+  signed_at: string | null
+  /** Avtalets startdatum ur Oneflow (contract_start_date, annars start_date) */
+  start_date: string | null
+  billing_anchor_mode: string | null
+  billing_anchor_verified_at: string | null
+  addon_rules: string | null
+  /** Avtalet har redan låsta fakturor (skickade, betalda): räknas som befintligt */
+  has_locked_invoices: boolean
+  /** Någon har redan valt avtalsår eller tilläggsregler i kartan (contract_events) */
+  has_manual_choice: boolean
+  /**
+   * Vad databasen säger att ett nytt avtal på kunden får för tilläggsregler
+   * (contract_default_addon_rules): 'v2', eller null när kunden har ett annat
+   * levande avtal med de gamla reglerna.
+   */
+  default_addon_rules: string | null
+}
+
+export interface NewContractRules {
+  /** Fälten som skrivs på avtalsraden (tomt = inget skrivs) */
+  updates: {
+    billing_anchor_mode?: 'start_day'
+    billing_anchor_verified_note?: string
+    addon_rules?: 'v2'
+  }
+  /** Kontrollmarkeringen sätts (verified_at = nu, skrivs av anroparen) */
+  verify: boolean
+  /** Varför något inte sattes (till rapporten) */
+  notes: string[]
+}
+
+/**
+ * Avgör om ett nyss signerat avtal ska få avtalsdagen och de nya
+ * tilläggsreglerna. Rör aldrig ett avtal som redan har något av fälten, som
+ * har låsta fakturor, där någon gjort ett val i kartan eller som signerades
+ * före NEW_CONTRACT_RULES_FROM.
+ */
+export function newContractBillingRules(c: NewContractRulesInput): NewContractRules {
+  const out: NewContractRules = { updates: {}, verify: false, notes: [] }
+  const signed = (c.signed_at ?? '').slice(0, 10)
+  if (!signed || signed < NEW_CONTRACT_RULES_FROM) return out
+  if (c.billing_anchor_mode || c.billing_anchor_verified_at || c.addon_rules) return out
+  if (c.has_manual_choice || c.has_locked_invoices) return out
+
+  const start = (c.start_date ?? '').slice(0, 10)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(start)) {
+    out.updates.billing_anchor_mode = 'start_day'
+    out.updates.billing_anchor_verified_note = SIGNING_ANCHOR_NOTE
+    out.verify = true
+  } else {
+    out.notes.push('Avtalsåret följer inte avtalsdagen: startdatum saknas i Oneflow-avtalet. Sätt startdatum och välj avtalsår under Fakturering i kartan.')
+  }
+  if (c.default_addon_rules === 'v2') {
+    out.updates.addon_rules = 'v2'
+  } else {
+    out.notes.push('Tilläggen faktureras som tidigare: kunden har ett annat levande avtal med de gamla tilläggsreglerna. Byt under Fakturering i kartan när alla kundens avtal ska följa premien.')
+  }
+  return out
 }

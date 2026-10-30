@@ -1269,6 +1269,12 @@ export class ContractScopeService {
 
     const nextOrder = await this.nextDisplayOrder(customerId)
     const typeName = input.contractType ?? input.label ?? null
+    // Steg 15: ett nytt avtal följer avtalsdagen från början, och tilläggen
+    // följer premien när kunden inte har andra levande avtal med de gamla
+    // reglerna (contract_default_addon_rules). Valet syns och ändras under
+    // Fakturering i kartan. Kontrollmarkeringen sätts inte här: startdatumet
+    // fylls i på pappret och markeras av den som har befogenheten.
+    const addonRules = await this.defaultAddonRulesFor(customerId)
     const { data: created, error } = await supabase
       .from('contracts')
       .insert({
@@ -1290,6 +1296,8 @@ export class ContractScopeService {
         price_list_id: customer.price_list_id ?? null,
         billing_active: true,
         display_order: nextOrder,
+        billing_anchor_mode: 'start_day',
+        addon_rules: addonRules,
       })
       .select('id')
       .single()
@@ -1298,9 +1306,21 @@ export class ContractScopeService {
     await this.logEvent(created.id, {
       event_type: 'other',
       title: 'Avtalet skapat',
-      detail: 'Skapat i avtalskartan (tomt avtalsblad)',
+      detail:
+        'Skapat i avtalskartan (tomt avtalsblad). Avtalsåret följer avtalsdagen' +
+        (addonRules === 'v2' ? ' och tilläggen följer premien.' : '; tilläggen faktureras som tidigare eftersom kunden har ett annat avtal med de gamla reglerna.'),
     })
     return created.id
+  }
+
+  /**
+   * Tilläggsregler för ett nytt avtal på kunden (steg 15): 'v2' eller null.
+   * Fel ger null, alltså de gamla reglerna (säkert läge).
+   */
+  static async defaultAddonRulesFor(customerId: string): Promise<'v2' | null> {
+    const { data, error } = await supabase.rpc('contract_default_addon_rules', { p_customer_id: customerId })
+    if (error) return null
+    return data === 'v2' ? 'v2' : null
   }
 
   /**

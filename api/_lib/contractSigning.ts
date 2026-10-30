@@ -36,6 +36,8 @@ import {
   identityNumberVariants,
   isIndividualParty,
   isOurChainContract,
+  newContractBillingRules,
+  NEW_CONTRACT_RULES_FROM,
   pickContractService,
   premiumExclVatFromOneflow,
   PREMIUM_REVIEW_NOTE,
@@ -88,6 +90,9 @@ export interface SigningReport {
   customerId: string | null
   customerCreated: boolean
   invoicesCreated: number
+  /** Avtalsår och tilläggsregler efter behandlingen (steg 15); saknas när avtalet hoppades över */
+  billingAnchorMode?: string | null
+  addonRules?: string | null
   /** Vad som gjordes (eller skulle göras vid dryRun) */
   actions: string[]
   /** Det som ska kontrolleras: hamnar i notisen till faktureringsansvariga */
@@ -489,6 +494,12 @@ export async function processSignedContract(
     }
   }
 
+  // --- Steg 15: avtalsdag och nya tilläggsregler för nya avtal ---
+  // Före kartan och fakturaplanen, så att båda räknar från avtalsdagen.
+  if (customer.customerId) {
+    await applyNewContractRules(ctx, contract, customer.customerId, lockedInvoices)
+  }
+
   // --- G: avtalskartan (vår kedja) ---
   if (ourChain && customer.customerId) {
     await setUpContractMap(ctx, contract, customer.customerId)
@@ -509,7 +520,85 @@ export async function processSignedContract(
     await notifyInvoiceApprovers(ctx, contract, customer.customerId)
   }
 
+  report.billingAnchorMode = str(contract.billing_anchor_mode)
+  report.addonRules = str(contract.addon_rules)
   return report
+}
+
+/**
+ * Steg 15: avtal som signeras från och med NEW_CONTRACT_RULES_FROM får
+ * avtalsdagen (startdatumet ur Oneflow, markerat som kontrollerat) och de nya
+ * tilläggsreglerna. Regeln är newContractBillingRules; här läses underlaget
+ * och fälten skrivs med service role (steg 12:s vakt släpper igenom den).
+ * Avtal som redan har något av fälten, har låsta fakturor eller där någon
+ * valt i kartan rörs aldrig, inte heller vid omkörning.
+ */
+async function applyNewContractRules(ctx: Ctx, contract: Row, customerId: string, lockedInvoices: boolean): Promise<void> {
+  const { db, report } = ctx
+  const contractId = String(contract.id)
+  const signedAt = str(contract.signed_at)
+  // Billig spärr först: gamla avtal och avtal som redan har fälten läser inget mer
+  if (!signedAt || signedAt.slice(0, 10) < NEW_CONTRACT_RULES_FROM) return
+  if (str(contract.billing_anchor_mode) || str(contract.billing_anchor_verified_at) || str(contract.addon_rules)) return
+
+  const [{ data: events }, defaultRules] = await Promise.all([
+    db
+      .from('contract_events')
+      .select('id')
+      .eq('contract_id', contractId)
+      .eq('event_type', 'billing')
+      .in('title', ['Avtalsår', 'Tilläggsregler'])
+      .limit(1),
+    readDefaultAddonRules(db, customerId, contractId),
+  ])
+  const rules = newContractBillingRules({
+    signed_at: signedAt,
+    start_date: str(contract.contract_start_date) ?? str(contract.start_date),
+    billing_anchor_mode: str(contract.billing_anchor_mode),
+    billing_anchor_verified_at: str(contract.billing_anchor_verified_at),
+    addon_rules: str(contract.addon_rules),
+    has_locked_invoices: lockedInvoices,
+    has_manual_choice: ((events ?? []) as Row[]).length > 0,
+    default_addon_rules: defaultRules,
+  })
+  report.notes.push(...rules.notes)
+  if (Object.keys(rules.updates).length === 0) return
+
+  const update: Record<string, unknown> = { ...rules.updates }
+  if (rules.verify) update.billing_anchor_verified_at = new Date().toISOString()
+  // Ramavtal: avtalsdagen ska inte skrivas över av ramavtalets startdatum
+  // (samma regel som contract_set_billing_anchor_mode i steg 12)
+  const overrides = Array.isArray(contract.framework_overrides) ? (contract.framework_overrides as string[]) : []
+  if (rules.updates.billing_anchor_mode && str(contract.framework_id) && !overrides.includes('contract_start_date')) {
+    update.framework_overrides = [...overrides, 'contract_start_date']
+  }
+  const start = str(contract.contract_start_date) ?? str(contract.start_date)
+  const parts: string[] = []
+  if (rules.updates.billing_anchor_mode) parts.push(`avtalsåret följer avtalsdagen ${start} (startdatum ur Oneflow)`)
+  if (rules.updates.addon_rules) parts.push('tilläggen följer premien (nya tilläggsregler)')
+  const text = parts.join(', ')
+
+  await write(ctx, `Nytt avtal: ${text}`, async () => {
+    must(await db.from('contracts').update(update).eq('id', contractId), 'Avtalsår och tilläggsregler')
+    const { error } = await db.from('contract_events').insert({
+      contract_id: contractId,
+      event_type: 'billing',
+      title: 'Avtalsår och tilläggsregler vid signering',
+      detail: `${text.charAt(0).toUpperCase()}${text.slice(1)}.`,
+      metadata: { source: 'signing', ...rules.updates },
+      created_by_name: 'Signeringen',
+    })
+    if (error) report.notes.push(`Händelseloggen kunde inte skrivas: ${error.message}`)
+  })
+  Object.assign(contract, update)
+}
+
+/** contract_default_addon_rules; fel eller okänd kund ger gamla regler (säkert läge) */
+async function readDefaultAddonRules(db: Db, customerId: string, contractId: string): Promise<string | null> {
+  if (customerId === '(ny kund)') return 'v2'
+  const { data, error } = await db.rpc('contract_default_addon_rules', { p_customer_id: customerId, p_exclude_contract_id: contractId })
+  if (error) return null
+  return typeof data === 'string' ? data : null
 }
 
 async function hasLockedInvoices(db: Db, contractId: string): Promise<boolean> {
@@ -804,6 +893,7 @@ async function setUpContractMap(ctx: Ctx, contract: Row, customerId: string): Pr
     notice_period_months: num(contract.notice_period_months),
     visits_per_year: num(contract.visits_per_year),
     visit_frequency: str(contract.visit_frequency),
+    billing_anchor_mode: str(contract.billing_anchor_mode),
   })
   if (setup.updates.billing_anchor_month) {
     const m = setup.updates.billing_anchor_month

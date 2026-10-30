@@ -6,6 +6,9 @@ import {
   identityNumberVariants,
   isIndividualParty,
   isOurChainContract,
+  newContractBillingRules,
+  NEW_CONTRACT_RULES_FROM,
+  SIGNING_ANCHOR_NOTE,
   pickContractService,
   premiumExclVatFromOneflow,
   selectSourceRowsCoveredByContract,
@@ -244,5 +247,73 @@ describe('avtalskartans uppsättning', () => {
     expect(
       deriveMapSetup({ contract_start_date: '2026-10-14', billing_frequency: 'quarterly', billing_anchor_month: 1, notice_period_months: 3, visit_frequency: 'quarterly' })
     ).toEqual({ updates: {}, missing: [] })
+  })
+})
+
+describe('steg 15: nya avtal får avtalsdag och nya tilläggsregler', () => {
+  const base = {
+    signed_at: '2026-11-03',
+    start_date: '2026-11-17',
+    billing_anchor_mode: null,
+    billing_anchor_verified_at: null,
+    addon_rules: null,
+    has_locked_invoices: false,
+    has_manual_choice: false,
+    default_addon_rules: 'v2',
+  }
+
+  it('nytt avtal med startdatum ur Oneflow: avtalsdag, kontrollerad, v2', () => {
+    const r = newContractBillingRules(base)
+    expect(r.updates).toEqual({ billing_anchor_mode: 'start_day', billing_anchor_verified_note: SIGNING_ANCHOR_NOTE, addon_rules: 'v2' })
+    expect(r.verify).toBe(true)
+    expect(r.notes).toEqual([])
+  })
+  it('signerat samma dag som go live räknas som nytt', () => {
+    expect(newContractBillingRules({ ...base, signed_at: NEW_CONTRACT_RULES_FROM }).updates.billing_anchor_mode).toBe('start_day')
+  })
+  it('signerat före go live rörs aldrig, inte heller vid omkörning', () => {
+    const r = newContractBillingRules({ ...base, signed_at: '2026-10-29' })
+    expect(r).toEqual({ updates: {}, verify: false, notes: [] })
+    expect(newContractBillingRules({ ...base, signed_at: null }).updates).toEqual({})
+  })
+  it('avtal som redan har något av fälten, låsta fakturor eller ett val i kartan rörs inte', () => {
+    expect(newContractBillingRules({ ...base, billing_anchor_mode: 'start_day' }).updates).toEqual({})
+    expect(newContractBillingRules({ ...base, billing_anchor_verified_at: '2026-11-01T10:00:00+01:00' }).updates).toEqual({})
+    expect(newContractBillingRules({ ...base, addon_rules: 'v2' }).updates).toEqual({})
+    expect(newContractBillingRules({ ...base, has_locked_invoices: true }).updates).toEqual({})
+    expect(newContractBillingRules({ ...base, has_manual_choice: true }).updates).toEqual({})
+  })
+  it('startdatum saknas: ingen avtalsdag men v2, med förklaring', () => {
+    const r = newContractBillingRules({ ...base, start_date: null })
+    expect(r.updates).toEqual({ addon_rules: 'v2' })
+    expect(r.verify).toBe(false)
+    expect(r.notes[0]).toContain('startdatum saknas')
+  })
+  it('kunden har ett annat levande avtal med gamla regler: avtalsdag men inte v2', () => {
+    const r = newContractBillingRules({ ...base, default_addon_rules: null })
+    expect(r.updates).toEqual({ billing_anchor_mode: 'start_day', billing_anchor_verified_note: SIGNING_ANCHOR_NOTE })
+    expect(r.notes[0]).toContain('gamla tilläggsreglerna')
+  })
+  it('deriveMapSetup: avtalsdag sätter ingen fakturamånad och saknar inte fakturamånad', () => {
+    const r = deriveMapSetup({
+      contract_start_date: '2026-11-17',
+      billing_frequency: 'annual',
+      billing_anchor_month: null,
+      notice_period_months: 2,
+      visit_frequency: 'quarterly',
+      billing_anchor_mode: 'start_day',
+    })
+    expect(r).toEqual({ updates: {}, missing: [] })
+  })
+  it('deriveMapSetup: avtalsdag utan startdatum faller tillbaka och saknar startdatum', () => {
+    const r = deriveMapSetup({
+      contract_start_date: null,
+      billing_frequency: 'annual',
+      billing_anchor_month: null,
+      notice_period_months: 2,
+      visit_frequency: 'quarterly',
+      billing_anchor_mode: 'start_day',
+    })
+    expect(r).toEqual({ updates: {}, missing: ['startdatum'] })
   })
 })

@@ -1120,13 +1120,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           today
         )
         toast.success(
-          `Nytt avtal${typeName ? ` (${typeName})` : ''} skapat med alla ${locations.length} enheter i § 1. Fyll i årspremie i § 6 och löptid i § 8.`
+          `Nytt avtal${typeName ? ` (${typeName})` : ''} skapat med alla ${locations.length} enheter i § 1. Fyll i årspremie i § 6 och löptid i § 8. Avtalsåret följer avtalsdagen, valet finns under Fakturering.`
         )
       } else {
         const unit = customerById.get(payload.unitId)
         await ContractScopeService.addSite(contractId, payload.unitId, today)
         toast.success(
-          `Nytt avtal${typeName ? ` (${typeName})` : ''} skapat med ${unit ? customerRowName(unit) : 'enheten'} i § 1 från idag. Fyll i årspremie i § 6 och löptid i § 8.`
+          `Nytt avtal${typeName ? ` (${typeName})` : ''} skapat med ${unit ? customerRowName(unit) : 'enheten'} i § 1 från idag. Fyll i årspremie i § 6 och löptid i § 8. Avtalsåret följer avtalsdagen, valet finns under Fakturering.`
         )
       }
       await onChanged()

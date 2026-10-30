@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.114.0',
+    date: '2026-10-30',
+    title: 'Nya avtal följer avtalsdagen',
+    items: [
+      { kind: 'andring', text: 'Nya avtal faktureras från avtalsdagen och tilläggsstationerna följer premiens takt från början. Startdatumet hämtas ur Oneflow när avtalet signeras.' },
+    ],
+  },
+  {
     version: '3.113.0',
     date: '2026-10-30',
     title: 'Avtalsåret kan följa avtalsdagen',
