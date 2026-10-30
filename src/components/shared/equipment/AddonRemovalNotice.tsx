@@ -4,6 +4,7 @@
 // Inga krediteringar och ingen blockering: andra klicket tar bort.
 
 import type { AddonRemovalGuard } from '../../../hooks/useAddonRemovalGuard'
+import { addonPaidThroughLabel } from '../../../types/addonStations'
 
 interface Props {
   guard: AddonRemovalGuard
@@ -30,7 +31,7 @@ export default function AddonRemovalNotice({ guard, className = '' }: Props) {
         <span className="mt-1.5 w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" aria-hidden />
         <div className="min-w-0 text-sm leading-relaxed">
           <p className="font-medium text-amber-400">
-            Betald till och med {info.paid_through}
+            {addonPaidThroughLabel(info)} {info.paid_through}
           </p>
           <p className="text-slate-300 mt-0.5">
             Kunden får ingen återbetalning om den tas bort nu, och den faktureras inte längre från{' '}

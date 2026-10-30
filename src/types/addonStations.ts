@@ -179,9 +179,56 @@ export interface AddonPaidThrough {
   paid_through?: string | null
   /** ÅÅÅÅ-MM-DD, dagen då stationen annars hade fakturerats igen */
   next_billing_from?: string | null
-  source?: 'prorata' | 'invoice' | null
-  /** Ärendenummer eller fakturanummer som täcker perioden */
+  /**
+   * Varifrån betald t.o.m. kommer. prorata/invoice när svaret räknas på
+   * dagens sätt; när stationen har täckningsrader (addon_station_coverage)
+   * källan på raden som slutar sist, där waived betyder efterskänkt.
+   */
+  source?: 'prorata' | 'invoice' | 'gap_invoice' | 'fortnox_manual' | 'waived' | 'backfill' | null
+  /** Ärendenummer, fakturanummer eller Fortnox-nummer som täcker perioden */
   reference?: string | null
   /** Pro rata-raden väntar fortfarande på ett öppet ärende */
   not_billed_yet?: boolean
+  /** Satt när svaret kommer från täckningsraderna (steg 8), annars saknas fältet */
+  from_coverage?: boolean
+  /** En täckningsrad hör till en makulerad faktura och väntar på Fakturera igen eller Efterskänk */
+  cancelled_unresolved?: boolean
+}
+
+/** Rubriken för betald t.o.m.: efterskänkta dagar är inte betalda. */
+export function addonPaidThroughLabel(info: Pick<AddonPaidThrough, 'source'> | null | undefined): string {
+  return info?.source === 'waived' ? 'Efterskänkt till och med' : 'Betald till och med'
+}
+
+/** En rad i täckningspanelen (RPC addon_station_coverage_list). */
+export interface AddonCoverageListRow {
+  id: string
+  station_id: string
+  station_kind: 'outdoor' | 'indoor'
+  unit_customer_id: string
+  unit_name: string | null
+  contract_id: string | null
+  /** ÅÅÅÅ-MM-DD */
+  covered_from: string
+  /** ÅÅÅÅ-MM-DD, inklusive */
+  covered_to: string
+  source: 'invoice' | 'prorata' | 'gap_invoice' | 'fortnox_manual' | 'waived' | 'backfill'
+  invoice_id: string | null
+  invoice_number: string | null
+  case_billing_item_id: string | null
+  case_number: string | null
+  fortnox_document_number: string | null
+  reference: string | null
+  invoice_cancelled_at: string | null
+  note: string | null
+  created_by_name: string | null
+  created_at: string
+  released_at: string | null
+  release_reason: string | null
+}
+
+/** Ett glapp i täckningen, båda datumen inklusive (ÅÅÅÅ-MM-DD). */
+export interface AddonCoverageGap {
+  gap_from: string
+  gap_to: string
 }

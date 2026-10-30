@@ -332,6 +332,8 @@ export class AddonStationBillingService {
    * Hur långt fram en tilläggsstation redan är fakturerad. Används av
    * varningen vid borttag. SECURITY DEFINER-RPC: fungerar för tekniker.
    * Null vid fel (varningen visas då inte, borttaget blockeras aldrig).
+   * Har stationen täckningsrader läses de först (from_coverage, källa,
+   * cancelled_unresolved); annars samma svar som före täckningsmotorn.
    */
   static async getPaidThrough(stationId: string, indoor: boolean): Promise<AddonPaidThrough | null> {
     const { data, error } = await supabase.rpc('addon_station_paid_through', {
