@@ -46,12 +46,23 @@ import {
 } from '../../src/shared/contractPlanner.ts'
 import {
   buildContractDiff,
+  consolidationGroupKey,
   coveredByFortnox,
+  cronFortnoxCovers,
   EDITABLE_STATUSES,
+  findPlannedFor,
+  fortnoxCovers,
+  isCovered,
   LOCKED_STATUSES,
+  matchModeFor,
+  matchPeriods,
   monthKey,
   periodKey,
+  periodOverlapShare,
+  SAME_PERIOD_SHARE,
   type ContractDiffEntry,
+  type ExistingRange,
+  type MatchMode,
 } from '../../src/shared/contractInvoiceMatch.ts'
 
 // ---------------------------------------------------------------------------
@@ -72,6 +83,10 @@ if (!/^\d{4}-\d{2}-\d{2}$/.test(TODAY)) {
   process.exit(2)
 }
 const OUT_DIR = arg('out-dir') ?? join(here, 'out')
+// Steg 7: --exact=<id-prefix>,<id-prefix> sätter billing_anchor_mode = 'start_day'
+// på de avtalen I MINNET (aldrig i databasen), för provet "exakt läge utan dubbletter".
+// --exact=all tar alla levande avtal. Vaktprovet skrivs till match-check-*.json.
+const EXACT_PREFIXES = (arg('exact') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
 const GIT_SHA = execSync('git rev-parse --short=8 HEAD', { cwd: repoRoot, encoding: 'utf8' }).trim()
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
@@ -216,6 +231,14 @@ console.log(`Läser prod (endast SELECT), idag = ${TODAY}, sha = ${GIT_SHA}`)
 const contracts = await selectAll<ContractRow>('contracts', CONTRACT_COLS, (q) =>
   q.eq('type', 'contract').in('status', ['signed', 'active'])
 )
+const exactIds: string[] = []
+for (const c of contracts) {
+  if (EXACT_PREFIXES.some((p) => p === 'all' || c.id.startsWith(p))) {
+    c.billing_anchor_mode = 'start_day'
+    exactIds.push(c.id)
+  }
+}
+if (EXACT_PREFIXES.length) console.log(`Exakt läge i minnet för ${exactIds.length} avtal: ${exactIds.sort(byStr).join(', ')}`)
 const customers = await selectAll<CustomerRow>(
   'customers',
   'id, parent_customer_id, contract_invoice_mode, annual_value, contract_start_date, contract_end_date, terminated_at, effective_end_date, billing_frequency, billing_anchor_month, billing_active, notice_period_months'
@@ -371,22 +394,95 @@ function loadExisting(customerId: string, contractId: string | null, opts?: { co
     }))
 }
 
-/** contractInvoiceGenerator.loadConsolidatedPeriodsForContract, rad 887 till 895 */
-function loadConsolidatedPeriodsForContract(customerId: string, contractId: string): Map<string, ExistingInvoice> {
-  const map = new Map<string, ExistingInvoice>()
-  for (const inv of loadExisting(customerId, null, { consolidated: true })) {
-    if (!inv.billing_period_start) continue
-    if (inv.invoice_items.some((it) => it.contract_id === contractId)) map.set(monthKey(inv.billing_period_start), inv)
-  }
-  return map
+/** contractInvoiceGenerator.loadConsolidatedPeriodsForContract (steg 7: en lista i hämtordning) */
+function loadConsolidatedPeriodsForContract(customerId: string, contractId: string): ExistingInvoice[] {
+  return loadExisting(customerId, null, { consolidated: true }).filter(
+    (inv) => !!inv.billing_period_start && inv.invoice_items.some((it) => it.contract_id === contractId)
+  )
 }
+
+// ---------------------------------------------------------------------------
+// Steg 7: gamla och nya matchningen sida vid sida
+// ---------------------------------------------------------------------------
+
+/**
+ * Den gamla månadsnyckeln ordagrant (buildContractDiff före steg 7, rad 964 till
+ * 967 och 1035 till 1037): planerad period -> befintlig, och vilka befintliga som
+ * blir "utan motsvarande plan". Fryst kopia, jämförs med matchPeriods(..., 'legacy').
+ */
+function frozenMonthKeyMatch(planned: PlannedPeriod[], existing: ExistingInvoice[]) {
+  const contractInvoices = existing.filter((e) => e.invoice_type === 'contract' && !(e.invoice_number ?? '').startsWith('F-'))
+  const plannedByKey = new Map(planned.map((p) => [monthKey(p.periodStart), p]))
+  const existingByKey = new Map(
+    contractInvoices.filter((e) => e.billing_period_start).map((e) => [monthKey(e.billing_period_start as string), e])
+  )
+  const pairs = planned.map((p) => existingByKey.get(monthKey(p.periodStart))?.id ?? null)
+  const unmatched = contractInvoices
+    .filter((e) => e.billing_period_start && !plannedByKey.has(monthKey(e.billing_period_start)))
+    .map((e) => e.id)
+  return { pairs, unmatched }
+}
+
+/**
+ * Planens variant av legacy-läget (avsnitt 5 steg 1 till 3): först par på
+ * överlapp (minst hälften), sedan månadsreserv för de omatchade. Byggdes INTE
+ * (se teknikplanen, steg 7); räknas här för att visa hur många matchningar den
+ * hade ändrat.
+ */
+function planVariantMatch(planned: PlannedPeriod[], existing: ExistingInvoice[]) {
+  const ci = existing.filter((e) => e.invoice_type === 'contract' && !(e.invoice_number ?? '').startsWith('F-') && e.billing_period_start)
+  const ranges = ci.map((e) => ({ id: e.id, start: e.billing_period_start as string, end: e.billing_period_end ?? (e.billing_period_start as string) }))
+  const ov = matchPeriods(planned.map((p) => ({ start: p.periodStart, end: p.periodEnd })), ranges, 'overlap')
+  const pairs = planned.map((_, i) => (ov.pairs.has(i) ? ci[ov.pairs.get(i)!].id : null))
+  const used = new Set(pairs.filter(Boolean))
+  planned.forEach((p, i) => {
+    if (pairs[i]) return
+    const hit = ci.find((e) => !used.has(e.id) && monthKey(e.billing_period_start as string) === monthKey(p.periodStart))
+    if (hit) {
+      pairs[i] = hit.id
+      used.add(hit.id)
+    }
+  })
+  return { pairs, unmatched: ci.filter((e) => !used.has(e.id)).map((e) => e.id) }
+}
+
+const matchCheck = { calls: 0, legacy_calls: 0, legacy_diffs: [] as unknown[], plan_variant_diffs: [] as unknown[] }
 
 /** contractInvoiceGenerator.buildDiff: tunt anrop till den delade buildContractDiff. */
 function buildDiff(
   planned: PlannedPeriod[],
   existing: ExistingInvoice[],
-  opts: { real: boolean; compareRows?: boolean; consolidatedPeriods?: Map<string, ExistingInvoice> }
+  opts: { real: boolean; compareRows?: boolean; consolidatedInvoices?: ExistingInvoice[]; mode?: MatchMode }
 ): GenEntry[] {
+  matchCheck.calls++
+  if ((opts.mode ?? 'legacy') === 'legacy') {
+    matchCheck.legacy_calls++
+    // Samma Fortnox-filter som buildContractDiff i legacy-läget
+    const fr = existing
+      .filter((e) => e.is_historical === true && (e.invoice_number ?? '').startsWith('F-') && e.billing_period_start && e.billing_period_end)
+      .map((e) => ({ start: e.billing_period_start as string, end: e.billing_period_end as string }))
+    const fp = fr.length ? planned.filter((p) => !fortnoxCovers(p, fr, 'legacy')) : planned
+    const old = frozenMonthKeyMatch(fp, existing)
+    const ci = existing.filter((e) => e.invoice_type === 'contract' && !(e.invoice_number ?? '').startsWith('F-') && e.billing_period_start)
+    const now = matchPeriods(
+      fp.map((p) => ({ start: p.periodStart, end: p.periodEnd })),
+      ci.map((e) => ({ id: e.id, start: e.billing_period_start as string, end: e.billing_period_end ?? (e.billing_period_start as string) })),
+      'legacy'
+    )
+    const nowPairs = fp.map((_, i) => (now.pairs.has(i) ? ci[now.pairs.get(i)!].id : null))
+    const nowUnmatched = now.unmatchedExisting.map((j) => ci[j].id)
+    const same = JSON.stringify([old.pairs, old.unmatched]) === JSON.stringify([nowPairs, nowUnmatched])
+    if (!same) matchCheck.legacy_diffs.push({ planned: fp.map((p) => p.periodStart), old, now: { pairs: nowPairs, unmatched: nowUnmatched } })
+    const pv = planVariantMatch(fp, existing)
+    if (JSON.stringify([old.pairs, old.unmatched]) !== JSON.stringify([pv.pairs, pv.unmatched])) {
+      matchCheck.plan_variant_diffs.push({
+        planned: fp.map((p) => `${p.periodStart}..${p.periodEnd}`),
+        existing: ci.map((e) => `${e.id.slice(0, 8)} ${e.status} ${e.billing_period_start}..${e.billing_period_end}`),
+        old,
+        plan_variant: pv,
+      })
+    }
+  }
   return buildContractDiff(planned, existing, opts)
 }
 
@@ -560,7 +656,8 @@ function genEquipment(contract: ContractRow, sources: Sources, customerId: strin
     window: 'binding',
     today: TODAY,
   })
-  const eqEntries = buildDiff(eqPlanned, loadExisting(customerId, contract.id, { kind: 'equipment' }), { real: true })
+  const mode = matchModeFor(contract)
+  const eqEntries = buildDiff(eqPlanned, loadExisting(customerId, contract.id, { kind: 'equipment' }), { real: true, mode })
   recordFortnoxCovered('contract', owner, contract.id, customerId, eqPlanned, eqEntries)
   for (const e of eqEntries) {
     addGenEntry('contract', owner, contract.id, customerId, 'equipment', e, invoiceById)
@@ -573,7 +670,7 @@ function genEquipment(contract: ContractRow, sources: Sources, customerId: strin
   })
   const existingMonthly = loadExisting(customerId, contract.id, { kind: 'equipment_monthly' })
   if (monthly.length > 0 || existingMonthly.length > 0) {
-    const mEntries = buildDiff(monthly, existingMonthly, { real: true })
+    const mEntries = buildDiff(monthly, existingMonthly, { real: true, mode })
     recordFortnoxCovered('contract', owner, contract.id, customerId, monthly, mEntries)
     for (const e of mEntries) {
       addGenEntry('contract', owner, contract.id, customerId, 'equipment_monthly', e, invoiceById)
@@ -586,8 +683,8 @@ function genPlanForContract(contract: ContractRow, customerId: string) {
   const sources = sourcesFor(contract.id)
   const planned = computePlannedPeriods(contract, { ...genPlanOpts(sources), equipmentMode: 'separate' })
   const existing = loadExisting(customerId, contract.id, { kind: 'premium' })
-  const consolidatedPeriods = loadConsolidatedPeriodsForContract(customerId, contract.id)
-  const entries = buildDiff(planned, existing, { real: true, consolidatedPeriods })
+  const consolidatedInvoices = loadConsolidatedPeriodsForContract(customerId, contract.id)
+  const entries = buildDiff(planned, existing, { real: true, consolidatedInvoices, mode: matchModeFor(contract) })
   recordFortnoxCovered('contract', contract.id, contract.id, customerId, planned, entries)
   for (const e of entries) {
     addGenEntry('contract', contract.id, contract.id, customerId, 'premium', e, invoiceById)
@@ -624,7 +721,7 @@ function genConsolidated(headId: string) {
   const family = liveContractsForFamily(headId)
   const groups = new Map<string, ContractRow[]>()
   for (const c of family) {
-    const key = `${c.billing_frequency ?? ''}|${c.billing_anchor_month ?? ''}`
+    const key = consolidationGroupKey(c)
     groups.set(key, [...(groups.get(key) ?? []), c])
   }
   for (const [gkey, group] of groups) {
@@ -633,6 +730,7 @@ function genConsolidated(headId: string) {
       genPlanForContract(group[0], headId)
       continue
     }
+    const mode = matchModeFor(group[0])
     const owner = `${headId}|${gkey}`
     const byPeriod = new Map<string, PlannedPeriod>()
     for (const contract of group) {
@@ -658,17 +756,28 @@ function genConsolidated(headId: string) {
     const planned = [...byPeriod.values()]
       .sort((a, b) => byStr(a.periodStart, b.periodStart))
       .map((p, i, arr) => ({ ...p, sequenceNumber: i + 1, totalSequenceCount: arr.length }))
-    const entries = buildDiff(planned, loadExisting(headId, null, { consolidated: true }), { real: true, compareRows: true })
+    const entries = buildDiff(planned, loadExisting(headId, null, { consolidated: true }), { real: true, compareRows: true, mode })
     recordFortnoxCovered('consolidated', owner, null, headId, planned, entries)
     const groupIds = new Set(group.map((c) => c.id))
+    // planConsolidatedForCustomer coversSlot (steg 7)
+    const coversSlot = (ex: ExistingInvoice): string | null => {
+      if (!ex.billing_period_start) return null
+      if (mode === 'legacy') return byPeriod.has(ex.billing_period_start) ? ex.billing_period_start : null
+      const exRange = { start: ex.billing_period_start, end: ex.billing_period_end ?? ex.billing_period_start }
+      for (const [start, slot] of byPeriod) {
+        if (periodOverlapShare({ start, end: slot.periodEnd }, exRange) >= SAME_PERIOD_SHARE) return start
+      }
+      return null
+    }
     for (const ex of loadExisting(headId, null).filter((e) => e.contract_id && groupIds.has(e.contract_id))) {
-      if (!ex.billing_period_start || !byPeriod.has(ex.billing_period_start)) continue
+      const slotStart = coversSlot(ex)
+      if (!slotStart) continue
       const status = ex.status ?? 'draft'
       if (EDITABLE_STATUSES.has(status)) {
         entries.push({ action: 'delete', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: 'Ersätts av samlingsfakturan' })
       } else if (LOCKED_STATUSES.has(status)) {
         entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: 'Redan skickad per avtal, samlingsfakturan hoppar över perioden' })
-        const idx = entries.findIndex((en) => en.planned?.periodStart === ex.billing_period_start && en.action === 'create')
+        const idx = entries.findIndex((en) => en.planned?.periodStart === slotStart && en.action === 'create')
         if (idx >= 0) entries.splice(idx, 1)
       }
     }
@@ -719,6 +828,7 @@ function loadCoveredPeriods(customerId: string) {
   const perContract = new Map<string, Set<string>>()
   const consolidated = new Set<string>()
   const fortnoxRanges: Array<{ kind: string; start: string; end: string }> = []
+  const ranges: CronRange[] = []
   const rows = (invoicesByCustomer.get(customerId) ?? [])
     .filter((i) => i.invoice_type === 'contract' || i.invoice_type === 'adhoc')
     .filter((i) => i.status !== null && i.status !== 'cancelled')
@@ -731,13 +841,16 @@ function loadCoveredPeriods(customerId: string) {
     }
     if (inv.invoice_type !== 'contract') continue
     const key = periodKey(kind, inv.billing_period_start)
+    const range = { id: inv.id, status: inv.status, invoice_number: inv.invoice_number, start: inv.billing_period_start, end: inv.billing_period_end ?? inv.billing_period_start, kind }
     if (inv.is_consolidated) {
       consolidated.add(key)
+      ranges.push({ ...range, owner: '__consolidated__' })
       for (const it of inv.invoice_items) {
         if (!it.contract_id) continue
         const set = perContract.get(it.contract_id) ?? new Set<string>()
         set.add(key)
         perContract.set(it.contract_id, set)
+        ranges.push({ ...range, owner: it.contract_id })
       }
       continue
     }
@@ -745,8 +858,16 @@ function loadCoveredPeriods(customerId: string) {
     const set = perContract.get(cKey) ?? new Set<string>()
     set.add(key)
     perContract.set(cKey, set)
+    ranges.push({ ...range, owner: cKey })
   }
-  return { perContract, consolidated, fortnoxRanges }
+  return { perContract, consolidated, fortnoxRanges, ranges }
+}
+
+/** Cronens CoveredRange och rangesFor (steg 7) */
+type CronRange = ExistingRange & { owner: string; kind: string }
+type CronCovered = ReturnType<typeof loadCoveredPeriods>
+function rangesFor(covered: CronCovered, owners: string[], kind: string): CronRange[] {
+  return covered.ranges.filter((r) => owners.includes(r.owner) && r.kind === kind)
 }
 
 type RowSpec = { line_kind: string; quantity: number; total_price: number }
@@ -783,13 +904,18 @@ function buildRows(contract: ContractRow, sources: Sources, p: PlannedPeriod): R
 type CronPlanned = { contract: ContractRow; sources: Sources; periods: PlannedPeriod[]; equipmentPeriods: PlannedPeriod[] }
 
 /** createPerContract, rad 529 till 559 */
-function cronCreatePerContract(pl: { contract: ContractRow; sources: Sources; periods: PlannedPeriod[] }, perContract: Map<string, Set<string>>) {
-  const own = perContract.get(pl.contract.id) ?? new Set<string>()
-  const legacy = perContract.get('__none__') ?? new Set<string>()
+function cronCreatePerContract(pl: { contract: ContractRow; sources: Sources; periods: PlannedPeriod[] }, covered: CronCovered) {
+  const own = covered.perContract.get(pl.contract.id) ?? new Set<string>()
+  const legacy = covered.perContract.get('__none__') ?? new Set<string>()
+  const mode = matchModeFor(pl.contract)
   for (const p of pl.periods) {
     const key = periodKey(p.kind, p.periodStart)
+    const exists =
+      mode === 'overlap'
+        ? isCovered({ start: p.periodStart, end: p.periodEnd }, rangesFor(covered, [pl.contract.id, '__none__'], p.kind ?? 'premium'), 'overlap')
+        : own.has(key) || legacy.has(key)
     let action: string
-    if (own.has(key) || legacy.has(key)) action = 'finns'
+    if (exists) action = 'finns'
     else if (!isDueForCreation(p, TODAY)) action = 'ej_dags'
     else if (buildRows(pl.contract, pl.sources, p).length === 0) action = 'inga_rader'
     else action = 'skapas'
@@ -805,10 +931,15 @@ function cronRefresh(pl: CronPlanned) {
   const editable = invoices.filter(
     (i) => i.contract_id === pl.contract.id && i.invoice_type === 'contract' && ['draft', 'pending_approval', 'ready'].includes(i.status ?? '')
   )
+  const mode = matchModeFor(pl.contract)
   for (const inv of editable) {
     if (inv.is_consolidated || !inv.billing_period_start) continue
     const kind = inv.contract_invoice_kind ?? 'premium'
-    const plannedPeriod = [...pl.periods, ...pl.equipmentPeriods].find((p) => (p.kind ?? 'premium') === kind && p.periodStart === inv.billing_period_start)
+    const plannedPeriod = findPlannedFor(
+      [...pl.periods, ...pl.equipmentPeriods].filter((p) => (p.kind ?? 'premium') === kind),
+      { start: inv.billing_period_start, end: inv.billing_period_end },
+      mode
+    )
     if (!plannedPeriod) continue
     const rows = buildRows(pl.contract, pl.sources, plannedPeriod)
     const existingRows = inv.invoice_items
@@ -834,7 +965,8 @@ function cronForCustomerContracts(customer: CustomerRow, list: ContractRow[]) {
         setCron('contract', contract.id, contract.id, contract.customer_id, p, 'historisk')
         return false
       }
-      if (coveredByFortnox(p, covered.fortnoxRanges)) {
+      // Skarpa körningen (v2 av): cronFortnoxCovers med v2 = false
+      if (cronFortnoxCovers(p, covered.fortnoxRanges, { mode: matchModeFor(contract), v2: false })) {
         setCron('contract', contract.id, contract.id, contract.customer_id, p, 'fortnox')
         return false
       }
@@ -842,22 +974,23 @@ function cronForCustomerContracts(customer: CustomerRow, list: ContractRow[]) {
     }
     planned.push({ contract, sources, periods: all.filter(keep), equipmentPeriods: allEq.filter(keep) })
   }
-  for (const pl of planned) cronCreatePerContract({ contract: pl.contract, sources: pl.sources, periods: pl.equipmentPeriods }, covered.perContract)
+  for (const pl of planned) cronCreatePerContract({ contract: pl.contract, sources: pl.sources, periods: pl.equipmentPeriods }, covered)
   for (const pl of planned) cronRefresh(pl)
 
   if (consolidatedMode) {
     const groups = new Map<string, CronPlanned[]>()
     for (const pl of planned) {
-      const key = `${pl.contract.billing_frequency ?? ''}|${pl.contract.billing_anchor_month ?? ''}`
+      const key = consolidationGroupKey(pl.contract)
       groups.set(key, [...(groups.get(key) ?? []), pl])
     }
     for (const [gkey, group] of groups) {
       if (group.length === 1) {
         // Cronen anropar här createPerContract utan today (rad 490), alltså
         // verklig dag. Skriptet använder --today för att vara deterministiskt.
-        cronCreatePerContract(group[0], covered.perContract)
+        cronCreatePerContract(group[0], covered)
         continue
       }
+      const groupMode = matchModeFor(group[0].contract)
       const owner = `${customer.id}|${gkey}`
       const byPeriod = new Map<string, { p: PlannedPeriod; rowCount: number }>()
       for (const pl of group) {
@@ -874,9 +1007,16 @@ function cronForCustomerContracts(customer: CustomerRow, list: ContractRow[]) {
       }
       for (const [periodStart, slot] of byPeriod) {
         const key = periodKey('premium', periodStart)
+        const range = { start: periodStart, end: slot.p.periodEnd }
+        const consHas =
+          groupMode === 'overlap' ? isCovered(range, rangesFor(covered, ['__consolidated__'], 'premium'), 'overlap') : covered.consolidated.has(key)
+        const perHas =
+          groupMode === 'overlap'
+            ? group.some((pl) => isCovered(range, rangesFor(covered, [pl.contract.id], 'premium'), 'overlap'))
+            : group.some((pl) => covered.perContract.get(pl.contract.id)?.has(key))
         let action: string
-        if (covered.consolidated.has(key)) action = 'finns'
-        else if (group.some((pl) => covered.perContract.get(pl.contract.id)?.has(key))) action = 'finns_per_avtal'
+        if (consHas) action = 'finns'
+        else if (perHas) action = 'finns_per_avtal'
         else if (!isDueForCreation(slot.p, TODAY)) action = 'ej_dags'
         else if (slot.rowCount === 0) action = 'inga_rader'
         else action = 'skapas'
@@ -885,7 +1025,7 @@ function cronForCustomerContracts(customer: CustomerRow, list: ContractRow[]) {
     }
     return
   }
-  for (const pl of planned) cronCreatePerContract(pl, covered.perContract)
+  for (const pl of planned) cronCreatePerContract(pl, covered)
 }
 
 /** generateForSynthCustomer, rad 641 till 685 */
@@ -1070,7 +1210,111 @@ writeFileSync(filePath, body, 'utf8')
 const hash = createHash('sha256').update(body, 'utf8').digest('hex')
 writeFileSync(`${filePath}.sha256`, `${hash}  ${fileName}\n`, 'utf8')
 
+// ---------------------------------------------------------------------------
+// Steg 7: vaktprov och matchningskontroll (egen fil, påverkar inte dumpen)
+// ---------------------------------------------------------------------------
+
+/**
+ * Simulerar databasens överlappsvakt (guard_contract_invoice_overlap) mot det
+ * generatorn och cronen föreslår: efter generatorns delete och update (nya
+ * datum), prövas varje create mot kvarvarande fakturor i samma omfång (samma
+ * avtal och typ, eller kundens samlingsfakturor). Stopp = andel minst hälften
+ * mot vilken faktura som helst, eller överlapp alls mot ett utkast (inte låst,
+ * inte F-). Cronens 'skapas' prövas mot fakturorna som de ligger.
+ */
+function guardSimulation() {
+  const isLocked = (i: { status: string | null; invoice_number: string | null }) =>
+    LOCKED_STATUSES.has(i.status ?? '') || (i.invoice_number ?? '').startsWith('F-')
+  const scopeOf = (r: Row): Invoice[] =>
+    invoices.filter(
+      (i) =>
+        i.invoice_type === 'contract' &&
+        i.status !== 'cancelled' &&
+        (i.contract_invoice_kind ?? 'premium') === r.kind &&
+        i.billing_period_start &&
+        (r.owner_type === 'consolidated'
+          ? i.is_consolidated === true && i.customer_id === r.customer_id
+          : r.contract_id !== null && i.contract_id === r.contract_id && i.is_consolidated !== true)
+    )
+  const deleted = new Set(rows.filter((r) => r.generator?.action === 'delete').map((r) => r.generator!.existing_id))
+  const moved = new Map<string, { start: string; end: string }>()
+  for (const r of rows) {
+    if (r.generator?.action === 'update' && r.generator.existing_id && r.planned) {
+      moved.set(r.generator.existing_id, { start: r.planned.periodStart, end: r.planned.periodEnd })
+    }
+  }
+  const stops: Array<Record<string, unknown>> = []
+  const check = (r: Row, who: 'generator' | 'cron', after: boolean) => {
+    if (!r.planned) return
+    const p = { start: r.planned.periodStart, end: r.planned.periodEnd }
+    for (const inv of scopeOf(r)) {
+      if (after && deleted.has(inv.id)) continue
+      const range = (after && moved.get(inv.id)) || { start: inv.billing_period_start as string, end: inv.billing_period_end ?? (inv.billing_period_start as string) }
+      const share = periodOverlapShare(p, range)
+      if (share <= 0) continue
+      if (share >= SAME_PERIOD_SHARE || !isLocked(inv)) {
+        stops.push({
+          who,
+          owner: r.owner_id,
+          kind: r.kind,
+          planned: `${p.start}..${p.end}`,
+          against: `${inv.invoice_number ?? inv.id} ${inv.status} ${range.start}..${range.end}`,
+          share: Math.round(share * 1000) / 1000,
+          against_locked: isLocked(inv),
+        })
+      }
+    }
+  }
+  let genCreates = 0
+  let cronCreates = 0
+  for (const r of rows) {
+    if (r.generator?.action === 'create' && r.owner_type !== 'synth') {
+      genCreates++
+      check(r, 'generator', true)
+    }
+    if (r.cron?.action === 'skapas' && r.owner_type !== 'synth') {
+      cronCreates++
+      check(r, 'cron', false)
+    }
+  }
+  return { generator_creates: genCreates, cron_creates: cronCreates, stops }
+}
+
+const guard = guardSimulation()
+const exactRows = rows.filter((r) => r.contract_id && exactIds.includes(r.contract_id))
+const checkBody =
+  JSON.stringify(
+    {
+      meta: { kind: 'match-check', today: TODAY, git_sha: GIT_SHA, exact_contracts: exactIds.sort(byStr) },
+      match: {
+        buildDiff_calls: matchCheck.calls,
+        legacy_calls: matchCheck.legacy_calls,
+        legacy_differences: matchCheck.legacy_diffs.length,
+        plan_variant_differences: matchCheck.plan_variant_diffs.length,
+        legacy_diffs: matchCheck.legacy_diffs,
+        plan_variant_diffs: matchCheck.plan_variant_diffs,
+      },
+      guard,
+      exact_rows: exactRows.map((r) => ({
+        contract_id: r.contract_id,
+        owner: `${r.owner_type}:${r.owner_id}`,
+        kind: r.kind,
+        period: `${r.periodStart}..${r.periodEnd}`,
+        generator: r.generator ? `${r.generator.action}${r.generator.existing_id ? ` ${r.generator.existing_id.slice(0, 8)} ${r.generator.existing_status}` : ''}` : null,
+        cron: r.cron?.action ?? null,
+      })),
+    },
+    null,
+    1
+  ) + '\n'
+const checkPath = join(OUT_DIR, `match-check-${TODAY}-${GIT_SHA}.json`)
+writeFileSync(checkPath, checkBody, 'utf8')
+
 console.log(`Skrev ${filePath}`)
+console.log(
+  `Matchning: ${matchCheck.legacy_calls} legacy-anrop, skillnader mot gamla månadsnyckeln: ${matchCheck.legacy_diffs.length}; planens variant (överlapp + månadsreserv) hade ändrat ${matchCheck.plan_variant_diffs.length}`
+)
+console.log(`Vaktprov: ${guard.generator_creates} create (generatorn), ${guard.cron_creates} skapas (cronen), stopp: ${guard.stops.length}. Se ${checkPath}`)
 console.log(`Avtal: ${contracts.length} (cronen väljer ${dump.meta.counts.cron_selected_contracts}), synth-kunder: ${synthSummaries.length}, rader: ${rows.length}`)
 console.log(`Generatorn: ${JSON.stringify(dump.meta.counts.generator_actions)}`)
 console.log(`Cronen: ${JSON.stringify(dump.meta.counts.cron_actions)}, byter tilläggsrader: ${dump.meta.counts.cron_refresh}`)

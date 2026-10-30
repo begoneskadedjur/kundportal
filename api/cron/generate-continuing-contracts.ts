@@ -32,9 +32,25 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { requireCronSecret } from '../_lib/cronAuth'
 import { withCronLog } from '../_lib/cronLogger'
-// Täckningsnyckeln (typ + månad) och Fortnox-täckningen delas med generatorn
-// och signeringen: src/shared/contractInvoiceMatch.ts
-import { coveredByFortnox, periodKey } from '../../src/shared/contractInvoiceMatch'
+// Täckningsnyckeln (typ + månad), överlappsmatchningen och Fortnox-täckningen
+// delas med generatorn och signeringen: src/shared/contractInvoiceMatch.ts
+//
+// Steg 7 (avtalsåret på exakt avtalsdag): avtal med billing_anchor_mode =
+// 'start_day' matchas på datumöverlapp (isCovered, findPlannedFor) och får
+// generatorns Fortnox-regel; övriga avtal matchas på månad som förut. Med v2
+// (torrkörningen, CONTINUING_CONTRACTS_V2) får även övriga avtal generatorns
+// Fortnox-regel (minst halva perioden) i stället för "varje överlapp". Den
+// skarpa körningen utan v2 är oförändrad för alla avtal utan exakt avtalsdag.
+import {
+  consolidationGroupKey,
+  coveredByFortnox,
+  cronFortnoxCovers,
+  findPlannedFor,
+  isCovered,
+  matchModeFor,
+  periodKey,
+  type ExistingRange,
+} from '../../src/shared/contractInvoiceMatch'
 import {
   computePlannedEquipmentPeriods,
   computePlannedMonthlyEquipmentPeriods,
@@ -338,20 +354,34 @@ function buildRows(contract: ContractRow, sources: Sources, p: PlannedPeriod): R
   return rows
 }
 
-/** Perioder som redan har faktura (per avtal, samlat eller Fortnox-import) på kunden, per fakturatyp. */
-async function loadCoveredPeriods(customerId: string): Promise<{
+/** En befintlig faktura som intervall: ägare = avtalets id, '__none__' (utan avtal) eller '__consolidated__'. */
+type CoveredRange = ExistingRange & { owner: string; kind: string }
+
+type Covered = {
   perContract: Map<string, Set<string>>
   consolidated: Set<string>
   fortnoxRanges: Array<{ kind: string; start: string; end: string }>
-}> {
+  /** Samma fakturor som intervall, för avtal med exakt avtalsdag (steg 7) */
+  ranges: CoveredRange[]
+}
+
+/** Befintliga fakturor för givna ägare och en fakturatyp, som intervall. */
+function rangesFor(covered: Covered, owners: string[], kind: string): CoveredRange[] {
+  return covered.ranges.filter((r) => owners.includes(r.owner) && r.kind === kind)
+}
+
+/** Perioder som redan har faktura (per avtal, samlat eller Fortnox-import) på kunden, per fakturatyp. */
+async function loadCoveredPeriods(customerId: string): Promise<Covered> {
   const { data } = await supabase
     .from('invoices')
-    .select('id, invoice_number, invoice_type, is_historical, is_consolidated, contract_id, contract_invoice_kind, billing_period_start, billing_period_end, invoice_items(contract_id)')
+    .select('id, invoice_number, invoice_type, is_historical, is_consolidated, contract_id, contract_invoice_kind, billing_period_start, billing_period_end, status, invoice_items(contract_id)')
     .eq('customer_id', customerId)
     .in('invoice_type', ['contract', 'adhoc'])
     // Makulerade fakturor täcker ingen period (samma regel som planeraren)
     .neq('status', 'cancelled')
   type Inv = {
+    id: string
+    status: string | null
     invoice_number: string | null
     invoice_type: string | null
     is_historical: boolean | null
@@ -365,6 +395,7 @@ async function loadCoveredPeriods(customerId: string): Promise<{
   const perContract = new Map<string, Set<string>>()
   const consolidated = new Set<string>()
   const fortnoxRanges: Array<{ kind: string; start: string; end: string }> = []
+  const ranges: CoveredRange[] = []
   for (const inv of (data ?? []) as Inv[]) {
     if (!inv.billing_period_start) continue
     const kind = inv.contract_invoice_kind ?? 'premium'
@@ -374,13 +405,23 @@ async function loadCoveredPeriods(customerId: string): Promise<{
     }
     if (inv.invoice_type !== 'contract') continue
     const key = periodKey(kind, inv.billing_period_start)
+    const range = {
+      id: inv.id,
+      status: inv.status,
+      invoice_number: inv.invoice_number,
+      start: inv.billing_period_start,
+      end: inv.billing_period_end ?? inv.billing_period_start,
+      kind,
+    }
     if (inv.is_consolidated) {
       consolidated.add(key)
+      ranges.push({ ...range, owner: '__consolidated__' })
       for (const it of inv.invoice_items ?? []) {
         if (!it.contract_id) continue
         const set = perContract.get(it.contract_id) ?? new Set<string>()
         set.add(key)
         perContract.set(it.contract_id, set)
+        ranges.push({ ...range, owner: it.contract_id })
       }
       continue
     }
@@ -388,8 +429,9 @@ async function loadCoveredPeriods(customerId: string): Promise<{
     const set = perContract.get(cKey) ?? new Set<string>()
     set.add(key)
     perContract.set(cKey, set)
+    ranges.push({ ...range, owner: cKey })
   }
-  return { perContract, consolidated, fortnoxRanges }
+  return { perContract, consolidated, fortnoxRanges, ranges }
 }
 
 async function generateInvoiceNumber(): Promise<string> {
@@ -509,6 +551,7 @@ async function generateForCustomerContracts(ctx: RunCtx, customer: CustomerRow, 
   const planned: Planned[] = []
   for (const contract of contracts) {
     const sources = await loadSources(ctx, contract.id)
+    const fortnoxOpts = { mode: matchModeFor(contract), v2: ctx.v2 }
     const planOpts = {
       steps: sources.steps,
       equipment: sources.equipment,
@@ -519,19 +562,19 @@ async function generateForCustomerContracts(ctx: RunCtx, customer: CustomerRow, 
     }
     const periods = computePlannedPeriods(contract, { ...planOpts, equipmentMode: sources.equipmentInvoiceMode })
       // Aldrig passerade perioder från cronen: de importeras från Fortnox
-      .filter((p) => !p.isHistorical && !coveredByFortnox(p, covered.fortnoxRanges))
+      .filter((p) => !p.isHistorical && !cronFortnoxCovers(p, covered.fortnoxRanges, fortnoxOpts))
     // Egna tilläggsfakturor: per år när avtalet fakturerar utrustning separat, per månad alltid
     const equipmentPeriods = [
       ...(sources.equipmentInvoiceMode === 'separate' ? computePlannedEquipmentPeriods(contract, planOpts) : []),
       ...computePlannedMonthlyEquipmentPeriods(contract, planOpts),
-    ].filter((p) => !p.isHistorical && !coveredByFortnox(p, covered.fortnoxRanges))
+    ].filter((p) => !p.isHistorical && !cronFortnoxCovers(p, covered.fortnoxRanges, fortnoxOpts))
     planned.push({ contract, sources, periods, equipmentPeriods })
   }
 
   let created = 0
   // Tilläggsfakturor samlas aldrig: alltid per avtal
   for (const pl of planned) {
-    created += await createPerContract(ctx, customer, orgNr, { contract: pl.contract, sources: pl.sources, periods: pl.equipmentPeriods }, covered.perContract, today)
+    created += await createPerContract(ctx, customer, orgNr, { contract: pl.contract, sources: pl.sources, periods: pl.equipmentPeriods }, covered, today)
   }
   // Redigerbara fakturor vars utrustningsrader avviker från dagens antal
   for (const pl of planned) {
@@ -540,17 +583,20 @@ async function generateForCustomerContracts(ctx: RunCtx, customer: CustomerRow, 
   }
 
   if (consolidatedMode) {
-    // Grupp = alla avtal med samma frekvens och ankarmånad
+    // Grupp = alla avtal med samma frekvens och ankarmånad (exakt avtalsdag:
+    // frekvens och avtalsdag), samma nyckel som generatorn
     const groups = new Map<string, Planned[]>()
     for (const pl of planned) {
-      const key = `${pl.contract.billing_frequency ?? ''}|${pl.contract.billing_anchor_month ?? ''}`
+      const key = consolidationGroupKey(pl.contract)
       groups.set(key, [...(groups.get(key) ?? []), pl])
     }
     for (const group of groups.values()) {
       if (group.length === 1) {
-        created += await createPerContract(ctx, customer, orgNr, group[0], covered.perContract)
+        created += await createPerContract(ctx, customer, orgNr, group[0], covered)
         continue
       }
+      // Alla avtal i gruppen har samma läge (nyckeln skiljer lägena åt)
+      const groupMode = matchModeFor(group[0].contract)
       const byPeriod = new Map<string, { p: PlannedPeriod; rows: RowSpec[]; labels: string[] }>()
       for (const pl of group) {
         for (const p of pl.periods) {
@@ -565,10 +611,16 @@ async function generateForCustomerContracts(ctx: RunCtx, customer: CustomerRow, 
         }
       }
       for (const [periodStart, slot] of byPeriod) {
-        const key = periodKey('premium', periodStart)
-        if (covered.consolidated.has(key)) continue
-        // Perioden redan fakturerad per avtal (t.ex. innan gemet slogs på): hoppa över
-        if (group.some((pl) => covered.perContract.get(pl.contract.id)?.has(key))) continue
+        if (groupMode === 'overlap') {
+          const range = { start: periodStart, end: slot.p.periodEnd }
+          if (isCovered(range, rangesFor(covered, ['__consolidated__'], 'premium'), 'overlap')) continue
+          if (group.some((pl) => isCovered(range, rangesFor(covered, [pl.contract.id], 'premium'), 'overlap'))) continue
+        } else {
+          const key = periodKey('premium', periodStart)
+          if (covered.consolidated.has(key)) continue
+          // Perioden redan fakturerad per avtal (t.ex. innan gemet slogs på): hoppa över
+          if (group.some((pl) => covered.perContract.get(pl.contract.id)?.has(key))) continue
+        }
         // Förlängning: direkt. Annars när fakturadatumet är inne (ledtiden).
         if (!dueToday(slot.p, today)) continue
         const ok = await insertInvoice(ctx, customer, orgNr, slot.p, slot.rows, {
@@ -583,7 +635,7 @@ async function generateForCustomerContracts(ctx: RunCtx, customer: CustomerRow, 
     return created
   }
 
-  for (const pl of planned) created += await createPerContract(ctx, customer, orgNr, pl, covered.perContract)
+  for (const pl of planned) created += await createPerContract(ctx, customer, orgNr, pl, covered)
   return created
 }
 
@@ -592,15 +644,22 @@ async function createPerContract(
   customer: CustomerRow,
   orgNr: string | null,
   pl: { contract: ContractRow; sources: Sources; periods: PlannedPeriod[] },
-  perContract: Map<string, Set<string>>,
+  covered: Covered,
   today: string = toLocalIsoDate(todayLocal())
 ): Promise<number> {
   let created = 0
-  const own = perContract.get(pl.contract.id) ?? new Set<string>()
-  const legacy = perContract.get('__none__') ?? new Set<string>()
+  const own = covered.perContract.get(pl.contract.id) ?? new Set<string>()
+  const legacy = covered.perContract.get('__none__') ?? new Set<string>()
+  // legacy: typ + månad som förut; exakt avtalsdag: datumöverlapp
+  const mode = matchModeFor(pl.contract)
   for (const p of pl.periods) {
-    const key = periodKey(p.kind, p.periodStart)
-    if (own.has(key) || legacy.has(key)) continue
+    if (mode === 'overlap') {
+      const existing = rangesFor(covered, [pl.contract.id, '__none__'], p.kind ?? 'premium')
+      if (isCovered({ start: p.periodStart, end: p.periodEnd }, existing, 'overlap')) continue
+    } else {
+      const key = periodKey(p.kind, p.periodStart)
+      if (own.has(key) || legacy.has(key)) continue
+    }
     if (!dueToday(p, today)) continue
     const isEquipment = p.kind === 'equipment' || p.kind === 'equipment_monthly'
     const ok = await insertInvoice(ctx, customer, orgNr, p, buildRows(pl.contract, pl.sources, p), {
@@ -636,7 +695,7 @@ async function refreshEditableEquipmentInvoices(
   void orgNr
   const { data: invoices } = await supabase
     .from('invoices')
-    .select('id, status, contract_invoice_kind, billing_period_start, is_consolidated, invoice_items(id, line_kind, contract_id, total_price, quantity)')
+    .select('id, status, contract_invoice_kind, billing_period_start, billing_period_end, is_consolidated, invoice_items(id, line_kind, contract_id, total_price, quantity)')
     .eq('contract_id', pl.contract.id)
     .eq('invoice_type', 'contract')
     .in('status', ['draft', 'pending_approval', 'ready'])
@@ -645,9 +704,12 @@ async function refreshEditableEquipmentInvoices(
     status: string | null
     contract_invoice_kind: string | null
     billing_period_start: string | null
+    billing_period_end: string | null
     is_consolidated: boolean | null
     invoice_items: Array<{ id: string; line_kind: string | null; contract_id: string | null; total_price: number | null; quantity: number | null }> | null
   }
+  // legacy: exakt samma periodstart (som förut); exakt avtalsdag: överlapp
+  const mode = matchModeFor(pl.contract)
   const isEq = (k: string | null | undefined) => k === 'equipment_annual' || k === 'equipment_monthly'
   const sig = (rows: Array<{ line_kind?: string | null; total_price?: number | null; quantity?: number | null }>) =>
     rows.map((r) => `${r.line_kind ?? ''}|${Math.round(Number(r.total_price ?? 0) * 100)}|${r.quantity ?? ''}`).sort().join(';')
@@ -655,7 +717,11 @@ async function refreshEditableEquipmentInvoices(
   for (const inv of (invoices ?? []) as Inv[]) {
     if (inv.is_consolidated || !inv.billing_period_start) continue
     const kind = inv.contract_invoice_kind ?? 'premium'
-    const plannedPeriod = [...pl.periods, ...pl.equipmentPeriods].find((p) => (p.kind ?? 'premium') === kind && p.periodStart === inv.billing_period_start)
+    const plannedPeriod = findPlannedFor(
+      [...pl.periods, ...pl.equipmentPeriods].filter((p) => (p.kind ?? 'premium') === kind),
+      { start: inv.billing_period_start, end: inv.billing_period_end },
+      mode
+    )
     if (!plannedPeriod) continue
     const rows = buildRows(pl.contract, pl.sources, plannedPeriod)
     const existingRows = inv.invoice_items ?? []

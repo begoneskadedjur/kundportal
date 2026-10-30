@@ -38,7 +38,16 @@ import {
 } from '../shared/contractInvoiceRows'
 import { addonInvoicePeriod, matchInvoiceAddonLines, type AddonCaseRow } from '../shared/invoiceAddonLines'
 import type { ContractWithBilling } from '../types/database'
-import { buildContractDiff, EDITABLE_STATUSES, LOCKED_STATUSES, monthKey } from '../shared/contractInvoiceMatch'
+import {
+  buildContractDiff,
+  consolidationGroupKey,
+  EDITABLE_STATUSES,
+  LOCKED_STATUSES,
+  matchModeFor,
+  periodOverlapShare,
+  SAME_PERIOD_SHARE,
+  type MatchMode,
+} from '../shared/contractInvoiceMatch'
 import {
   computePlannedEquipmentPeriods,
   computePlannedMonthlyEquipmentPeriods,
@@ -454,11 +463,13 @@ export class ContractInvoiceGenerator {
       window: 'binding',
     })
     const existing = await this.loadExisting(customerId, contract.id, { kind: 'premium' })
-    const consolidatedPeriods = await this.loadConsolidatedPeriodsForContract(customerId, contract.id)
+    const consolidatedInvoices = await this.loadConsolidatedPeriodsForContract(customerId, contract.id)
     const billingCustomer = await this.loadCustomer(customerId)
     const marking = sources.invoiceReference ?? billingCustomer.billing_reference ?? null
+    // Exakt avtalsdag matchar på datumöverlapp, övriga på månad (steg 7)
+    const mode = matchModeFor(contract)
 
-    const entries: BillingPlanEntry[] = this.buildDiff(planned, existing, { real: true, consolidatedPeriods }).map((e) => {
+    const entries: BillingPlanEntry[] = this.buildDiff(planned, existing, { real: true, consolidatedInvoices, mode }).map((e) => {
       if (!e.planned) return { ...e, kind: 'premium' as const, contractId: contract.id, contractLabel: sources.label }
       return {
         ...e,
@@ -493,6 +504,7 @@ export class ContractInvoiceGenerator {
   ): Promise<BillingPlanEntry[]> {
     const out: BillingPlanEntry[] = []
     const freq = contract.billing_frequency as BillingFrequency | null
+    const mode = matchModeFor(contract)
     // Tilläggsfakturor är alltid en per avtal. consolidated sätts uttryckligen
     // till false: mergePlans ärver annars gruppens samlingsflagga, och då
     // sparas fakturan utan contract_id och krockar på invoices_consolidated_period_key.
@@ -518,7 +530,7 @@ export class ContractInvoiceGenerator {
         window: 'binding',
       })
       const existing = await this.loadExisting(customerId, contract.id, { kind: 'equipment' })
-      out.push(...this.buildDiff(planned, existing, { real: true }).map((e) => decorate(e, 'equipment')))
+      out.push(...this.buildDiff(planned, existing, { real: true, mode }).map((e) => decorate(e, 'equipment')))
     }
     const monthly = computePlannedMonthlyEquipmentPeriods(contract as PlanningContract, {
       paymentTermsDays,
@@ -527,7 +539,7 @@ export class ContractInvoiceGenerator {
     })
     const existingMonthly = await this.loadExisting(customerId, contract.id, { kind: 'equipment_monthly' })
     if (monthly.length > 0 || existingMonthly.length > 0) {
-      out.push(...this.buildDiff(monthly, existingMonthly, { real: true }).map((e) => decorate(e, 'equipment_monthly')))
+      out.push(...this.buildDiff(monthly, existingMonthly, { real: true, mode }).map((e) => decorate(e, 'equipment_monthly')))
     }
     return out
   }
@@ -569,6 +581,7 @@ export class ContractInvoiceGenerator {
 
   /**
    * Samlad faktura per kund (gemet): avtal som delar frekvens och ankarmånad
+   * (exakt avtalsdag: frekvens och avtalsdag, consolidationGroupKey)
    * hamnar på samma faktura med en rad per avtal. Avtal som avviker faller ut
    * som egna planer. Synth-avtal samfaktureras aldrig (de har inget avtal).
    */
@@ -579,7 +592,7 @@ export class ContractInvoiceGenerator {
 
     const groups = new Map<string, ContractWithBilling[]>()
     for (const c of contracts) {
-      const key = `${c.billing_frequency ?? ''}|${c.billing_anchor_month ?? ''}`
+      const key = consolidationGroupKey(c)
       groups.set(key, [...(groups.get(key) ?? []), c])
     }
 
@@ -646,7 +659,9 @@ export class ContractInvoiceGenerator {
         .map((p, i, arr) => ({ ...p, sequenceNumber: i + 1, totalSequenceCount: arr.length }))
 
       const existing = await this.loadExisting(customerId, null, { consolidated: true })
-      const entries: BillingPlanEntry[] = this.buildDiff(planned, existing, { real: true, compareRows: true }).map((e) => {
+      // Alla avtal i gruppen har samma läge (nyckeln skiljer exakt avtalsdag från den 1:a)
+      const mode: MatchMode = matchModeFor(group[0])
+      const entries: BillingPlanEntry[] = this.buildDiff(planned, existing, { real: true, compareRows: true, mode }).map((e) => {
         if (!e.planned) return { ...e, kind: 'premium' as const, contractId: null, consolidated: true }
         const slot = byPeriod.get(e.planned.periodStart)!
         // Beslut 2026-09-02: huvudkundens referens i huvudet, avtalen som rader.
@@ -672,8 +687,20 @@ export class ContractInvoiceGenerator {
       const perContractExisting = (await this.loadExisting(customerId, null)).filter(
         (e) => e.contract_id && groupIds.has(e.contract_id)
       )
+      // Samma period: legacy exakt samma startdag (som förut), exakt avtalsdag
+      // minst hälften överlapp mot någon av gruppens perioder.
+      const coversSlot = (ex: ExistingInvoice): string | null => {
+        if (!ex.billing_period_start) return null
+        if (mode === 'legacy') return byPeriod.has(ex.billing_period_start) ? ex.billing_period_start : null
+        const exRange = { start: ex.billing_period_start, end: ex.billing_period_end ?? ex.billing_period_start }
+        for (const [start, slot] of byPeriod) {
+          if (periodOverlapShare({ start, end: slot.planned.periodEnd }, exRange) >= SAME_PERIOD_SHARE) return start
+        }
+        return null
+      }
       for (const ex of perContractExisting) {
-        if (!ex.billing_period_start || !byPeriod.has(ex.billing_period_start)) continue
+        const slotStart = coversSlot(ex)
+        if (!slotStart) continue
         const status = ex.status ?? 'draft'
         if (EDITABLE_STATUSES.has(status)) {
           entries.push({
@@ -694,7 +721,7 @@ export class ContractInvoiceGenerator {
             reason: 'Redan skickad per avtal, samlingsfakturan hoppar över perioden',
           })
           // Perioden ska då inte skapas samlat
-          const idx = entries.findIndex((en) => en.planned?.periodStart === ex.billing_period_start && en.action === 'create')
+          const idx = entries.findIndex((en) => en.planned?.periodStart === slotStart && en.action === 'create')
           if (idx >= 0) entries.splice(idx, 1)
         }
       }
@@ -877,15 +904,16 @@ export class ContractInvoiceGenerator {
       }))
   }
 
-  /** Perioder där avtalet redan ligger på en samlad faktura (rad med contract_id). */
-  private static async loadConsolidatedPeriodsForContract(customerId: string, contractId: string): Promise<Map<string, ExistingInvoice>> {
+  /**
+   * Samlade fakturor där avtalet redan ligger (rad med contract_id), i
+   * hämtordning. Matchningen mot perioderna görs i buildContractDiff (legacy:
+   * samma månad, sista vinner som förut; exakt avtalsdag: överlapp).
+   */
+  private static async loadConsolidatedPeriodsForContract(customerId: string, contractId: string): Promise<ExistingInvoice[]> {
     const rows = await this.loadExisting(customerId, null, { consolidated: true })
-    const map = new Map<string, ExistingInvoice>()
-    for (const inv of rows) {
-      if (!inv.billing_period_start) continue
-      if ((inv.invoice_items ?? []).some((it) => it.contract_id === contractId)) map.set(monthKey(inv.billing_period_start), inv)
-    }
-    return map
+    return rows.filter(
+      (inv) => !!inv.billing_period_start && (inv.invoice_items ?? []).some((it) => it.contract_id === contractId)
+    )
   }
 
   // ------- Rader -------
@@ -920,7 +948,7 @@ export class ContractInvoiceGenerator {
   private static buildDiff(
     planned: PlannedInvoice[],
     existing: ExistingInvoice[],
-    opts: { real: boolean; compareRows?: boolean; consolidatedPeriods?: Map<string, ExistingInvoice> }
+    opts: { real: boolean; compareRows?: boolean; consolidatedInvoices?: ExistingInvoice[]; mode?: MatchMode }
   ): BillingPlanEntry[] {
     return buildContractDiff(planned, existing, opts)
   }

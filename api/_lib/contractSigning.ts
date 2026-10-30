@@ -67,7 +67,7 @@ import {
   toInvoiceItemRows,
   type ContractServiceItem,
 } from '../../src/shared/contractInvoiceRows'
-import { fortnoxCovers, monthKey } from '../../src/shared/contractInvoiceMatch'
+import { fortnoxCovers, isCovered, matchModeFor, monthKey, type ExistingRange } from '../../src/shared/contractInvoiceMatch'
 import { deriveDeliveryFromContract, type DerivedDelivery } from '../../src/shared/invoiceDelivery'
 import { tolkaIdNummer } from '../../src/shared/webLeadUppgifter'
 import { jamforIdNummer, kundensIdNummer, valideraKundOchOmfattning, type KopplingsKund } from '../../src/shared/avtalsKundKoppling'
@@ -977,13 +977,16 @@ async function planInvoices(ctx: Ctx, contract: Row, customerId: string, contrac
   }
 
   // Befintliga fakturor: samma täckningsregel som planeraren (månadsnyckel per avtal,
-  // samlingsfakturor med rad för avtalet, Fortnox-importer som täcker minst halva perioden)
+  // samlingsfakturor med rad för avtalet, Fortnox-importer som täcker minst halva perioden).
+  // Exakt avtalsdag (steg 7): datumöverlapp i stället för månadsnyckel.
+  const mode = matchModeFor(planning)
   const covered = new Set<string>()
+  const coveredRanges: ExistingRange[] = []
   const fortnoxRanges: Array<{ start: string; end: string }> = []
   if (!isNewCustomer) {
     const { data: invoices } = await db
       .from('invoices')
-      .select('id, invoice_number, invoice_type, is_historical, is_consolidated, contract_id, contract_invoice_kind, billing_period_start, billing_period_end, invoice_items(contract_id)')
+      .select('id, invoice_number, invoice_type, is_historical, is_consolidated, contract_id, contract_invoice_kind, billing_period_start, billing_period_end, status, invoice_items(contract_id)')
       .eq('customer_id', customerId)
       .in('invoice_type', ['contract', 'adhoc'])
       .neq('status', 'cancelled')
@@ -1002,7 +1005,16 @@ async function planInvoices(ctx: Ctx, contract: Row, customerId: string, contrac
         inv.contract_id === contractId ||
         (!inv.contract_id && !inv.is_consolidated) ||
         (!!inv.is_consolidated && items.some((it) => it.contract_id === contractId))
-      if (mine) covered.add(monthKey(start))
+      if (mine) {
+        covered.add(monthKey(start))
+        coveredRanges.push({
+          id: String(inv.id),
+          status: str(inv.status),
+          invoice_number: number,
+          start,
+          end: str(inv.billing_period_end) ?? start,
+        })
+      }
     }
   }
 
@@ -1026,9 +1038,10 @@ async function planInvoices(ctx: Ctx, contract: Row, customerId: string, contrac
   }
 
   for (const p of periods) {
-    const key = monthKey(p.periodStart)
-    if (covered.has(key)) continue
-    if (fortnoxCovers(p, fortnoxRanges)) continue
+    if (mode === 'overlap') {
+      if (isCovered({ start: p.periodStart, end: p.periodEnd }, coveredRanges, 'overlap')) continue
+    } else if (covered.has(monthKey(p.periodStart))) continue
+    if (fortnoxCovers(p, fortnoxRanges, mode)) continue
     if (p.isHistorical) {
       report.notes.push(`Perioden ${p.periodStart} t.o.m. ${p.periodEnd} har redan passerat utan faktura. Koppla Fortnox-fakturan eller planera den i kartan.`)
       continue

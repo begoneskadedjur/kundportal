@@ -51,3 +51,19 @@ npx tsx --env-file=.env scripts/regression/periods-twin.mts
 Jämför `periodContaining` i `src/shared/contractPeriods.ts` (exakt avtalsdag) med SQL-funktionen `contract_period_on_pure` för 400 fasta kombinationer (20 startdagar, fyra frekvenser, fem frågedatum, fast frö). `--starts=N` ger fler. Exitkod 0 vid noll skillnader. Funktionen är ren och läser ingen tabell.
 
 `avtalsar-perioder.test.sql` provar SQL-grenarna för exakt läge på FEV:s avtal i ett block som alltid rullas tillbaka (raise exception med resultatet).
+
+## Överlappsmatchningen (steg 7)
+
+`plan-dump.mts` kör sedan steg 7 också en kontroll som skrivs till `out/match-check-<today>-<sha>.json` (dumpen påverkas inte):
+
+- `match.legacy_differences`: varje `buildDiff`-anrop i gamla läget jämförs med en fryst kopia av månadsnyckeln före steg 7. Ska vara 0.
+- `match.plan_variant_differences`: hur många anrop planens variant (överlapp först, sedan månadsreserv) hade ändrat. Bara information; varianten byggdes inte.
+- `guard.stops`: simulering av överlappsvakten mot generatorns create (efter delete och update) och cronens skapas. Ska vara tom.
+
+`--exact=<id-prefix>,<id-prefix>` (eller `--exact=all`) sätter `billing_anchor_mode = 'start_day'` på de avtalen i minnet, aldrig i databasen. Använd en egen `--out-dir`.
+
+```bash
+npx tsx --env-file=.env scripts/regression/plan-dump.mts --today=2026-10-30 --out-dir=scripts/regression/out/steg7/exakt --exact=bca4c235,72818957
+```
+
+`overlap-share-twin.mts` jämför `periodOverlapShare` i TS med SQL-funktionen `contract_period_overlap_share` (som överlappsvakten anropar) för 400 fasta par (`--pairs=N` ger fler). `overlap-share.test.sql` provar vakten på riktigt kring gränsen hälften i ett block som alltid rullas tillbaka.

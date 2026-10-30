@@ -18,6 +18,9 @@ import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { computePlannedInvoicesPure, ContractInvoiceGenerator, type CustomerForPlanning } from './contractInvoiceGenerator'
 import { resolveContractForCustomer } from './contractResolver'
+import { LOCKED_STATUSES, matchModeFor, periodOverlapShare, SAME_PERIOD_SHARE } from '../shared/contractInvoiceMatch'
+import { addMonthsClampedIso, periodStepMonths } from '../shared/contractPeriods'
+import { addDaysIso } from '../shared/contractPlanner'
 
 const LOCKED_INVOICE_STATUSES = ['booked', 'sent', 'paid']
 
@@ -67,7 +70,7 @@ export class ContractAdditionService {
     const { data } = await supabase
       .from('contracts')
       .select(
-        'id, customer_id, label, contract_type, annual_value, contract_start_date, contract_end_date, terminated_at, billing_frequency, billing_anchor_month, billing_active, notice_period_months'
+        'id, customer_id, label, contract_type, annual_value, contract_start_date, contract_end_date, terminated_at, billing_frequency, billing_anchor_month, billing_active, notice_period_months, billing_anchor_mode'
       )
       .eq('id', contractId)
       .maybeSingle()
@@ -148,17 +151,46 @@ export class ContractAdditionService {
       return { reason: 'Avtalet har ingen kommande fakturaperiod - kontakta kontoret så läggs tillägget manuellt.' }
     }
 
-    // Hoppa över perioder vars faktura redan är låst (bokförd/skickad/betald)
-    let lockedQuery = supabase
-      .from('invoices')
-      .select('billing_period_start')
-      .eq('customer_id', billingCustomerId)
-      .eq('invoice_type', 'contract')
-      .in('status', LOCKED_INVOICE_STATUSES)
-      .in('billing_period_start', futureStarts)
-    if (contract) lockedQuery = lockedQuery.or(`contract_id.eq.${contract.id},is_consolidated.eq.true`)
-    const { data: lockedInvoices } = await lockedQuery
-    const lockedStarts = new Set((lockedInvoices || []).map((i) => i.billing_period_start))
+    // Hoppa över perioder vars faktura redan är låst (bokförd/skickad/betald).
+    // Exakt avtalsdag (steg 7): låst faktura som tar minst hälften av perioden
+    // (samma regel som överlappsvakten); annars exakt samma startdag som förut.
+    let lockedStarts: Set<string>
+    if (matchModeFor(contract) === 'overlap') {
+      const stepMonths = periodStepMonths(billing.billing_frequency)
+      const futureRanges = futureStarts.map((start) => ({
+        start,
+        end: plan.find((p) => p.periodStart === start)?.periodEnd ?? addDaysIso(addMonthsClampedIso(start, stepMonths), -1),
+      }))
+      const minStart = futureRanges.reduce((m, r) => (r.start < m ? r.start : m), futureRanges[0].start)
+      const maxEnd = futureRanges.reduce((m, r) => (r.end > m ? r.end : m), futureRanges[0].end)
+      let rangeQuery = supabase
+        .from('invoices')
+        .select('billing_period_start, billing_period_end')
+        .eq('customer_id', billingCustomerId)
+        .eq('invoice_type', 'contract')
+        .in('status', [...LOCKED_STATUSES])
+        .lte('billing_period_start', maxEnd)
+        .gte('billing_period_end', minStart)
+      if (contract) rangeQuery = rangeQuery.or(`contract_id.eq.${contract.id},is_consolidated.eq.true`)
+      const { data: lockedRanges } = await rangeQuery
+      const locked = ((lockedRanges || []) as Array<{ billing_period_start: string | null; billing_period_end: string | null }>)
+        .filter((i) => !!i.billing_period_start)
+        .map((i) => ({ start: i.billing_period_start as string, end: i.billing_period_end ?? (i.billing_period_start as string) }))
+      lockedStarts = new Set(
+        futureRanges.filter((r) => locked.some((l) => periodOverlapShare(r, l) >= SAME_PERIOD_SHARE)).map((r) => r.start)
+      )
+    } else {
+      let lockedQuery = supabase
+        .from('invoices')
+        .select('billing_period_start')
+        .eq('customer_id', billingCustomerId)
+        .eq('invoice_type', 'contract')
+        .in('status', LOCKED_INVOICE_STATUSES)
+        .in('billing_period_start', futureStarts)
+      if (contract) lockedQuery = lockedQuery.or(`contract_id.eq.${contract.id},is_consolidated.eq.true`)
+      const { data: lockedInvoices } = await lockedQuery
+      lockedStarts = new Set((lockedInvoices || []).map((i) => i.billing_period_start as string))
+    }
     const effectiveFrom = futureStarts.find((start) => !lockedStarts.has(start))
     if (!effectiveFrom) {
       return { reason: 'Alla kommande perioder är redan fakturerade - kontakta kontoret.' }
