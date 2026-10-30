@@ -10,6 +10,15 @@
 // före fakturadatumet även vid kort uppsägningstid. Idempotent: bara perioder
 // som saknar faktura skapas.
 //
+// Torrkörning (steg 4 i planen för avtalsåret på exakt avtalsdag): dry=1
+// räknar allt men skriver ingenting (inga fakturor, inga radbyten, ingen
+// antalssynk av tilläggsstationer). Det som skulle ha skapats eller bytts
+// hamnar i summeringen (would_create, would_refresh); bara loggraden i
+// cron_runs skrivs. v2=1 eller CONTINUING_CONTRACTS_V2=1 tar med alla levande
+// avtal oavsett slutdatum och frekvens. Båda är AV som standard, så den skarpa
+// körningen 03:00 UTC går som förut. Torrkörningen 03:30 UTC ligger i
+// api/cron/generate-continuing-contracts-dry.ts och kör dry + v2.
+//
 // Avtalskartan som motor (fas 2): läser AVTALEN (contracts), inte kundraden.
 // Samma periodmatematik som webben (src/shared/contractPlanner.ts), samma
 // källor (premietrappa, § 4-rader med billing_model = premium, § 6-rader med
@@ -90,6 +99,37 @@ type ContractRow = PlanningContract & {
   display_order: number | null
 }
 
+/** En faktura som skulle ha skapats eller fått nya tilläggsrader. */
+export type PlannedWrite = {
+  customer_id: string
+  company_name: string
+  contract_id: string | null
+  kind: string
+  periodStart: string
+  periodEnd: string
+  subtotal: number
+  action: 'create' | 'refresh'
+}
+
+/**
+ * Körningens läge. dryRun: inget skrivs, posterna samlas i planned.
+ * v2: nytt urval (alla levande avtal oavsett slutdatum och frekvens).
+ */
+export type RunCtx = { dryRun: boolean; v2: boolean; planned: PlannedWrite[] }
+
+/**
+ * Enda vägen till skrivningar i cronen (samma mönster som signeringens
+ * ctx.dryRun i api/_lib/contractSigning.ts). I torrkörning läggs posten i
+ * ctx.planned, fn körs inte och dryValue returneras.
+ */
+async function write<T>(ctx: RunCtx, entry: PlannedWrite, dryValue: T, fn: () => Promise<T>): Promise<T> {
+  if (ctx.dryRun) {
+    ctx.planned.push(entry)
+    return dryValue
+  }
+  return fn()
+}
+
 type RowSpec = {
   contract_id: string | null
   line_kind: string
@@ -131,14 +171,17 @@ function isImported(c: ContractRow): boolean {
   return c.template_id === 'imported' || (c.oneflow_contract_id ?? '').startsWith('imported-')
 }
 
-async function loadSources(contractId: string): Promise<Sources> {
+async function loadSources(ctx: RunCtx, contractId: string): Promise<Sources> {
   // Antal tilläggsstationer vid debiteringstillfället: synka § 6-raderna
-  // från utplacerade stationer innan planen räknas (service role)
-  try {
-    await supabase.rpc('sync_addon_period_lines', { p_customer_id: null, p_contract_id: contractId, p_annual_price: null })
-    await supabase.rpc('sync_addon_article_lines', { p_contract_id: contractId })
-  } catch (err) {
-    console.warn('Antalssynk av tilläggsstationer misslyckades:', err)
+  // från utplacerade stationer innan planen räknas (service role).
+  // Synken skriver, så torrkörningen hoppar över den och läser raderna som de är.
+  if (!ctx.dryRun) {
+    try {
+      await supabase.rpc('sync_addon_period_lines', { p_customer_id: null, p_contract_id: contractId, p_annual_price: null })
+      await supabase.rpc('sync_addon_article_lines', { p_contract_id: contractId })
+    } catch (err) {
+      console.warn('Antalssynk av tilläggsstationer misslyckades:', err)
+    }
   }
   const [{ data: steps }, { data: items }] = await Promise.all([
     supabase.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contractId),
@@ -364,6 +407,7 @@ async function generateInvoiceNumber(): Promise<string> {
 }
 
 async function insertInvoice(
+  ctx: RunCtx,
   customer: CustomerRow,
   orgNr: string | null,
   p: PlannedPeriod,
@@ -372,6 +416,27 @@ async function insertInvoice(
 ): Promise<boolean> {
   if (rows.length === 0) return false
   const subtotal = Math.round(rows.reduce((s, r) => s + r.total_price, 0) * 100) / 100
+  const entry: PlannedWrite = {
+    customer_id: customer.id,
+    company_name: customer.company_name,
+    contract_id: opts.contractId,
+    kind: p.kind ?? 'premium',
+    periodStart: p.periodStart,
+    periodEnd: p.periodEnd,
+    subtotal,
+    action: 'create',
+  }
+  return write(ctx, entry, true, () => insertInvoiceNow(customer, orgNr, p, rows, opts, subtotal))
+}
+
+async function insertInvoiceNow(
+  customer: CustomerRow,
+  orgNr: string | null,
+  p: PlannedPeriod,
+  rows: RowSpec[],
+  opts: { contractId: string | null; consolidated: boolean; marking: string | null; notes: string },
+  subtotal: number
+): Promise<boolean> {
   const vat = Math.round(rows.reduce((s, r) => s + (r.total_price * r.vat_rate) / 100, 0) * 100) / 100
   const invNum = await generateInvoiceNumber()
   const { data: inv, error } = await supabase
@@ -432,7 +497,7 @@ async function insertInvoice(
 const dueToday = isDueForCreation
 
 /** Riktiga avtal på en kund: skapa saknade perioder i bindningsfönstret. */
-async function generateForCustomerContracts(customer: CustomerRow, contracts: ContractRow[], today: string): Promise<number> {
+async function generateForCustomerContracts(ctx: RunCtx, customer: CustomerRow, contracts: ContractRow[], today: string): Promise<number> {
   const orgNr = await resolveOrgNr(customer)
   const covered = await loadCoveredPeriods(customer.id)
   const consolidatedMode = customer.contract_invoice_mode === 'consolidated' && contracts.length > 1
@@ -440,7 +505,7 @@ async function generateForCustomerContracts(customer: CustomerRow, contracts: Co
   type Planned = { contract: ContractRow; sources: Sources; periods: PlannedPeriod[]; equipmentPeriods: PlannedPeriod[] }
   const planned: Planned[] = []
   for (const contract of contracts) {
-    const sources = await loadSources(contract.id)
+    const sources = await loadSources(ctx, contract.id)
     const planOpts = {
       steps: sources.steps,
       equipment: sources.equipment,
@@ -463,12 +528,12 @@ async function generateForCustomerContracts(customer: CustomerRow, contracts: Co
   let created = 0
   // Tilläggsfakturor samlas aldrig: alltid per avtal
   for (const pl of planned) {
-    created += await createPerContract(customer, orgNr, { contract: pl.contract, sources: pl.sources, periods: pl.equipmentPeriods }, covered.perContract, today)
+    created += await createPerContract(ctx, customer, orgNr, { contract: pl.contract, sources: pl.sources, periods: pl.equipmentPeriods }, covered.perContract, today)
   }
   // Redigerbara fakturor vars utrustningsrader avviker från dagens antal
   for (const pl of planned) {
     created += 0
-    await refreshEditableEquipmentInvoices(customer, orgNr, pl)
+    await refreshEditableEquipmentInvoices(ctx, customer, orgNr, pl)
   }
 
   if (consolidatedMode) {
@@ -480,7 +545,7 @@ async function generateForCustomerContracts(customer: CustomerRow, contracts: Co
     }
     for (const group of groups.values()) {
       if (group.length === 1) {
-        created += await createPerContract(customer, orgNr, group[0], covered.perContract)
+        created += await createPerContract(ctx, customer, orgNr, group[0], covered.perContract)
         continue
       }
       const byPeriod = new Map<string, { p: PlannedPeriod; rows: RowSpec[]; labels: string[] }>()
@@ -503,7 +568,7 @@ async function generateForCustomerContracts(customer: CustomerRow, contracts: Co
         if (group.some((pl) => covered.perContract.get(pl.contract.id)?.has(key))) continue
         // Förlängning: direkt. Annars när fakturadatumet är inne (ledtiden).
         if (!dueToday(slot.p, today)) continue
-        const ok = await insertInvoice(customer, orgNr, slot.p, slot.rows, {
+        const ok = await insertInvoice(ctx, customer, orgNr, slot.p, slot.rows, {
           contractId: null,
           consolidated: true,
           marking: customer.billing_reference,
@@ -515,11 +580,12 @@ async function generateForCustomerContracts(customer: CustomerRow, contracts: Co
     return created
   }
 
-  for (const pl of planned) created += await createPerContract(customer, orgNr, pl, covered.perContract)
+  for (const pl of planned) created += await createPerContract(ctx, customer, orgNr, pl, covered.perContract)
   return created
 }
 
 async function createPerContract(
+  ctx: RunCtx,
   customer: CustomerRow,
   orgNr: string | null,
   pl: { contract: ContractRow; sources: Sources; periods: PlannedPeriod[] },
@@ -534,7 +600,7 @@ async function createPerContract(
     if (own.has(key) || legacy.has(key)) continue
     if (!dueToday(p, today)) continue
     const isEquipment = p.kind === 'equipment' || p.kind === 'equipment_monthly'
-    const ok = await insertInvoice(customer, orgNr, p, buildRows(pl.contract, pl.sources, p), {
+    const ok = await insertInvoice(ctx, customer, orgNr, p, buildRows(pl.contract, pl.sources, p), {
       contractId: pl.contract.id,
       consolidated: false,
       marking: pl.contract.invoice_reference ?? customer.billing_reference,
@@ -559,6 +625,7 @@ async function createPerContract(
  * fakturan (manuellt justerad).
  */
 async function refreshEditableEquipmentInvoices(
+  ctx: RunCtx,
   customer: CustomerRow,
   orgNr: string | null,
   pl: { contract: ContractRow; sources: Sources; periods: PlannedPeriod[]; equipmentPeriods: PlannedPeriod[] }
@@ -594,33 +661,45 @@ async function refreshEditableEquipmentInvoices(
     if (sig(rows.filter((r) => !isEq(r.line_kind))) !== sig(existingRows.filter((r) => !isEq(r.line_kind)))) continue
     const subtotal = Math.round(rows.reduce((s, r) => s + r.total_price, 0) * 100) / 100
     const vat = Math.round(rows.reduce((s, r) => s + (r.total_price * r.vat_rate) / 100, 0) * 100) / 100
-    await supabase.from('invoice_items').delete().eq('invoice_id', inv.id)
-    await supabase.from('invoice_items').insert(
-      rows.map((r) => ({
-        invoice_id: inv.id,
-        contract_id: r.contract_id,
-        line_kind: r.line_kind,
-        case_billing_item_id: r.case_billing_item_id ?? null,
-        article_id: null,
-        article_code: r.article_code,
-        article_name: r.article_name,
-        quantity: r.quantity,
-        unit_price: r.unit_price,
-        total_price: r.total_price,
-        vat_rate: r.vat_rate,
-        discount_percent: r.discount_percent,
-      }))
-    )
-    await supabase
-      .from('invoices')
-      .update({
-        subtotal,
-        vat_amount: vat,
-        total_amount: Math.round((subtotal + vat) * 100) / 100,
-        // Godkänd faktura vars rader ändrats ska granskas igen
-        ...(inv.status === 'ready' ? { status: 'pending_approval' } : {}),
-      })
-      .eq('id', inv.id)
+    const entry: PlannedWrite = {
+      customer_id: customer.id,
+      company_name: customer.company_name,
+      contract_id: pl.contract.id,
+      kind,
+      periodStart: plannedPeriod.periodStart,
+      periodEnd: plannedPeriod.periodEnd,
+      subtotal,
+      action: 'refresh',
+    }
+    await write(ctx, entry, undefined, async () => {
+      await supabase.from('invoice_items').delete().eq('invoice_id', inv.id)
+      await supabase.from('invoice_items').insert(
+        rows.map((r) => ({
+          invoice_id: inv.id,
+          contract_id: r.contract_id,
+          line_kind: r.line_kind,
+          case_billing_item_id: r.case_billing_item_id ?? null,
+          article_id: null,
+          article_code: r.article_code,
+          article_name: r.article_name,
+          quantity: r.quantity,
+          unit_price: r.unit_price,
+          total_price: r.total_price,
+          vat_rate: r.vat_rate,
+          discount_percent: r.discount_percent,
+        }))
+      )
+      await supabase
+        .from('invoices')
+        .update({
+          subtotal,
+          vat_amount: vat,
+          total_amount: Math.round((subtotal + vat) * 100) / 100,
+          // Godkänd faktura vars rader ändrats ska granskas igen
+          ...(inv.status === 'ready' ? { status: 'pending_approval' } : {}),
+        })
+        .eq('id', inv.id)
+    })
     updated++
   }
   return updated
@@ -631,7 +710,7 @@ async function refreshEditableEquipmentInvoices(
  * aldrig passerade perioder. Inom bindningstiden fylls bara kunder vars
  * slutdatum passerat (som förut); förlängningen skapas för alla.
  */
-async function generateForSynthCustomer(customer: CustomerRow, today: string): Promise<number> {
+async function generateForSynthCustomer(ctx: RunCtx, customer: CustomerRow, today: string): Promise<number> {
   const orgNr = await resolveOrgNr(customer)
   const covered = await loadCoveredPeriods(customer.id)
   const rolled = !!customer.contract_end_date && customer.contract_end_date < today
@@ -649,6 +728,7 @@ async function generateForSynthCustomer(customer: CustomerRow, today: string): P
     // jämförelse mot rå periodStart träffade aldrig.
     if (existing.has(periodKey(p.kind, p.periodStart)) || !dueToday(p, today)) continue
     const ok = await insertInvoice(
+      ctx,
       customer,
       orgNr,
       p,
@@ -677,93 +757,137 @@ async function generateForSynthCustomer(customer: CustomerRow, today: string): P
   return created
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (!requireCronSecret(req, res)) return
+/** Högst så många poster i would_create och would_refresh i cron_runs. */
+const PLANNED_LOG_LIMIT = 500
 
-  const result = await withCronLog('generate-continuing-contracts', async () => {
-    const today = toLocalIsoDate(todayLocal())
-    const horizon = rollingHorizonEnd()
+/**
+ * Själva körningen, utan loggning. Exporteras för torrkörningsposten och för
+ * lokal torrkörning (då skrivs inte ens loggraden i cron_runs).
+ */
+export async function runContinuingContracts(ctx: RunCtx) {
+  const today = toLocalIsoDate(todayLocal())
+  const horizon = rollingHorizonEnd()
 
-    // 1. Riktiga avtal som är levande och faktureras: slutdatum inom ett år
-    //    (förlängningen kan bli säker) eller inget slutdatum (tills vidare)
-    const { data: contractRows, error: cErr } = await supabase
-      .from('contracts')
-      .select(
-        'id, customer_id, label, contract_type, invoice_reference, diary_number, annual_value, contract_start_date, contract_end_date, terminated_at, effective_end_date, billing_frequency, billing_anchor_month, billing_active, notice_period_months, renewal_mode, status, template_id, oneflow_contract_id, display_order'
-      )
-      .in('status', LIVE_STATUSES)
-      .eq('type', 'contract')
+  // 1. Riktiga avtal som är levande och faktureras: slutdatum inom ett år
+  //    (förlängningen kan bli säker) eller inget slutdatum (tills vidare).
+  //    v2: alla levande avtal, oavsett slutdatum och frekvens.
+  let contractQuery = supabase
+    .from('contracts')
+    .select(
+      'id, customer_id, label, contract_type, invoice_reference, diary_number, annual_value, contract_start_date, contract_end_date, terminated_at, effective_end_date, billing_frequency, billing_anchor_month, billing_active, notice_period_months, renewal_mode, status, template_id, oneflow_contract_id, display_order'
+    )
+    .in('status', LIVE_STATUSES)
+    .eq('type', 'contract')
+  if (!ctx.v2) {
+    contractQuery = contractQuery
       .not('billing_frequency', 'is', null)
       .or(`contract_end_date.is.null,contract_end_date.lt.${horizon}`)
-    if (cErr) throw cErr
+  }
+  const { data: contractRows, error: cErr } = await contractQuery
+  if (cErr) throw cErr
 
-    const byCustomer = new Map<string, ContractRow[]>()
-    for (const c of (contractRows ?? []) as ContractRow[]) {
-      if (!isLive(c, today) || isImported(c) || c.billing_active === false) continue
-      if (!c.customer_id) continue
-      byCustomer.set(c.customer_id, [...(byCustomer.get(c.customer_id) ?? []), c])
+  const byCustomer = new Map<string, ContractRow[]>()
+  for (const c of (contractRows ?? []) as ContractRow[]) {
+    if (!isLive(c, today) || isImported(c) || c.billing_active === false) continue
+    if (!c.customer_id) continue
+    byCustomer.set(c.customer_id, [...(byCustomer.get(c.customer_id) ?? []), c])
+  }
+
+  // 2. Kunder utan avtalsrad (synth) med slutdatum inom ett år. Kunder utan
+  //    slutdatum och utan avtalsrad planeras inte här (som förut).
+  const { data: synthCustomers, error: sErr } = await supabase
+    .from('customers')
+    .select('*')
+    .lt('contract_end_date', horizon)
+    .is('terminated_at', null)
+    .eq('billing_active', true)
+  if (sErr) throw sErr
+
+  const results: Array<{ customer_id: string; company_name: string; created: number }> = []
+  const errors: Array<{ customer_id: string; message: string }> = []
+
+  for (const [customerId, contracts] of byCustomer) {
+    try {
+      const { data: customer } = await supabase.from('customers').select('*').eq('id', customerId).single()
+      if (!customer) continue
+      const created = await generateForCustomerContracts(ctx, customer as CustomerRow, contracts, today)
+      if (created > 0) results.push({ customer_id: customerId, company_name: (customer as CustomerRow).company_name, created })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error(`Fel vid regenerering av ${customerId}:`, message)
+      errors.push({ customer_id: customerId, message })
     }
+  }
 
-    // 2. Kunder utan avtalsrad (synth) med slutdatum inom ett år. Kunder utan
-    //    slutdatum och utan avtalsrad planeras inte här (som förut).
-    const { data: synthCustomers, error: sErr } = await supabase
-      .from('customers')
-      .select('*')
-      .lt('contract_end_date', horizon)
-      .is('terminated_at', null)
-      .eq('billing_active', true)
-    if (sErr) throw sErr
-
-    const results: Array<{ customer_id: string; company_name: string; created: number }> = []
-    const errors: Array<{ customer_id: string; message: string }> = []
-
-    for (const [customerId, contracts] of byCustomer) {
-      try {
-        const { data: customer } = await supabase.from('customers').select('*').eq('id', customerId).single()
-        if (!customer) continue
-        const created = await generateForCustomerContracts(customer as CustomerRow, contracts, today)
-        if (created > 0) results.push({ customer_id: customerId, company_name: (customer as CustomerRow).company_name, created })
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err)
-        console.error(`Fel vid regenerering av ${customerId}:`, message)
-        errors.push({ customer_id: customerId, message })
-      }
+  for (const c of (synthCustomers ?? []) as CustomerRow[]) {
+    if (byCustomer.has(c.id)) continue
+    // Kunder med någon levande avtalsrad hanteras av avtalsvägen, aldrig ur kundraden
+    const { data: anyLive } = await supabase
+      .from('contracts')
+      .select('id')
+      .eq('customer_id', c.id)
+      .in('status', LIVE_STATUSES)
+      .eq('type', 'contract')
+      .limit(1)
+    if (anyLive && anyLive.length > 0) continue
+    try {
+      const created = await generateForSynthCustomer(ctx, c, today)
+      if (created > 0) results.push({ customer_id: c.id, company_name: c.company_name, created })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error(`Fel vid regenerering av ${c.id}:`, message)
+      errors.push({ customer_id: c.id, message })
     }
+  }
 
-    for (const c of (synthCustomers ?? []) as CustomerRow[]) {
-      if (byCustomer.has(c.id)) continue
-      // Kunder med någon levande avtalsrad hanteras av avtalsvägen, aldrig ur kundraden
-      const { data: anyLive } = await supabase
-        .from('contracts')
-        .select('id')
-        .eq('customer_id', c.id)
-        .in('status', LIVE_STATUSES)
-        .eq('type', 'contract')
-        .limit(1)
-      if (anyLive && anyLive.length > 0) continue
-      try {
-        const created = await generateForSynthCustomer(c, today)
-        if (created > 0) results.push({ customer_id: c.id, company_name: c.company_name, created })
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err)
-        console.error(`Fel vid regenerering av ${c.id}:`, message)
-        errors.push({ customer_id: c.id, message })
-      }
-    }
+  const wouldCreate = ctx.planned.filter((w) => w.action === 'create')
+  const wouldRefresh = ctx.planned.filter((w) => w.action === 'refresh')
+  return {
+    status: errors.length > 0 ? ('partial' as const) : ('success' as const),
+    summary: {
+      dry_run: ctx.dryRun,
+      v2: ctx.v2,
+      customers_processed: byCustomer.size + (synthCustomers?.length ?? 0),
+      contracts_selected: [...byCustomer.values()].reduce((sum, list) => sum + list.length, 0),
+      // I torrkörning skapas ingenting; details visar då vad som skulle ha skapats per kund
+      total_invoices_created: ctx.dryRun ? 0 : results.reduce((sum, r) => sum + r.created, 0),
+      details: results,
+      errors,
+      ...(ctx.dryRun
+        ? {
+            would_create_count: wouldCreate.length,
+            would_refresh_count: wouldRefresh.length,
+            would_create: wouldCreate.slice(0, PLANNED_LOG_LIMIT),
+            would_refresh: wouldRefresh.slice(0, PLANNED_LOG_LIMIT),
+          }
+        : {}),
+    },
+  }
+}
 
-    return {
-      status: errors.length > 0 ? ('partial' as const) : ('success' as const),
-      summary: {
-        customers_processed: byCustomer.size + (synthCustomers?.length ?? 0),
-        total_invoices_created: results.reduce((sum, r) => sum + r.created, 0),
-        details: results,
-        errors,
-      },
-    }
-  })
+/** Gemensam handler: den skarpa posten och torrkörningsposten. */
+export async function handleContinuingContracts(
+  req: VercelRequest,
+  res: VercelResponse,
+  force: { dryRun?: boolean; v2?: boolean } = {}
+) {
+  if (!requireCronSecret(req, res)) return
+
+  const ctx: RunCtx = {
+    dryRun: force.dryRun === true || req.query.dry === '1',
+    v2: force.v2 === true || req.query.v2 === '1' || process.env.CONTINUING_CONTRACTS_V2 === '1',
+    planned: [],
+  }
+  // Torrkörningen loggas under eget namn så att den inte blandas ihop med den skarpa
+  const jobName = ctx.dryRun ? 'generate-continuing-contracts-dry' : 'generate-continuing-contracts'
+  const result = await withCronLog(jobName, () => runContinuingContracts(ctx))
 
   if (result.status === 'failed') {
     return res.status(500).json({ success: false, error: result.errorMessage, ...result.summary })
   }
   return res.status(200).json({ success: true, ...result.summary })
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  return handleContinuingContracts(req, res)
 }
