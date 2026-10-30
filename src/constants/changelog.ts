@@ -49,7 +49,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-10-30',
     title: 'Befintliga kunder sorteras på nyast',
     items: [
-      { kind: 'nyhet', text: 'I Befintliga kunder kan du välja Sortera: Senast tillagda eller Senast signerade. Då visas alla kunder i en lista med den nyaste överst och datumet bredvid namnet, så att ingen ny kund missas.' },
+      { kind: 'nyhet', text: 'I Befintliga kunder kan du välja Sortera: Senast tillagda. Då visas alla kunder i en lista med den nyaste överst och datumet bredvid namnet, så att ingen ny kund missas.' },
     ],
   },
   {

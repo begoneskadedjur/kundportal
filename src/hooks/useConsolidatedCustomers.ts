@@ -328,7 +328,7 @@ export function useConsolidatedCustomers() {
              annual_value, total_contract_value, billing_frequency, billing_anchor_month,
              billing_active, contract_start_date, contract_end_date, contract_length,
              terminated_at, termination_reason, notice_period_months, effective_end_date,
-             contract_type, address_label, display_order, signed_at`
+             contract_type, address_label, display_order`
           )
           .in('status', ['signed', 'active'])
           .neq('billing_active', false)

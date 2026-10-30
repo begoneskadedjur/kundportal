@@ -74,8 +74,8 @@ type QuickView = 'all' | 'atgard' | 'inkomplett'
 const LEGACY_INCOMPLETE = ['fortnox', 'karta_saknas', 'karta_ofullstandig', 'inkomplett']
 
 // Sortering: grupperad (standard) eller en platt lista med nyast först, så att
-// ingen ny kund göms i en hopfälld grupp. ?sort=tillagd|signerad i URL:en.
-type SortMode = 'standard' | 'tillagd' | 'signerad'
+// ingen ny kund göms i en hopfälld grupp. ?sort=tillagd i URL:en.
+type SortMode = 'standard' | 'tillagd'
 
 function maxIso(values: Array<string | null | undefined>): string | null {
   let best: string | null = null
@@ -89,16 +89,9 @@ function addedAt(c: ConsolidatedCustomer): string | null {
   return maxIso([c.created_at, c.headquarterCustomer?.created_at, ...c.sites.map((s) => s.created_at)])
 }
 
-// Signerad: senaste signeringsdatumet bland organisationens avtal.
-// signed_at finns i databasen men inte i den genererade typen.
-function signedAt(c: ConsolidatedCustomer): string | null {
-  return maxIso(c.allContracts.map((k) => (k as { signed_at?: string | null }).signed_at))
-}
-
-// ÅÅÅÅ-MM-DD i svensk tid. signed_at är ett rent datum, created_at en tidsstämpel i UTC.
+// ÅÅÅÅ-MM-DD i svensk tid (created_at är en tidsstämpel i UTC)
 function isoDay(iso: string | null): string | null {
   if (!iso) return null
-  if (iso.length === 10) return iso
   return new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' })
 }
 
@@ -225,7 +218,7 @@ export default function Customers() {
     return q && LEGACY_INCOMPLETE.includes(q) ? 'inkomplett' : 'all'
   })
   const sortParam = searchParams.get('sort')
-  const sortMode: SortMode = sortParam === 'tillagd' || sortParam === 'signerad' ? sortParam : 'standard'
+  const sortMode: SortMode = sortParam === 'tillagd' ? 'tillagd' : 'standard'
   const setSortMode = (mode: SortMode) => setSearchParams(prev => {
     if (mode === 'standard') prev.delete('sort')
     else prev.set('sort', mode)
@@ -294,17 +287,12 @@ export default function Customers() {
     )
 
     // Nyast först: en platt lista utan grupper, så att inget göms i en hopfälld grupp.
-    // Kunder utan signeringsdatum hamnar sist, sorterade på när de lades till.
-    if (sortMode !== 'standard') {
+    if (sortMode === 'tillagd') {
       const desc = (a: string | null, b: string | null) =>
         a && b ? b.localeCompare(a) : a ? -1 : b ? 1 : 0
-      const rows = byName.sort((a, b) =>
-        sortMode === 'signerad'
-          ? desc(signedAt(a), signedAt(b)) || desc(addedAt(a), addedAt(b))
-          : desc(addedAt(a), addedAt(b))
-      )
+      const rows = byName.sort((a, b) => desc(addedAt(a), addedAt(b)))
       return rows.length > 0
-        ? [{ key: sortMode, label: sortMode === 'signerad' ? 'Senast signerade' : 'Senast tillagda', rows, sum: null as number | null }]
+        ? [{ key: 'tillagd', label: 'Senast tillagda', rows, sum: null as number | null }]
         : []
     }
 
@@ -350,10 +338,6 @@ export default function Customers() {
     if (sortMode === 'tillagd') {
       const d = isoDay(addedAt(c))
       return d ? `Tillagd ${d}` : null
-    }
-    if (sortMode === 'signerad') {
-      const d = isoDay(signedAt(c))
-      return d ? `Signerad ${d}` : 'Signeringsdatum saknas'
     }
     return null
   }
@@ -862,7 +846,6 @@ export default function Customers() {
             {([
               { key: 'standard', label: 'Grupperad' },
               { key: 'tillagd', label: 'Senast tillagda' },
-              { key: 'signerad', label: 'Senast signerade' },
             ] as const).map((s) => {
               const active = sortMode === s.key
               return (

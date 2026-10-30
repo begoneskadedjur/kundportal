@@ -256,7 +256,7 @@ interface Props {
   setup?: SetupSummary | null
   /** Klick på en statusikon eller nästa åtgärd */
   onSetupNavigate?: (target: SetupTarget) => void
-  /** Sorterat på datum: "Tillagd 2026-10-22" eller "Signerad 2026-10-08" bredvid namnet */
+  /** Sorterat på datum: "Tillagd 2026-10-22" bredvid namnet */
   dateNote?: string | null
 }
 
