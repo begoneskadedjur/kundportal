@@ -11,6 +11,7 @@ import { ContractInvoiceGenerator } from './contractInvoiceGenerator'
 import { cancelVisitsAfterEnd, restoreVisitsAfterEnd } from './terminationVisits'
 import { ContractService } from './contractService'
 import { describePlanChange, type PlanChangePreview, type PreviewExistingInvoice } from '../shared/contractAnchorPreview'
+import { materializedBillingFrequency } from '../shared/billingFrequencyDefault'
 import type { ContractWithBilling } from '../types/database'
 
 export interface ScopeRow {
@@ -361,6 +362,16 @@ export class ContractScopeService {
     // fel slutdatum och fel uppsägningstid.
     const hasOtherLive = (await this.liveContractsOnCustomer(customerId)).length > 0
     const annual = hasOtherLive ? 0 : Number(customer.annual_value ?? 0)
+    // Intervallet ärvs inte blint (steg 13): kundradens gamla standard var ett
+    // tyst månadsvis, och så fick Falu månadsfakturering. Regeln ligger i
+    // materializedBillingFrequency; ärvt värde ber om kontroll på avtalet.
+    const frequency = hasOtherLive
+      ? { value: null, needsCheck: false }
+      : materializedBillingFrequency({
+          customerFrequency: customer.billing_frequency,
+          annualValue: annual,
+          contractType: label || customer.contract_type,
+        })
     const nextOrder = await this.nextDisplayOrder(customerId)
     const { data: created, error } = await supabase
       .from('contracts')
@@ -387,7 +398,8 @@ export class ContractScopeService {
         billing_address: customer.billing_address ?? null,
         annual_value: annual > 0 ? annual : null,
         total_value: annual > 0 ? annual : null,
-        billing_frequency: hasOtherLive ? null : (customer.billing_frequency ?? null),
+        billing_frequency: frequency.value,
+        billing_frequency_needs_check: frequency.needsCheck,
         billing_anchor_month: hasOtherLive ? null : (customer.billing_anchor_month ?? null),
         contract_start_date: hasOtherLive ? null : (customer.contract_start_date ?? null),
         contract_end_date: hasOtherLive ? null : (customer.contract_end_date ?? null),
@@ -1317,6 +1329,8 @@ export class ContractScopeService {
         billing_frequency: input.billingFrequency ?? null,
         billing_anchor_month: input.billingAnchorMonth ?? null,
         billing_active: true,
+        // Sparat i § 6 = aktivt val, kontrollraden från materialiseringen släcks
+        billing_frequency_needs_check: false,
       })
       .eq('id', contractId)
     if (error) throw new Error(`Kunde inte spara premien: ${error.message}`)

@@ -71,7 +71,10 @@ const INITIAL_FORM = {
   // Steg 3
   billing_email: '',
   billing_address: '',
-  billing_frequency: 'monthly' as 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'on_demand',
+  // Inget tyst standardintervall: tomt = inget intervall (avrop eller per
+  // ärende). Får kunden en årspremie förifylls Årsvis (beslut 2026-10-30:
+  // årsvis är standard om inget motsäger det) och fältet blir obligatoriskt.
+  billing_frequency: '' as '' | 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'on_demand',
   billing_reference: '',
   cost_center: '',
   billing_recipient: '',
@@ -79,6 +82,9 @@ const INITIAL_FORM = {
 }
 
 type FormData = typeof INITIAL_FORM
+
+/** Kunden får en årspremie: då krävs ett faktureringsintervall */
+const hasPremium = (f: FormData): boolean => parseFloat(f.annual_value) > 0
 
 export default function CreateCustomerManuallyModal({
   isOpen,
@@ -125,6 +131,11 @@ export default function CreateCustomerManuallyModal({
         if (!isNaN(parsed)) next.monthly_value = (parsed / 12).toFixed(0)
       }
 
+      // Årspremie utan valt intervall: Årsvis förifylls synligt i steg 3
+      if (field === 'annual_value' && !prev.billing_frequency && parseFloat(value) > 0) {
+        next.billing_frequency = 'annual'
+      }
+
       // Auto-beräkna totalt kontraktsvärde från annual_value × avtalslängd (heltal år)
       const annualRaw = field === 'annual_value' ? value : prev.annual_value
       const lengthRaw = field === 'contract_length' ? value : prev.contract_length
@@ -152,6 +163,9 @@ export default function CreateCustomerManuallyModal({
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contact_email)) {
         errs.contact_email = 'Ogiltig e-postadress'
       }
+    }
+    if (s === 3 && hasPremium(form) && !form.billing_frequency) {
+      errs.billing_frequency = 'Välj intervall när kunden har årspremie'
     }
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -206,7 +220,7 @@ export default function CreateCustomerManuallyModal({
         agreement_text: form.agreement_text.trim() || null,
         billing_email: form.billing_email.trim() || null,
         billing_address: form.billing_address.trim() || null,
-        billing_frequency: form.billing_frequency,
+        billing_frequency: form.billing_frequency || null,
         billing_reference: form.billing_reference.trim() || null,
         cost_center: form.cost_center.trim() || null,
         billing_recipient: form.billing_recipient.trim() || null,
@@ -613,7 +627,9 @@ export default function CreateCustomerManuallyModal({
                   <Select
                     value={form.billing_frequency}
                     onChange={v => set('billing_frequency', v as FormData['billing_frequency'])}
+                    error={errors.billing_frequency}
                     options={[
+                      { value: '', label: 'Inget intervall (avrop eller per ärende)', disabled: hasPremium(form) },
                       { value: 'monthly', label: 'Månadsvis' },
                       { value: 'quarterly', label: 'Kvartalsvis' },
                       { value: 'semi_annual', label: 'Halvårsvis' },

@@ -114,6 +114,10 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
     isAvrop ||
     annual <= 0 ||
     (!!c.billing_frequency && (exactDay ? !!c.contract_start_date : !!c.billing_anchor_month || c.billing_frequency === 'on_demand'))
+  // Steg 13: intervallet ärvdes från kundraden eller blev årsvis som standard
+  // när avtalet skapades ur kundkortet. Släcks när § 6 sparas eller avtalet
+  // markeras Kontrollerat.
+  const frequencyUnchecked = !isAvrop && !!c.billing_frequency_needs_check && !c.reviewed_at
   const hasTerm = !!start && !!c.notice_period_months && (!!c.contract_end_date || c.renewal_mode === 'rolling' || !c.renewal_mode)
   // Fakturaplanen är ett eget steg: villkoren kan vara satta utan att någon
   // klickat Planera fakturor. Pausad fakturering (gamla kunder som faktureras
@@ -132,6 +136,7 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
     { key: 'scope', label: 'Omfattning', ok: hasScope, vital: true, group: 'omfattning', paragraph: '§ 1', hint: 'Dra in minst en enhet, eller hela verksamheten, i § 1.' },
     { key: 'premium', label: 'Årspremie', ok: hasPremium, vital: true, group: 'fakturering', paragraph: '§ 6', hint: 'Årspremien är grunden för fakturaplanen och marginalen.' },
     { key: 'billing', label: 'Faktureringsvillkor', ok: hasBillingTerms, vital: true, group: 'fakturering', paragraph: '§ 6', hint: 'Frekvens och ankarmånad avgör när fakturorna skapas.' },
+    { key: 'frequency_check', label: 'Kontrollera faktureringsintervall', ok: !frequencyUnchecked, vital: false, group: 'fakturering', paragraph: '§ 6', hint: 'Intervallet kom från kundkortet när avtalet skapades. Stäm av mot avtalet och Fortnox och spara § 6.' },
     { key: 'plan', label: 'Fakturaplan', ok: hasPlan, vital: true, group: 'fakturering', paragraph: '§ 6', hint: 'Klicka Planera fakturor så nästa period ligger som utkast i portalen.' },
     { key: 'followup', label: 'Besöksfrekvens', ok: hasFollowup, vital: true, group: 'uppfoljning', paragraph: '§ 3', hint: 'Antal besök per år är facit vid schemaläggning och uppföljning.' },
     { key: 'schedule', label: unitsWithoutSchedule === 1 ? 'En enhet saknar schema' : `${unitsWithoutSchedule} enheter saknar schema`, ok: unitsWithoutSchedule === 0, vital: true, group: 'uppfoljning', paragraph: '§ 3', hint: 'Skapa schemat ur § 3 i panelen så besöken finns i kalendern och teknikern ser dem.' },

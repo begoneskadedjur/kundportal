@@ -115,6 +115,8 @@ export class CaseCustomerService {
         customer_number: null,
         is_active: true,
         billing_active: false,
+        // Ärendekund utan avtal: inget faktureringsintervall (steg 13)
+        billing_frequency: null,
         source_type: 'manual',
       })
       .select('id')

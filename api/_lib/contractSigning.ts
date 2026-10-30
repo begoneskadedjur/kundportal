@@ -679,6 +679,9 @@ async function createOrLinkCustomer(
     total_contract_value: totalContractValue,
     annual_value: annualValue,
     monthly_value: annualValue ? annualValue / 12 : null,
+    // Avtalets intervall (guiden sätter årsvis). Saknas det och avtalet har
+    // premie blir det årsvis, aldrig kolumnens gamla tysta månadsvis (steg 13).
+    billing_frequency: str(contract.billing_frequency) ?? (annualValue && annualValue > 0 ? 'annual' : null),
     currency: 'SEK',
     agreement_text: str(contract.agreement_text),
     products: contract.selected_products ?? null,

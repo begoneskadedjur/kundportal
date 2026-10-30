@@ -162,7 +162,9 @@ export default function BillingSettingsModal({
   const [contractServicesTotal, setContractServicesTotal] = useState(0)
 
   // Billing form state
-  const [billingFrequency, setBillingFrequency] = useState<BillingFrequency>('monthly')
+  // Inget tyst standardintervall (steg 13): null = inget valt. Har kunden
+  // årspremie gäller Årsvis tills någon väljer annat (effectiveFrequency).
+  const [billingFrequency, setBillingFrequency] = useState<BillingFrequency | null>(null)
   const [billingEmail, setBillingEmail] = useState('')
   const [billingAddress, setBillingAddress] = useState('')
   const [billingType, setBillingType] = useState<'consolidated' | 'per_site'>('consolidated')
@@ -176,7 +178,7 @@ export default function BillingSettingsModal({
   // Init form
   useEffect(() => {
     if (!isOpen || !customerId) return
-    setBillingFrequency(currentBillingFrequency || 'annual')
+    setBillingFrequency(currentBillingFrequency ?? null)
     setBillingEmail(currentBillingEmail || '')
     setBillingAddress(currentBillingAddress || '')
     setBillingType(currentBillingType || 'consolidated')
@@ -227,7 +229,8 @@ export default function BillingSettingsModal({
       .then(contract => {
         if (cancelled || !contract) return
         // Avtalsfält → lokal state (override:ar prop-default)
-        if (contract.billing_frequency) setBillingFrequency(contract.billing_frequency)
+        // Avtalets eget värde, även tomt: visningen ska inte låna kundradens intervall
+        setBillingFrequency(contract.billing_frequency ?? null)
         setContractStartDate(contract.contract_start_date ?? '')
         setContractEndDate(contract.contract_end_date ?? '')
         if (contract.billing_anchor_month != null) setBillingAnchorMonth(contract.billing_anchor_month)
@@ -385,22 +388,25 @@ export default function BillingSettingsModal({
   const fixedVal = fixedContractValue !== '' ? parseFloat(fixedContractValue) || 0 : null
   const baseTotal = fixedVal != null ? fixedVal : calculatedTotal
   const adjustedTotal = hasAdjustment ? Math.round(baseTotal * (1 + adjustPct / 100)) : baseTotal
-  const freqMonths = BILLING_FREQUENCY_CONFIG[billingFrequency]?.months ?? 1
+  // Årspremie utan valt intervall: årsvis är standard (beslut 2026-10-30).
+  // Utan premie är intervallet tomt tills någon väljer.
+  const effectiveFrequency: BillingFrequency | null = billingFrequency ?? (adjustedTotal > 0 ? 'annual' : null)
+  const freqMonths = effectiveFrequency ? (BILLING_FREQUENCY_CONFIG[effectiveFrequency]?.months ?? 1) : 12
   const perPeriodAdj = freqMonths > 0 && freqMonths !== 12 ? Math.round(adjustedTotal * freqMonths / 12) : adjustedTotal
 
   // Fakturaschema – använder samma plan-funktion som ContractInvoiceGenerator
   // så att det som visas här matchar exakt vad som skapas vid Spara.
   const plannedSchedule = (() => {
     if (!contractStartDate || !contractEndDate) return []
-    if (billingFrequency === 'on_demand') return []
+    if (!effectiveFrequency || effectiveFrequency === 'on_demand') return []
     if (adjustedTotal <= 0) return []
-    if (!billingAnchorMonth && billingFrequency === 'annual') return []
+    if (!billingAnchorMonth && effectiveFrequency === 'annual') return []
     return computePlannedInvoicesPure({
       annual_value: adjustedTotal,
       contract_start_date: contractStartDate,
       contract_end_date: contractEndDate,
       terminated_at: null,
-      billing_frequency: billingFrequency as any,
+      billing_frequency: effectiveFrequency,
       billing_anchor_month: billingAnchorMonth,
       // Visa alltid schemat även om billing_active=false (pedagogiskt)
       billing_active: true,
@@ -487,7 +493,11 @@ export default function BillingSettingsModal({
     // Utan avtal (synth-kund) skrivs fälten till kundraden som förut.
     if (!contractId) {
       customerUpdate.billing_paused_until = billingActive ? null : (billingPausedUntil || null)
-      customerUpdate.billing_frequency = billingFrequency
+      // Skrivs bara när värdet ändras: ett aktivt val, eller Årsvis för en
+      // kund med årspremie som saknade intervall. Aldrig ett tyst månadsvis.
+      if (effectiveFrequency !== (currentBillingFrequency ?? null)) {
+        customerUpdate.billing_frequency = effectiveFrequency
+      }
       customerUpdate.annual_value = annualValue
       customerUpdate.monthly_value = monthlyValue
       customerUpdate.contract_start_date = contractStartDate || null
@@ -730,7 +740,7 @@ export default function BillingSettingsModal({
                   <span>Fakturamånad</span>
                   <span className="text-slate-200 text-right">{billingAnchorMonth ? MONTHS_SV[billingAnchorMonth - 1] : 'ej angiven'}</span>
                   <span>Frekvens</span>
-                  <span className="text-slate-200 text-right">{BILLING_FREQUENCY_CONFIG[billingFrequency]?.label ?? '–'}</span>
+                  <span className="text-slate-200 text-right">{billingFrequency ? BILLING_FREQUENCY_CONFIG[billingFrequency]?.label ?? '–' : 'inget intervall'}</span>
                   <span>Årspremie</span>
                   <span className="text-slate-200 tabular-nums text-right">{fixedVal != null ? fmt(fixedVal) : '–'}</span>
                 </div>
@@ -798,7 +808,7 @@ export default function BillingSettingsModal({
                   <CalendarDays className="w-3.5 h-3.5 text-[#20c58f]" />
                   <span className="text-xs font-medium text-slate-300">Fakturaschema</span>
                   <span className="text-xs text-slate-500">
-                    · {BILLING_FREQUENCY_CONFIG[billingFrequency]?.label.toLowerCase()}
+                    · {effectiveFrequency ? BILLING_FREQUENCY_CONFIG[effectiveFrequency]?.label.toLowerCase() : ''}
                     {billingAnchorMonth ? `, fakturamånad: ${MONTHS_SV[billingAnchorMonth - 1]}` : ''}
                     · {plannedSchedule.length} {plannedSchedule.length === 1 ? 'faktura' : 'fakturor'}
                   </span>
@@ -846,7 +856,7 @@ export default function BillingSettingsModal({
               </div>
             )}
 
-            {!contractScoped && billingAnchorMonth != null && billingFrequency !== 'on_demand' && plannedSchedule.length === 0 && (
+            {!contractScoped && billingAnchorMonth != null && !!effectiveFrequency && effectiveFrequency !== 'on_demand' && plannedSchedule.length === 0 && (
               <p className="text-xs text-slate-500">
                 Inga fakturor planeras — kontrollera avtalsstart, avtalsslut och årspremie.
               </p>
@@ -862,13 +872,16 @@ export default function BillingSettingsModal({
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Faktureringsfrekvens</label>
                 <Select
-                  value={billingFrequency}
+                  value={effectiveFrequency ?? ''}
                   disabled={contractScoped}
-                  onChange={(v) => setBillingFrequency(v as BillingFrequency)}
-                  options={Object.entries(BILLING_FREQUENCY_CONFIG).map(([k, c]) => ({
-                    value: k,
-                    label: c.label,
-                  }))}
+                  onChange={(v) => setBillingFrequency(v ? (v as BillingFrequency) : null)}
+                  options={[
+                    { value: '', label: 'Inget intervall (avrop eller per ärende)', disabled: adjustedTotal > 0 },
+                    ...Object.entries(BILLING_FREQUENCY_CONFIG).map(([k, c]) => ({
+                      value: k,
+                      label: c.label,
+                    })),
+                  ]}
                 />
               </div>
               <div>
@@ -1001,13 +1014,13 @@ export default function BillingSettingsModal({
                 <p className="text-xs text-slate-500 mt-0.5">
                   Efter justering ({adjustPct > 0 ? '+' : ''}{adjustPct}%): <span className="text-[#20c58f] font-medium tabular-nums">{fmt(adjustedTotal)}</span>
                   {freqMonths > 0 && freqMonths !== 12 && (
-                    <> — {fmt(perPeriodAdj)} per faktura ({BILLING_FREQUENCY_CONFIG[billingFrequency]?.label.toLowerCase()})</>
+                    <> — {fmt(perPeriodAdj)} per faktura ({effectiveFrequency ? BILLING_FREQUENCY_CONFIG[effectiveFrequency]?.label.toLowerCase() : ''})</>
                   )}
                 </p>
               )}
               {!hasAdjustment && freqMonths > 0 && freqMonths !== 12 && adjustedTotal > 0 && (
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Per faktura ({BILLING_FREQUENCY_CONFIG[billingFrequency]?.label.toLowerCase()}): <span className="text-slate-300 font-medium">{fmt(perPeriodAdj)}</span>
+                  Per faktura ({effectiveFrequency ? BILLING_FREQUENCY_CONFIG[effectiveFrequency]?.label.toLowerCase() : ''}): <span className="text-slate-300 font-medium">{fmt(perPeriodAdj)}</span>
                 </p>
               )}
             </div>

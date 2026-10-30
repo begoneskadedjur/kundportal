@@ -491,6 +491,8 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
           contract_length: `${contractData.contract_length} månader`,
           annual_value: contractData.annual_value,
           total_contract_value: contractData.annual_value * (parseInt(contractData.contract_length) / 12),
+          // Inget tyst månadsvis (steg 13): årspremie utan valt intervall blir årsvis
+          billing_frequency: contractData.annual_value > 0 ? 'annual' : null,
           agreement_text: contractData.agreement_text,
           service_details: contractData.service_details,
           product_summary: contractData.product_summary,

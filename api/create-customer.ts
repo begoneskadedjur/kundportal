@@ -177,6 +177,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         annual_value: customerData.annual_value ? parseFloat(customerData.annual_value) : null,
         monthly_value: customerData.monthly_value ? parseFloat(customerData.monthly_value) : null,
         total_contract_value: customerData.total_contract_value ? parseFloat(customerData.total_contract_value) : null,
+        // Inget tyst månadsvis (steg 13): årspremie utan valt intervall blir årsvis
+        billing_frequency: customerData.billing_frequency || (customerData.annual_value && parseFloat(customerData.annual_value) > 0 ? 'annual' : null),
         agreement_text: customerData.agreement_text || null,
         
         // Account management

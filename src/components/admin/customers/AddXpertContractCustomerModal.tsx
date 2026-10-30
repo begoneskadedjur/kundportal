@@ -216,6 +216,8 @@ export default function AddXpertContractCustomerModal({
         annual_value: formData.annual_value ? parseFloat(formData.annual_value) : null,
         monthly_value: formData.monthly_value ? parseFloat(formData.monthly_value) : null,
         total_contract_value: formData.total_contract_value ? parseFloat(formData.total_contract_value) : null,
+        // Inget tyst månadsvis (steg 13): årspremie utan valt intervall blir årsvis
+        billing_frequency: formData.annual_value && parseFloat(formData.annual_value) > 0 ? 'annual' : null,
         agreement_text: formData.agreement_text?.trim() || null,
         oneflow_contract_id: formData.oneflow_contract_id?.trim() || null,
         assigned_account_manager: formData.assigned_account_manager?.trim() || null,

@@ -53,6 +53,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'nyhet', text: 'Varje tilläggsstation visar betald till och med, även för manuella Fortnox-fakturor och efterskänkta debiteringar.' },
       { kind: 'andring', text: 'Kundkortet och avtalskartan visar om ärenden faktureras per ärende eller samlat per månad.' },
       { kind: 'buggfix', text: 'Kundens avtalsblad i kundportalen visar avtalet igen. Det föll på ett fel i prislistan.' },
+      { kind: 'andring', text: 'Nya kunder får inget faktureringsintervall förrän någon väljer ett. Har kunden årspremie föreslås årsvis. Tidigare blev det månadsvis utan att det syntes.' },
     ],
   },
   {

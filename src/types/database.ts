@@ -737,6 +737,12 @@ export type Database = {
           billing_anchor_verified_note?: string | null
           /** NULL = dagens tilläggsregler, 'v2' = täckning per station och pro rata version 2. */
           addon_rules?: 'v2' | null
+          /**
+           * Steg 13 (2026-10-30): intervallet ärvdes från kundraden eller blev
+           * årsvis som standard när avtalet skapades ur kundkortet. Kompletthets-
+           * raden ber om kontroll tills § 6 sparas eller avtalet kontrolleras.
+           */
+          billing_frequency_needs_check?: boolean
 
           created_at: string
           updated_at: string
