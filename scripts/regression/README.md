@@ -67,3 +67,9 @@ npx tsx --env-file=.env scripts/regression/plan-dump.mts --today=2026-10-30 --ou
 ```
 
 `overlap-share-twin.mts` jämför `periodOverlapShare` i TS med SQL-funktionen `contract_period_overlap_share` (som överlappsvakten anropar) för 400 fasta par (`--pairs=N` ger fler). `overlap-share.test.sql` provar vakten på riktigt kring gränsen hälften i ett block som alltid rullas tillbaka.
+
+## Pro rata version 2 (steg 9)
+
+`prorata-compare.sql` kör `sync_addon_prorata_line` (och `_legacy` när den finns) för alla anrop som förekommer i dag, varje anrop i en deltransaktion som rullas tillbaka, och skriver md5 per funktion. Före och efter migrationen ska md5 vara lika (avtal utan `addon_rules = 'v2'` går den gamla vägen). Svaret beror på dagens datum.
+
+`prorata-v2.test.sql` provar version 2 på Falu kommun i målbilden (exakt avtalsdag, option, v2), ledtidsregeln på FEV, reservtriggern och teknikerns RLS, i ett block som alltid rullas tillbaka.

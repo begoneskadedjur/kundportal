@@ -29,7 +29,6 @@ import { IndoorStationService } from '../../services/indoorStationService'
 import { CasePreparationService } from '../../services/casePreparationService'
 import { AddonStationBillingService } from '../../services/addonStationBillingService'
 import type { AddonBillingModel, AddonPrices } from '../../types/addonStations'
-import { supabase } from '../../lib/supabase'
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { FloorPlanUploadForm } from '../shared/indoor/FloorPlanUploadForm'
 import { IndoorStationForm, StationTypeSelector } from '../shared/indoor/IndoorStationForm'
@@ -132,6 +131,9 @@ export function AddStationWizard({
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
   const [replacingImage, setReplacingImage] = useState(false)
   const replaceImageInputRef = useRef<HTMLInputElement>(null)
+  // Kunder där teknikern redan fått veta vilket av flera öppna
+  // etableringsärenden stationerna kopplas till (visas en gång per kund)
+  const flerArendenVisade = useRef<Set<string>>(new Set())
 
   // Ladda kunder när wizard öppnas
   useEffect(() => {
@@ -350,25 +352,24 @@ export function AddStationWizard({
   const handleCreateStation = async (input: CreateIndoorStationInput) => {
     setIsSubmitting(true)
     try {
+      // Stationen kopplas till etableringsärendet den sätts ut på
+      // (placed_case_id). Samma ärendeuppslag som preparatet nedan, nu före
+      // utsättningen; fel här stoppar aldrig utsättningen.
+      const behoverArende = !!(((input.preparation_id && input.preparation_quantity) || input.is_addon) && selectedCustomerId)
+      const placering = behoverArende && selectedCustomerId
+        ? await AddonStationBillingService.findOpenEstablishmentCase(selectedCustomerId)
+        : null
+
       await IndoorStationService.createStation(
-        input,
+        { ...input, placed_case_id: placering?.case?.id ?? null },
         technicianId || profile?.technicians?.id
       )
 
       // Spara preparat + bakgrundssynka etableringsradens antal mot öppet etableringsärende
-      if (((input.preparation_id && input.preparation_quantity) || input.is_addon) && selectedCustomerId) {
+      if (behoverArende && selectedCustomerId) {
         try {
-          const { data: establishmentCase, error: caseError } = await supabase
-            .from('cases')
-            .select('id, created_at')
-            .eq('customer_id', selectedCustomerId)
-            .eq('service_type', 'establishment')
-            .not('status', 'ilike', '%avslutat%')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-
-          if (caseError) throw caseError
+          if (placering?.error) throw placering.error
+          const establishmentCase = placering?.case ?? null
 
           if (establishmentCase) {
             if (input.preparation_id && input.preparation_quantity) {
@@ -399,6 +400,14 @@ export function AddStationWizard({
             technicianId || profile?.technician_id || null,
             profile?.technicians?.name?.trim() || null
           )
+          const arendeText = AddonStationBillingService.placementCaseMessage(
+            placering?.openCount ?? 0,
+            placering?.case?.case_number
+          )
+          if (arendeText && !flerArendenVisade.current.has(selectedCustomerId)) {
+            flerArendenVisade.current.add(selectedCustomerId)
+            toast(arendeText, { duration: 8000 })
+          }
         }
       }
 

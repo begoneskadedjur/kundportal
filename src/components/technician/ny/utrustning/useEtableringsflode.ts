@@ -161,6 +161,9 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
 
   // Cache för avtalsuppslag per kund (batch-placering, se handleFormSubmit)
   const resolvedContractCache = useRef<Map<string, string | null>>(new Map())
+  // Kunder där teknikern redan fått veta vilket av flera öppna
+  // etableringsärenden stationerna kopplas till (visas en gång per kund)
+  const flerArendenVisade = useRef<Set<string>>(new Set())
 
   // Befintliga stationer för vald kund, visas på kartväljaren under placering.
   // Läser ALLTID ur hela hämtningen, oavsett Alla/Mina: kollegans stationer
@@ -327,9 +330,18 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
           resolvedContractCache.current.set(customerId, resolvedContractId)
         }
 
+        // Stationen kopplas till etableringsärendet den sätts ut på
+        // (placed_case_id). Samma ärendeuppslag som preparatet nedan, nu före
+        // utsättningen; fel här stoppar aldrig utsättningen.
+        const behoverArende = !!((formData.preparation_id && formData.preparation_quantity) || formData.is_addon)
+        const placering = behoverArende
+          ? await AddonStationBillingService.findOpenEstablishmentCase(customerId)
+          : null
+
         const result = await EquipmentService.createEquipment({
           customer_id: customerId,
           contract_id: resolvedContractId,
+          placed_case_id: placering?.case?.id ?? null,
           placed_by_technician_id: technicianId,
           equipment_type: formData.equipment_type,
           serial_number: formData.serial_number || null,
@@ -363,19 +375,10 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
         }
 
         // Spara preparat på öppet etableringsärende
-        if ((formData.preparation_id && formData.preparation_quantity) || formData.is_addon) {
+        if (behoverArende) {
           try {
-            const { data: establishmentCase, error: caseError } = await supabase
-              .from('cases')
-              .select('id, created_at')
-              .eq('customer_id', customerId)
-              .eq('service_type', 'establishment')
-              .not('status', 'ilike', '%avslutat%')
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .maybeSingle()
-
-            if (caseError) throw caseError
+            if (placering?.error) throw placering.error
+            const establishmentCase = placering?.case ?? null
 
             if (establishmentCase) {
               if (formData.preparation_id && formData.preparation_quantity) {
@@ -410,6 +413,14 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
           )
           const warning = AddonStationBillingService.priceMissingMessage(missing)
           if (warning) toast.error(warning, { duration: 8000 })
+          const arendeText = AddonStationBillingService.placementCaseMessage(
+            placering?.openCount ?? 0,
+            placering?.case?.case_number
+          )
+          if (arendeText && !flerArendenVisade.current.has(customerId)) {
+            flerArendenVisade.current.add(customerId)
+            toast(arendeText, { duration: 8000 })
+          }
         }
 
         toast.success('Utrustning placerad!')

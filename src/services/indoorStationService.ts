@@ -289,6 +289,8 @@ export class IndoorStationService {
           preparation_unit: input.preparation_id ? (input.preparation_unit || 'g') : null,
           photo_path: photoPath,
           placed_by_technician_id: technicianId || null,
+          // Ärendet stationen sätts ut på (steg 9 avtalsåret på avtalsdag)
+          placed_case_id: input.placed_case_id ?? null,
           status: 'active'
         })
         .select()

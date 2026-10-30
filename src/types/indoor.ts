@@ -364,6 +364,8 @@ export interface CreateIndoorStationInput {
   preparation_id?: string | null;
   preparation_quantity?: number | null;
   preparation_unit?: PreparationUnit;
+  /** Ärendet stationen sätts ut på (etableringsärendet). Null = okänt, reservtriggern försöker. */
+  placed_case_id?: string | null;
 }
 
 export interface UpdateIndoorStationInput {

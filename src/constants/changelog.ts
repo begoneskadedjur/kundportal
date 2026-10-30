@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.111.0',
+    date: '2026-10-30',
+    title: 'Tilläggsstationen hör till sitt ärende',
+    items: [
+      { kind: 'andring', text: 'En ny tilläggsstation kopplas till etableringsärendet där den sattes ut. Har kunden flera öppna etableringsärenden får du veta vilket ärende stationen kopplas till.' },
+    ],
+  },
+  {
     version: '3.110.0',
     date: '2026-10-30',
     title: 'Skydd mot dubbla avtalsfakturor',

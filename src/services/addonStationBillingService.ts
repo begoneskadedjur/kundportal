@@ -225,6 +225,10 @@ export class AddonStationBillingService {
   /**
    * Pro rata-rad på öppet etableringsärende för per år/per månad-stationer:
    * årspris × dagar till nästa periodstart / 365 per station. Sväljer fel.
+   * Avtal med addon_rules = 'v2' räknas per station och ärende där stationen
+   * sattes ut (placed_case_id), bara över dagar utan täckning, kapat vid
+   * avtalets slut (src/shared/addonProrata.ts speglar regeln). Övriga avtal
+   * som förut.
    */
   static async syncAddonProrataLine(
     customerId: string,
@@ -345,6 +349,46 @@ export class AddonStationBillingService {
       return null
     }
     return (data as AddonPaidThrough | null) ?? null
+  }
+
+  /**
+   * Öppet etableringsärende som en ny station kopplas till (placed_case_id,
+   * steg 9 avtalsåret på avtalsdag). Samma urval som utsättningsflödena redan
+   * använder för preparaten: kundens senast skapade öppna etableringsärende.
+   * Räknar också hur många som är öppna, så att flödet kan tala om vilket
+   * ärende stationen kopplas till. Kastar aldrig: fel returneras i `error`
+   * och utsättningen ska alltid kunna fortsätta utan ärende.
+   */
+  static async findOpenEstablishmentCase(customerId: string): Promise<{
+    case: { id: string; created_at: string; case_number: string | null } | null
+    openCount: number
+    error: unknown | null
+  }> {
+    try {
+      const { data, error, count } = await supabase
+        .from('cases')
+        .select('id, created_at, case_number', { count: 'exact' })
+        .eq('customer_id', customerId)
+        .eq('service_type', 'establishment')
+        .not('status', 'ilike', '%avslutat%')
+        .order('created_at', { ascending: false })
+        .limit(1)
+      if (error) return { case: null, openCount: 0, error }
+      const row = (data?.[0] ?? null) as { id: string; created_at: string; case_number: string | null } | null
+      return { case: row, openCount: count ?? (row ? 1 : 0), error: null }
+    } catch (err) {
+      return { case: null, openCount: 0, error: err }
+    }
+  }
+
+  /**
+   * Text när kunden har flera öppna etableringsärenden: stationen kopplas
+   * till det senast skapade, och teknikern ska se vilket. Tom sträng annars.
+   */
+  static placementCaseMessage(openCount: number, caseNumber: string | null | undefined): string {
+    if (openCount <= 1) return ''
+    const which = caseNumber ? `ärende ${caseNumber}` : 'det senast skapade ärendet'
+    return `Kunden har ${openCount} öppna etableringsärenden. Stationen kopplas till ${which}, det senast skapade.`
   }
 
   /** Synk efter utsättning/borttag beroende på stationens modell. */
