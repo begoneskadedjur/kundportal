@@ -42,6 +42,10 @@
     "src/shared/contractPeriods.ts",
     // Matchningen planerade perioder mot befintliga fakturor (cronen, signeringen)
     "src/shared/contractInvoiceMatch.ts",
+    // Tilläggsregler version 2 (steg 11): planering, märkning, läsning av underlaget
+    "src/shared/addonPlanV2.ts",
+    "src/shared/addonMarking.ts",
+    "src/shared/addonV2Loader.ts",
 
     // Avtalsvärde ur Oneflows produkttabell, synlig priskolumn (webhook, synkar, import)
     "src/shared/oneflowProductValue.ts",

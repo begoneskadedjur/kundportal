@@ -88,3 +88,42 @@ describe('fakturarader för en avtalsperiod', () => {
     expect(nextInvoiceNumber('INV-202610', null)).toBe('INV-202610-0001')
   })
 })
+
+describe('A5: nya tilläggsregler, enhetens namn på raden', () => {
+  const eqPeriod: PlannedPeriod = {
+    ...period,
+    kind: 'equipment',
+    amount: 0,
+    equipmentRows: [
+      { source_id: 'L1', contract_id: 'C1', name: 'Ljusfälla', code: '601', quantity: 2, unit_price: 1686, total_price: 3372, vat_rate: 25, unit_name: 'Återvinningscentralen', station_ids: ['s1', 's2'] },
+    ],
+  }
+  const sources = { premiumItems: [], equipment: [], additionNotes: [], label: 'GNU 2026/60', diaryNumber: null }
+
+  it('radtexten innehåller enhetens namn och stationerna följer raden', () => {
+    const rows = buildContractInvoiceRows('C1', sources, eqPeriod)
+    expect(rows[0].article_name).toBe('Ljusfälla, Återvinningscentralen, tillägg utöver avtal GNU 2026/60, 2026-10-01 t.o.m. 2027-09-30, 2 st')
+    expect(rows[0].station_ids).toEqual(['s1', 's2'])
+  })
+
+  it('gamla regler: samma text som förut', () => {
+    const legacy = { ...eqPeriod, equipmentRows: [{ ...eqPeriod.equipmentRows[0], unit_name: undefined, station_ids: undefined }] }
+    expect(buildContractInvoiceRows('C1', sources, legacy)[0].article_name).toBe(
+      'Ljusfälla, tillägg utöver avtal GNU 2026/60, 2026-10-01 t.o.m. 2027-09-30, 2 st'
+    )
+  })
+
+  it('glappfaktura: rad per enhet och typ, anteckning om utsättningen', () => {
+    const gap: PlannedPeriod = { ...eqPeriod, kind: 'equipment_gap', periodStart: '2026-11-10', periodEnd: '2027-06-30' }
+    const rows = buildContractInvoiceRows('C1', sources, gap)
+    expect(rows[0]).toMatchObject({
+      line_kind: 'equipment_annual',
+      case_billing_item_id: null,
+      article_name: 'Ljusfälla, Återvinningscentralen, tillägg från utsättning, 2026-11-10 t.o.m. 2027-06-30, 2 st',
+      station_ids: ['s1', 's2'],
+    })
+    expect(buildContractInvoiceNotes(gap, 'GNU 2026/60', null)).toBe(
+      'Tilläggsstationer från utsättning till nästa periodstart · GNU 2026/60 · Period 2026-11-10 t.o.m. 2027-06-30'
+    )
+  })
+})

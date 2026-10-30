@@ -1025,8 +1025,11 @@ export default function InvoiceDetailModal({
       // så att tilläggsstationer och utrustningsrader speglar antalet just nu.
       // Rör bara redigerbara fakturor och bara den här fakturan.
       let itemsForSend = invoice.items
+      // Nya tilläggsregler (steg 11): tilläggsraderna delas till högst 50 tecken
+      let splitAddonRows = false
       if (invoice.invoice_type === 'contract') {
         const refreshed = await ContractInvoiceGenerator.refreshContractInvoiceBeforeSend(invoice.id)
+        splitAddonRows = refreshed.splitAddonRows === true
         if (refreshed.changed) {
           itemsForSend = refreshed.items as unknown as typeof invoice.items
           toast('Fakturan uppdaterades med dagens antal tilläggsstationer innan sändning', { icon: 'ℹ️' })
@@ -1065,6 +1068,7 @@ export default function InvoiceDetailModal({
         vatIncluded,
         fastighetsbeteckning: invoice.fastighetsbeteckning,
         addonLines: invoice.invoice_type === 'adhoc' ? addons.lines : [],
+        splitAddonRows,
       })
 
       // 4. Skapa faktura i Fortnox

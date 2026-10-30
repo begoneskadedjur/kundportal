@@ -5,6 +5,7 @@ import {
   addonLineName,
   addonPeriodText,
   buildFortnoxInvoiceRows,
+  splitFortnoxAddonText,
   fortnoxText,
   houseWorkHoursFor,
   matchInvoiceAddonLines,
@@ -160,5 +161,35 @@ describe('fortnoxText', () => {
 
   it('lämnar vanlig text orörd', () => {
     expect(fortnoxText('Pär-Eric Nilsson, BE-0009084 (10 %)')).toBe('Pär-Eric Nilsson, BE-0009084 (10 %)')
+  })
+})
+
+describe('A5: Fortnox-rader högst 50 tecken för nya tilläggsregler', () => {
+  const v2Item = {
+    id: 'i1',
+    article_code: '601',
+    article_name: 'Ljusfälla, Återvinningscentralen, tillägg utöver avtal GNU 2026/60, 2026-10-01 t.o.m. 2027-09-30, 2 st',
+    quantity: 2,
+    unit_price: 1686,
+    total_price: 3372,
+    vat_rate: 25,
+    discount_percent: 0,
+    line_kind: 'equipment_annual',
+  }
+  it('huvudraden och textraderna är högst 50 tecken, enhetens namn finns kvar', () => {
+    const rows = buildFortnoxInvoiceRows([v2Item], { vatIncluded: false, splitAddonRows: true })
+    expect(rows.length).toBeGreaterThan(1)
+    for (const r of rows) expect(r.Description.length).toBeLessThanOrEqual(50)
+    expect(rows.map((r) => r.Description).join(' ')).toContain('Återvinningscentralen')
+    expect(rows[0]).toMatchObject({ ArticleNumber: '601', DeliveredQuantity: 2, Price: 1686 })
+    expect(rows.slice(1).every((r) => !('Price' in r))).toBe(true)
+  })
+  it('utan flaggan skickas raden som förut', () => {
+    const rows = buildFortnoxInvoiceRows([v2Item], { vatIncluded: false })
+    expect(rows).toHaveLength(1)
+    expect(rows[0].Description.length).toBeGreaterThan(50)
+  })
+  it('kort rad delas inte', () => {
+    expect(splitFortnoxAddonText('Ljusfälla, ÅVC, 2 st')).toEqual({ main: 'Ljusfälla, ÅVC, 2 st', rest: [] })
   })
 })

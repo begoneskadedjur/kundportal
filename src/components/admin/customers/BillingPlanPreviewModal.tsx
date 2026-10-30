@@ -388,7 +388,13 @@ export default function BillingPlanPreviewModal({ isOpen, plan: basePlan, loadin
                         <span className="text-slate-200 w-24">{formatPeriod(entry.planned?.periodStart)}</span>
                         {entry.kind && entry.kind !== 'premium' && (
                           <span className="text-[10px] uppercase tracking-wide text-slate-400">
-                            {entry.kind === 'equipment_monthly' ? 'tillägg per månad' : 'tillägg per år'}
+                            {entry.kind === 'equipment_monthly'
+                              ? 'tillägg per månad'
+                              : entry.kind === 'equipment_gap'
+                                ? 'tillägg från utsättning'
+                                : 'tillägg per år'}
+                            {/* Nya tilläggsregler: en tilläggsfaktura per referenskod */}
+                            {entry.addonRulesV2 && entry.marking ? ` · ${entry.marking}` : ''}
                           </span>
                         )}
                         {/* Exkl. moms, samma tal som § 6 på pappret och kundens avtal */}

@@ -6,6 +6,7 @@
 
 import { resolvePremiumShares, allocateByShares } from './premiumShares'
 import type { EquipmentLine, PlannedPeriod } from './contractPlanner'
+import { gapRowName, GAP_INVOICE_NOTE, isV2Row, v2AddonRowName } from './addonPlanV2'
 
 export interface ContractServiceItem {
   case_billing_item_id: string
@@ -65,21 +66,46 @@ export function buildContractInvoiceRows(contractId: string, sources: ContractRo
   const diary = sources.diaryNumber ? ` (${sources.diaryNumber})` : ''
   const rows: InvoiceRowSpec[] = []
 
-  // Egna tilläggsfakturor: bara utrustningsraderna
-  if (planned.kind === 'equipment' || planned.kind === 'equipment_monthly') {
+  // Glappfaktura (nya tilläggsregler, steg 11): en rad per enhet och
+  // stationstyp, dagarna från utsättningen till nästa periodstart
+  if (planned.kind === 'equipment_gap') {
     for (const eq of planned.equipmentRows) {
       rows.push({
         contract_id: contractId,
-        line_kind: planned.kind === 'equipment_monthly' ? 'equipment_monthly' : 'equipment_annual',
-        case_billing_item_id: eq.source_id,
+        line_kind: 'equipment_annual',
+        case_billing_item_id: null,
         article_code: eq.code,
-        article_name: `${eq.name}, tillägg utöver avtal${sources.label ? ` ${sources.label}` : ''}, ${period}, ${eq.quantity} st`,
+        article_name: gapRowName(eq, period),
         quantity: eq.quantity,
         unit_price: eq.unit_price,
         total_price: eq.total_price,
         vat_rate: eq.vat_rate,
         discount_percent: 0,
-        station_ids: sources.equipment.find((e) => e.id === eq.source_id)?.station_ids ?? null,
+        station_ids: eq.station_ids ?? null,
+      })
+    }
+    return rows
+  }
+
+  // Egna tilläggsfakturor: bara utrustningsraderna
+  if (planned.kind === 'equipment' || planned.kind === 'equipment_monthly') {
+    for (const eq of planned.equipmentRows) {
+      // Nya tilläggsregler: enhetens namn på raden och periodens stationer
+      const v2 = isV2Row(eq)
+      rows.push({
+        contract_id: contractId,
+        line_kind: planned.kind === 'equipment_monthly' ? 'equipment_monthly' : 'equipment_annual',
+        case_billing_item_id: eq.source_id,
+        article_code: eq.code,
+        article_name: v2
+          ? v2AddonRowName(eq, sources.label, period)
+          : `${eq.name}, tillägg utöver avtal${sources.label ? ` ${sources.label}` : ''}, ${period}, ${eq.quantity} st`,
+        quantity: eq.quantity,
+        unit_price: eq.unit_price,
+        total_price: eq.total_price,
+        vat_rate: eq.vat_rate,
+        discount_percent: 0,
+        station_ids: v2 ? (eq.station_ids ?? null) : (sources.equipment.find((e) => e.id === eq.source_id)?.station_ids ?? null),
       })
     }
     return rows
@@ -167,17 +193,21 @@ export function buildContractInvoiceRows(contractId: string, sources: ContractRo
   }
 
   for (const eq of planned.equipmentRows) {
+    // Nya tilläggsregler med månadspremie: tilläggen på premiefakturan, med
+    // enhetens namn och stationerna (täckningen skrivs när fakturan skickas)
+    const v2 = isV2Row(eq)
     rows.push({
       contract_id: contractId,
       line_kind: 'equipment_annual',
       case_billing_item_id: eq.source_id,
       article_code: eq.code,
-      article_name: `${eq.name}, tillägg utöver avtal, ${period}`,
+      article_name: v2 ? v2AddonRowName(eq, null, period) : `${eq.name}, tillägg utöver avtal, ${period}`,
       quantity: eq.quantity,
       unit_price: eq.unit_price,
       total_price: eq.total_price,
       vat_rate: eq.vat_rate,
       discount_percent: 0,
+      ...(v2 ? { station_ids: eq.station_ids ?? null } : {}),
     })
   }
 
@@ -202,6 +232,9 @@ export function buildContractInvoiceRows(contractId: string, sources: ContractRo
 }
 
 export function buildContractInvoiceNotes(planned: PlannedPeriod, label: string | null, diary: string | null): string {
+  if (planned.kind === 'equipment_gap') {
+    return `${GAP_INVOICE_NOTE}${label ? ` · ${label}` : ''} · Period ${periodLabel(planned)}${diary ? ` · ${diary}` : ''}`
+  }
   if (planned.kind === 'equipment' || planned.kind === 'equipment_monthly') {
     return `Tilläggsstationer utöver avtal${label ? ` ${label}` : ''} · Period ${periodLabel(planned)}${diary ? ` · ${diary}` : ''}`
   }

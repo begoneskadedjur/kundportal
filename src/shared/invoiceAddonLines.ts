@@ -216,12 +216,53 @@ export function fortnoxText(text: string): string {
     .trim()
 }
 
+/** Fortnox radtext på en tilläggsrad i nya tilläggsregler: högst så många tecken. */
+export const FORTNOX_ADDON_ROW_MAX = 50
+
+/**
+ * Delar en lång tilläggsrad (v2: "Ljusfälla, Återvinningscentralen, tillägg
+ * utöver avtal X, period, 2 st") vid kommatecken: huvudraden får så många
+ * delar som ryms inom max tecken, resten blir textrader under raden, var och
+ * en högst max tecken. Enhetens namn hamnar därmed på huvudraden när den
+ * ryms, annars på textraden direkt under.
+ */
+export function splitFortnoxAddonText(text: string, max: number = FORTNOX_ADDON_ROW_MAX): { main: string; rest: string[] } {
+  const clean = fortnoxText(text)
+  if (clean.length <= max) return { main: clean, rest: [] }
+  const parts = clean.split(', ').flatMap((p) => {
+    const out: string[] = []
+    for (let i = 0; i < p.length; i += max) out.push(p.slice(i, i + max))
+    return out
+  })
+  const lines: string[] = []
+  let cur = ''
+  for (const p of parts) {
+    const next = cur ? `${cur}, ${p}` : p
+    if (next.length <= max) cur = next
+    else {
+      if (cur) lines.push(cur)
+      cur = p
+    }
+  }
+  if (cur) lines.push(cur)
+  return { main: lines[0] ?? '', rest: lines.slice(1) }
+}
+
+const isEquipmentLineKind = (k: string | null | undefined) => k === 'equipment_annual' || k === 'equipment_monthly'
+
 export function buildFortnoxInvoiceRows(
   items: InvoiceItemLike[],
   opts: {
     vatIncluded: boolean
     fastighetsbeteckning?: string | null
     addonLines?: InvoiceAddonLine[]
+    /**
+     * Avtal med nya tilläggsregler (steg 11): tilläggsrader delas så att
+     * varje Fortnox-rad är högst 50 tecken (enhetens namn på textraden under
+     * när huvudraden annars blir för lång). Av som standard: övriga fakturor
+     * skickas som förut.
+     */
+    splitAddonRows?: boolean
   }
 ): FortnoxInvoiceRow[] {
   const addonByItem = new Map((opts.addonLines ?? []).map((l) => [l.invoiceItemId, l]))
@@ -237,9 +278,10 @@ export function buildFortnoxInvoiceRows(
         ? `${addonLineName(item.article_name, 'labour')}, timmar`
         : addonLineName(item.article_name, 'station')
       : item.article_name
+    const split = opts.splitAddonRows && !addon && isEquipmentLineKind(item.line_kind) ? splitFortnoxAddonText(name) : null
     rows.push({
       ArticleNumber: item.article_code || undefined,
-      Description: fortnoxText(name).slice(0, 200),
+      Description: split ? split.main : fortnoxText(name).slice(0, 200),
       DeliveredQuantity: Number(item.quantity),
       Price: opts.vatIncluded ? toVatInclusivePrice(Number(item.unit_price), item.vat_rate) : Number(item.unit_price),
       VAT: item.vat_rate,
@@ -252,6 +294,7 @@ export function buildFortnoxInvoiceRows(
           }
         : {}),
     })
+    if (split) for (const line of split.rest) rows.push({ Description: line })
     const period = addon ? addonPeriodText(addon.timeline) : null
     if (period) rows.push({ Description: fortnoxText(`Period ${period}`) })
   }

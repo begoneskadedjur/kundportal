@@ -6,6 +6,7 @@ import {
   isDueForCreation,
   lastNoticeDay,
   nextRenewal,
+  snapsToPeriodStart,
   type PlanningContract,
 } from './contractPlanner'
 
@@ -205,5 +206,28 @@ describe('tillägg per månad följer bindningsfönstret', () => {
     const renewal = after.filter((p) => p.renewal)
     expect(renewal[0].periodStart).toBe('2027-10-01')
     expect(renewal).toHaveLength(12)
+  })
+})
+
+describe('exakt avtalsdag: § 6-rad som började den 1:a (FEV, steg 11)', () => {
+  const eq = [{ id: 'L1', name: 'Aurocon', code: null, quantity: 2, unit_price_annual: 2348, vat_rate: 25, billing_start_date: '2027-07-01' }]
+  const fev = base({ contract_start_date: '2026-06-30', contract_end_date: '2028-06-29', billing_anchor_month: 7, notice_period_months: 6 })
+  it('exakt läge: raden tas med från avtalsdagen 2027-06-30', () => {
+    const p = computePlannedPeriods({ ...fev, billing_anchor_mode: 'start_day' }, { window: 'binding', today: '2026-10-30', equipment: eq })
+    const second = p.find((x) => x.periodStart === '2027-06-30')!
+    expect(second.equipmentRows).toHaveLength(1)
+    expect(second.equipmentRows[0].billing_start_snapped).toBe('2027-07-01')
+    expect(p.find((x) => x.periodStart === '2026-06-30')!.equipmentRows).toHaveLength(0)
+  })
+  it('gamla läget: oförändrat, raden från 2027-07-01 utan markering', () => {
+    const p = computePlannedPeriods(fev, { window: 'binding', today: '2026-10-30', equipment: eq })
+    const row = p.find((x) => x.periodStart === '2027-07-01')!.equipmentRows[0]
+    expect(row).toBeDefined()
+    expect(row).not.toHaveProperty('billing_start_snapped')
+  })
+  it('mer än 31 dagar efter periodstart: nästa period som förut', () => {
+    expect(snapsToPeriodStart('2027-08-01', '2027-06-30', '2028-06-29')).toBe(false)
+    expect(snapsToPeriodStart('2027-07-31', '2027-06-30', '2028-06-29')).toBe(true)
+    expect(snapsToPeriodStart('2027-07-05', '2027-06-30', '2027-07-29')).toBe(false)
   })
 })

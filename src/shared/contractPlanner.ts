@@ -24,8 +24,10 @@ export type BillingFrequency = 'monthly' | 'quarterly' | 'semi_annual' | 'annual
  * när avtalet fakturerar utrustning på premiefakturan), equipment = egna
  * fakturor för § 5 per år-rader, equipment_monthly = egna månadsfakturor för
  * § 5 per månad-rader. Diffen mot befintliga fakturor görs alltid per typ.
+ * equipment_gap = glappfaktura för tilläggsstationer från utsättningen till
+ * nästa periodstart (bara avtal med addon_rules = 'v2', steg 11).
  */
-export type ContractInvoiceKind = 'premium' | 'equipment' | 'equipment_monthly'
+export type ContractInvoiceKind = 'premium' | 'equipment' | 'equipment_monthly' | 'equipment_gap'
 
 /** Var § 5 per år-rader hamnar: på premiefakturan eller på egna fakturor. */
 export type EquipmentInvoiceMode = 'with_premium' | 'separate'
@@ -80,6 +82,11 @@ export interface EquipmentLine {
   billing_start_date?: string | null
   /** Tilläggsstationerna bakom raden just nu, fryses på fakturaraden */
   station_ids?: string[] | null
+  /** Nya tilläggsregler (v2): enheten raden hör till, dess namn och märkning */
+  site_customer_id?: string | null
+  station_type_id?: string | null
+  unit_name?: string | null
+  marking?: string | null
 }
 
 /** En utrustningsrad skalad till fakturaperioden. */
@@ -92,6 +99,20 @@ export interface PlannedEquipmentRow {
   unit_price: number
   total_price: number
   vat_rate: number
+  /**
+   * Nya tilläggsregler (v2, steg 11): enhetens namn på raden och stationerna
+   * som faktureras just den perioden. Sätts bara i v2; undefined i gamla läget
+   * (regressionsdumpen ska vara oförändrad).
+   */
+  unit_name?: string | null
+  station_ids?: string[] | null
+  /** Enhetens referenskod när den skiljer sig från fakturans (en faktura för hela avtalet) */
+  unit_marking?: string | null
+  /**
+   * Exakt avtalsdag: § 6-radens billing_start_date (som låg strax efter
+   * periodstart, ett arv från den 1:a) och raden togs med från periodstart.
+   */
+  billing_start_snapped?: string
 }
 
 export interface PlannedPeriod {
@@ -337,6 +358,25 @@ export function isDueForCreation(p: Pick<PlannedPeriod, 'renewal' | 'invoiceDate
   return !!p.renewal || p.invoiceDate <= todayIso
 }
 
+/** Högst så många dagar efter periodstart får billing_start_date ligga för att raden ska tas med från periodstart. */
+export const SNAP_MAX_DAYS = 31
+
+/**
+ * Exakt avtalsdag (steg 11, FEV-fyndet i steg 7): en § 6-rad vars
+ * billing_start_date ligger högst SNAP_MAX_DAYS dagar efter periodstart i en
+ * halvårs- eller årsperiod är ett arv från perioden som började den 1:a
+ * (FEV: 2027-07-01 mot avtalsdagen 2027-06-30). Raden tas med från
+ * periodstart i stället för att falla ur hela perioden. Gäller bara exakt läge.
+ */
+export function snapsToPeriodStart(billingStart: string, periodStartIso: string, periodEndIso: string): boolean {
+  if (billingStart <= periodStartIso || billingStart > periodEndIso) return false
+  const day = 86_400_000
+  const ps = parseLocalDate(periodStartIso).getTime()
+  const len = Math.round((parseLocalDate(periodEndIso).getTime() - ps) / day) + 1
+  const after = Math.round((parseLocalDate(billingStart).getTime() - ps) / day)
+  return len >= 180 && after <= SNAP_MAX_DAYS
+}
+
 /** Periodens mittpunkt ligger före datumet: perioden hör till största delen till tiden före. */
 function midpointBefore(periodStart: Date, periodEnd: Date, limit: Date): boolean {
   return (periodStart.getTime() + periodEnd.getTime()) / 2 < limit.getTime()
@@ -514,11 +554,19 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
     const annual = annualValueInForce(contract, opts.steps, periodStartIso)
     const amount = amountPerPeriodPure(annual, freq)
 
+    const periodEndIso = toLocalIsoDate(periodEnd)
     const equipmentRows: PlannedEquipmentRow[] = (onPremium ? yearlyLines : [])
-      .filter((e) => e.quantity > 0 && e.unit_price_annual > 0 && (!e.billing_start_date || e.billing_start_date <= periodStartIso))
+      .filter(
+        (e) =>
+          e.quantity > 0 &&
+          e.unit_price_annual > 0 &&
+          (!e.billing_start_date ||
+            e.billing_start_date <= periodStartIso ||
+            (exactMode && snapsToPeriodStart(e.billing_start_date, periodStartIso, periodEndIso)))
+      )
       .map((e) => {
         const unit = Math.round((e.unit_price_annual * 100) / divisor) / 100
-        return {
+        const row: PlannedEquipmentRow = {
           source_id: e.id,
           contract_id: e.contract_id ?? null,
           name: e.name,
@@ -528,6 +576,8 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
           total_price: Math.round(unit * e.quantity * 100) / 100,
           vat_rate: e.vat_rate,
         }
+        if (e.billing_start_date && e.billing_start_date > periodStartIso) row.billing_start_snapped = e.billing_start_date
+        return row
       })
 
     const equipmentSubtotal = equipmentRows.reduce((s, r) => s + r.total_price, 0)

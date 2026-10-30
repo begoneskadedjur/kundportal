@@ -73,3 +73,15 @@ npx tsx --env-file=.env scripts/regression/plan-dump.mts --today=2026-10-30 --ou
 `prorata-compare.sql` kör `sync_addon_prorata_line` (och `_legacy` när den finns) för alla anrop som förekommer i dag, varje anrop i en deltransaktion som rullas tillbaka, och skriver md5 per funktion. Före och efter migrationen ska md5 vara lika (avtal utan `addon_rules = 'v2'` går den gamla vägen). Svaret beror på dagens datum.
 
 `prorata-v2.test.sql` provar version 2 på Falu kommun i målbilden (exakt avtalsdag, option, v2), ledtidsregeln på FEV, reservtriggern och teknikerns RLS, i ett block som alltid rullas tillbaka.
+
+## Tilläggsregler version 2 (steg 11)
+
+`tillaggsregler-v2.test.sql` provar SQL-delen i två block som alltid rullas tillbaka: glappen för Falu kommun i målbilden (`addon_gap_candidates`, tilläggens takt, efterskänkt del, öppet ärende, utan v2), arbetslistans glapprad och överlappsvakten med `marking_key` på FEV (T1 till T3), och läget efter drop-raderna från steg 5 på en temp-kopia av invoices (T4).
+
+`addon-v2-prov.mts` sätter exakt avtalsdag och `addon_rules = 'v2'` i minnet på FEV:s fyra avtal, WBAB:s tre och Falu kommun och visar tilläggsfakturorna (märkning, perioder, rader, belopp, åtgärd mot befintliga fakturor) i dagens läge och i läget efter drop-raderna. `--refs=beslut` lägger referenserna enligt beslut 8 i datadokumentet i minnet. Bara läsning.
+
+```bash
+npx tsx --env-file=.env scripts/regression/addon-v2-prov.mts --today=2026-10-30 [--refs=beslut]
+```
+
+`plan-dump.mts` speglar inte version 2 (inget avtal har `addon_rules` satt); provet ovan använder samma delade kod som Planera fakturor.

@@ -39,6 +39,20 @@ import {
 import { addonInvoicePeriod, matchInvoiceAddonLines, type AddonCaseRow } from '../shared/invoiceAddonLines'
 import type { ContractWithBilling } from '../types/database'
 import {
+  buildGapDiff,
+  computeAddonPlanV2,
+  decorateV2Period,
+  dedupeLockedWithoutPlan,
+  existingByMarkingGroup,
+  isAddonRulesV2,
+  planGapGroups,
+  type AddonPlanV2,
+  type CoverageRange,
+  type GapCandidate,
+} from '../shared/addonPlanV2'
+import { markingKey, markingKeyColumn } from '../shared/addonMarking'
+import { loadAddonV2Inputs } from '../shared/addonV2Loader'
+import {
   buildContractDiff,
   consolidationGroupKey,
   EDITABLE_STATUSES,
@@ -163,6 +177,13 @@ export interface BillingPlanEntry {
   duplicateIds?: string[]
   /** Fortnox-kontrollen för passerade perioder (sätts efter grundplanen) */
   fortnox?: FortnoxCheckInfo
+  /**
+   * Nya tilläggsregler (steg 11): värdet som skrivs i invoices.marking_key
+   * (null = ingen märkningsnyckel). undefined = gamla regler, kolumnen rörs inte.
+   */
+  markingKey?: string | null
+  /** Posten hör till nya tilläggsregler: apply raderar sådana utkast först */
+  addonRulesV2?: boolean
 }
 
 export interface BillingPlan {
@@ -257,6 +278,7 @@ type ExistingInvoice = {
   contract_id?: string | null
   invoice_type?: string | null
   contract_invoice_kind?: string | null
+  marking_key?: string | null
   invoice_items?: Array<{ article_name: string | null; line_kind?: string | null; contract_id?: string | null; total_price?: number | null }> | null
   fortnox_document_number?: string | null
   has_generic_items?: boolean
@@ -274,6 +296,17 @@ type ContractSources = {
   label: string | null
   invoiceReference: string | null
   diaryNumber: string | null
+}
+
+/** Underlaget för nya tilläggsregler (addon_rules = 'v2'), se loadAddonV2. */
+type AddonV2Context = {
+  /** invoice_marking_split_ready: en tilläggsfaktura per märkning och glappfakturor */
+  split: boolean
+  lines: EquipmentLine[]
+  coverage: CoverageRange[]
+  fallbackMarking: string | null
+  plan: AddonPlanV2
+  gaps: GapCandidate[]
 }
 
 const EMPTY_SUMMARY = (): BillingPlan['summary'] => ({
@@ -452,20 +485,13 @@ export class ContractInvoiceGenerator {
     }
 
     const sources = await this.loadContractSources(contract.id)
-    const planned = computePlannedPeriods(contract as PlanningContract, {
-      paymentTermsDays,
-      steps: sources.steps,
-      equipment: sources.equipment,
-      leadDays: DEFAULT_INVOICE_LEAD_DAYS,
-      equipmentMode: sources.equipmentInvoiceMode,
-      // Nuvarande bindningstid; nästa bindningsperiod först när sista
-      // uppsägningsdag passerat (samma regel som signeringen och cronen).
-      window: 'binding',
-    })
-    const existing = await this.loadExisting(customerId, contract.id, { kind: 'premium' })
-    const consolidatedInvoices = await this.loadConsolidatedPeriodsForContract(customerId, contract.id)
     const billingCustomer = await this.loadCustomer(customerId)
     const marking = sources.invoiceReference ?? billingCustomer.billing_reference ?? null
+    // Nya tilläggsregler (steg 11) bara när avtalet har addon_rules = 'v2'
+    const v2 = isAddonRulesV2(contract) ? await this.loadAddonV2(contract, sources, paymentTermsDays, marking) : null
+    const planned = this.premiumPeriodsFor(contract, sources, paymentTermsDays, v2)
+    const existing = await this.loadExisting(customerId, contract.id, { kind: 'premium' })
+    const consolidatedInvoices = await this.loadConsolidatedPeriodsForContract(customerId, contract.id)
     // Exakt avtalsdag matchar på datumöverlapp, övriga på månad (steg 7)
     const mode = matchModeFor(contract)
 
@@ -484,7 +510,11 @@ export class ContractInvoiceGenerator {
 
     // Egna fakturor för tillägg: per år (när avtalet fakturerar utrustning
     // separat) och per månad (alltid egna månadsfakturor). Diffen görs per typ.
-    entries.push(...(await this.planEquipmentEntries(contract, sources, customerId, paymentTermsDays, marking)))
+    entries.push(
+      ...(v2
+        ? await this.planEquipmentEntriesV2(contract, sources, customerId, marking, v2)
+        : await this.planEquipmentEntries(contract, sources, customerId, paymentTermsDays, marking))
+    )
     entries.sort((a, b) => (a.planned?.periodStart ?? '').localeCompare(b.planned?.periodStart ?? ''))
 
     return { customerId, contractId: contract.id, contractLabel: sources.label, entries, summary: summarize(entries) }
@@ -545,6 +575,181 @@ export class ContractInvoiceGenerator {
   }
 
   /**
+   * Premieperioderna för ett avtal. Gamla tilläggsregler: som förut (§ 6 per
+   * år på egna fakturor). Nya tilläggsregler med månadspremie: tilläggen
+   * ligger på månadsfakturan med enhetens namn och periodens stationer.
+   */
+  private static premiumPeriodsFor(
+    contract: ContractWithBilling,
+    sources: ContractSources,
+    paymentTermsDays: number,
+    v2: AddonV2Context | null
+  ): PlannedPeriod[] {
+    const withPremium = v2?.plan.cadence === 'with_premium'
+    const planned = computePlannedPeriods(contract as PlanningContract, {
+      paymentTermsDays,
+      steps: sources.steps,
+      equipment: withPremium ? v2!.plan.premiumEquipment : v2 ? [] : sources.equipment,
+      leadDays: DEFAULT_INVOICE_LEAD_DAYS,
+      equipmentMode: withPremium ? 'with_premium' : v2 ? 'separate' : sources.equipmentInvoiceMode,
+      // Nuvarande bindningstid; nästa bindningsperiod först när sista
+      // uppsägningsdag passerat (samma regel som signeringen och cronen).
+      window: 'binding',
+    })
+    if (!withPremium) return planned
+    return planned.map((p) => decorateV2Period(p, v2!.plan.premiumEquipment, v2!.coverage, v2!.fallbackMarking))
+  }
+
+  /**
+   * Underlaget för nya tilläggsregler (steg 11): enheternas namn och
+   * referenskoder på § 6-raderna, stationernas täckning, glappen (SQL
+   * addon_gap_candidates) och om databasen tar tilläggsfakturor per märkning
+   * (invoice_marking_split_ready, falsk tills drop-raderna från steg 5 körts).
+   */
+  private static async loadAddonV2(
+    contract: ContractWithBilling,
+    sources: ContractSources,
+    paymentTermsDays: number,
+    fallbackMarking: string | null
+  ): Promise<AddonV2Context> {
+    const inputs = await loadAddonV2Inputs(supabase, {
+      contractId: contract.id,
+      contractCustomerId: contract.customer_id as string,
+      invoiceReference: sources.invoiceReference,
+      lines: sources.equipment,
+    })
+    if (inputs.gapError) console.warn('[ContractInvoiceGenerator] Glappen kunde inte läsas:', inputs.gapError)
+    const plan = computeAddonPlanV2(contract as PlanningContract, inputs.lines, {
+      paymentTermsDays,
+      steps: sources.steps,
+      leadDays: DEFAULT_INVOICE_LEAD_DAYS,
+      window: 'binding',
+      split: inputs.split,
+      fallbackMarking,
+      coverage: inputs.coverage,
+    })
+    return { split: inputs.split, lines: inputs.lines, coverage: inputs.coverage, fallbackMarking, plan, gaps: inputs.gaps }
+  }
+
+  /**
+   * Tilläggsfakturor med nya tilläggsregler: en per märkning och period
+   * (eller en per period med märkning per rad så länge databasen inte tar
+   * flera), plus glappfakturor. Utkast i gamla månadsfakturor (kind
+   * equipment_monthly) raderas: tilläggen följer premien.
+   */
+  private static async planEquipmentEntriesV2(
+    contract: ContractWithBilling,
+    sources: ContractSources,
+    customerId: string,
+    marking: string | null,
+    v2: AddonV2Context
+  ): Promise<BillingPlanEntry[]> {
+    const mode = matchModeFor(contract)
+    const out: BillingPlanEntry[] = []
+    const namesOf = (rows: Array<{ article_name: string | null }>) => rows.map((r) => r.article_name ?? '').sort().join('|')
+    const decorate = (
+      e: BillingPlanEntry,
+      kind: ContractInvoiceKind,
+      groupMarking: string | null,
+      key: string | null,
+      existingById: Map<string, ExistingInvoice>
+    ): BillingPlanEntry => {
+      const base = { ...e, kind, contractId: contract.id, contractLabel: sources.label, consolidated: false, addonRulesV2: true }
+      if (!e.planned) return base
+      const rows = this.buildRowsForContract(contract.id, sources, e.planned, contract.billing_frequency as BillingFrequency | null)
+      const snapped = e.planned.equipmentRows.filter((r) => r.billing_start_snapped)
+      let action = e.action
+      // Samma belopp men nya rader (enhetens namn, andra stationer): uppdatera
+      if (action === 'keep' && e.existingId) {
+        const ex = existingById.get(e.existingId)
+        if (ex && namesOf(ex.invoice_items ?? []) !== namesOf(rows)) action = 'update'
+      }
+      return {
+        ...base,
+        action,
+        rows,
+        marking: groupMarking,
+        markingKey: key,
+        notes: this.buildNotes(e.planned, sources.label, sources.diaryNumber),
+        ...(snapped.length && !e.reason
+          ? { reason: `§ 6-raden börjar ${snapped[0].billing_start_snapped}, tas med från periodstart ${e.planned.periodStart}` }
+          : {}),
+      }
+    }
+
+    // Egna tilläggsfakturor per märkning
+    if (v2.plan.cadence !== 'with_premium' || v2.plan.groups.length > 0) {
+      const existing = await this.loadExisting(customerId, contract.id, { kind: 'equipment' })
+      const existingById = new Map(existing.map((e) => [e.id, e]))
+      const byKey = existingByMarkingGroup(
+        v2.plan.groups.map((g) => g.markingKey),
+        v2.split ? existing : existing.map((e) => ({ ...e, marking_key: null }))
+      )
+      const groupEntries: BillingPlanEntry[] = []
+      for (const [key, list] of byKey) {
+        const g = v2.plan.groups.find((x) => x.markingKey === key)
+        const groupMarking = g ? g.marking : (list.find((x) => x.marking_key)?.marking_key ?? marking)
+        const keyColumn = v2.split ? markingKeyColumn(groupMarking ?? key) : null
+        groupEntries.push(
+          ...this.buildDiff(g?.periods ?? [], list as ExistingInvoice[], { real: true, mode }).map((e) =>
+            decorate(e, 'equipment', groupMarking, keyColumn, existingById)
+          )
+        )
+      }
+      out.push(...dedupeLockedWithoutPlan(groupEntries))
+    }
+
+    // Gamla månadsfakturor för tillägg: tilläggen följer premien i v2
+    const existingMonthly = await this.loadExisting(customerId, contract.id, { kind: 'equipment_monthly' })
+    if (existingMonthly.length > 0) {
+      const byId = new Map(existingMonthly.map((e) => [e.id, e]))
+      out.push(...this.buildDiff([], existingMonthly, { real: true, mode }).map((e) => decorate(e, 'equipment_monthly', marking, null, byId)))
+    }
+
+    // Glappfakturor
+    if (v2.gaps.length > 0) {
+      const markingByKey = new Map<string, string | null>()
+      for (const l of v2.lines) markingByKey.set(markingKey(l.marking ?? null), l.marking ?? null)
+      const codeFor = (unitId: string, typeId: string | null) =>
+        v2.lines.find((l) => l.site_customer_id === unitId && (l.station_type_id ?? null) === typeId)?.code ?? null
+      const groups = planGapGroups(
+        v2.gaps.map((g) => (v2.split ? g : { ...g, marking_key: '' })),
+        {
+          today: toLocalIsoDate(todayLocal()),
+          paymentTermsDays: await PaymentTermsService.getDays('contract'),
+          markingFor: (k) => (v2.split ? (markingByKey.get(k) ?? (k || null)) : marking),
+          codeFor,
+        }
+      )
+      if (!v2.split) {
+        for (const g of groups) {
+          out.push({
+            action: 'later',
+            kind: 'equipment_gap',
+            planned: g.period,
+            contractId: contract.id,
+            contractLabel: sources.label,
+            consolidated: false,
+            addonRulesV2: true,
+            reason:
+              'Glappfaktura för tilläggsstationer. Skapas först när databasändringen för fakturatypen (steg 5) är körd.',
+          })
+        }
+      } else {
+        const existingGap = await this.loadExisting(customerId, contract.id, { kind: 'equipment_gap' })
+        const byId = new Map(existingGap.map((e) => [e.id, e]))
+        for (const e of buildGapDiff(groups, existingGap)) {
+          const groupMarking = e.gap ? e.gap.marking : marking
+          const entry = decorate(e, 'equipment_gap', groupMarking, e.gap ? markingKeyColumn(e.gap.markingKey) : null, byId)
+          if (e.gap?.missingPrice.length) entry.reason = `${e.gap.missingPrice.length} stationer saknar årspris och är inte med`
+          out.push(entry)
+        }
+      }
+    }
+    return out
+  }
+
+  /**
    * Planera om en enskild avtalsfaktura före sändning till Fortnox:
    * debiteringstillfället är sändningen, så antalet tilläggsstationer och
    * utrustningsraderna ska spegla läget just då. Rör bara redigerbara
@@ -552,7 +757,7 @@ export class ContractInvoiceGenerator {
    */
   static async refreshContractInvoiceBeforeSend(
     invoiceId: string
-  ): Promise<{ changed: boolean; items: Array<Record<string, unknown>> }> {
+  ): Promise<{ changed: boolean; items: Array<Record<string, unknown>>; splitAddonRows?: boolean }> {
     const { data: inv } = await supabase
       .from('invoices')
       .select('id, invoice_type, contract_id, customer_id, status, is_consolidated')
@@ -568,11 +773,13 @@ export class ContractInvoiceGenerator {
     if (!EDITABLE_STATUSES.has(inv.status ?? '')) return { changed: false, items: await loadItems() }
     try {
       const plan = await this.planForContract(inv.contract_id, { customerId: inv.customer_id ?? undefined })
+      // Nya tilläggsregler: tilläggsraderna delas till högst 50 tecken i Fortnox
+      const splitAddonRows = plan.entries.some((e) => e.addonRulesV2) || undefined
       const entry = plan.entries.find((e) => e.existingId === invoiceId && e.action === 'update' && e.planned)
-      if (!entry) return { changed: false, items: await loadItems() }
+      if (!entry) return { changed: false, items: await loadItems(), splitAddonRows }
       const customer = await this.loadCustomer(plan.customerId)
       await this.updateContractInvoice(invoiceId, customer, entry.planned!, entry.contractId ?? plan.contractId, entry)
-      return { changed: true, items: await loadItems() }
+      return { changed: true, items: await loadItems(), splitAddonRows }
     } catch (err) {
       console.warn('[ContractInvoiceGenerator] Omplanering före sändning misslyckades:', err)
       return { changed: false, items: await loadItems() }
@@ -612,18 +819,15 @@ export class ContractInvoiceGenerator {
       const equipmentEntries: BillingPlanEntry[] = []
       for (const contract of group) {
         const sources = await this.loadContractSources(contract.id)
-        const periods = computePlannedPeriods(contract as PlanningContract, {
-          paymentTermsDays,
-          steps: sources.steps,
-          equipment: sources.equipment,
-          leadDays: DEFAULT_INVOICE_LEAD_DAYS,
-          equipmentMode: sources.equipmentInvoiceMode,
-          window: 'binding',
-        })
+        const contractMarking = sources.invoiceReference ?? billingCustomer.billing_reference ?? null
+        const v2 = isAddonRulesV2(contract) ? await this.loadAddonV2(contract, sources, paymentTermsDays, contractMarking) : null
+        const periods = this.premiumPeriodsFor(contract, sources, paymentTermsDays, v2)
         perContract.push({ contract, sources, periods })
         // Tillägg på egna fakturor samlas aldrig: de planeras per avtal
         equipmentEntries.push(
-          ...(await this.planEquipmentEntries(contract, sources, customerId, paymentTermsDays, sources.invoiceReference ?? billingCustomer.billing_reference ?? null))
+          ...(v2
+            ? await this.planEquipmentEntriesV2(contract, sources, customerId, contractMarking, v2)
+            : await this.planEquipmentEntries(contract, sources, customerId, paymentTermsDays, contractMarking))
         )
       }
 
@@ -838,6 +1042,8 @@ export class ContractInvoiceGenerator {
         billing_model: s.billing_model === 'per_month' ? ('per_month' as const) : ('per_year' as const),
         billing_start_date: s.billing_start_date ?? null,
         station_ids: s.site_customer_id ? (stationIdsByRow.get(`${s.site_customer_id}|${s.station_type_id ?? ''}`) ?? null) : null,
+        site_customer_id: s.site_customer_id ?? null,
+        station_type_id: s.station_type_id ?? null,
       }))
     const c = contract as {
       label?: string | null
@@ -881,7 +1087,7 @@ export class ContractInvoiceGenerator {
     let q = supabase
       .from('invoices')
       .select(
-        'id, invoice_number, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, is_consolidated, contract_id, invoice_type, contract_invoice_kind, fortnox_document_number, invoice_items(article_name, line_kind, contract_id, total_price)'
+        'id, invoice_number, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, is_consolidated, contract_id, invoice_type, contract_invoice_kind, marking_key, fortnox_document_number, invoice_items(article_name, line_kind, contract_id, total_price)'
       )
       .eq('customer_id', customerId)
       .in('invoice_type', ['contract', 'adhoc'])
@@ -991,8 +1197,20 @@ export class ContractInvoiceGenerator {
       return loaded
     }
 
+    // Nya tilläggsregler: utkast som ska bort raderas före allt annat, så att
+    // en ny faktura för en annan märkning inte krockar med det gamla utkastet
+    // för samma period (gamla unika indexet, överlappsvakten).
+    const v2Deletes = entries.filter((e) => e.addonRulesV2 && e.action === 'delete' && e.existingId)
+    for (const entry of v2Deletes) {
+      await supabase.from('invoice_items').delete().eq('invoice_id', entry.existingId!)
+      const { error } = await supabase.from('invoices').delete().eq('id', entry.existingId!)
+      if (error) throw new Error(`Kunde inte radera faktura: ${error.message}`)
+      result.deletedIds.push(entry.existingId!)
+    }
+
     for (const entry of entries) {
       const contractId = entry.consolidated ? null : (entry.contractId ?? plan.contractId)
+      if (v2Deletes.includes(entry)) continue
       if (entry.action === 'keep' || entry.action === 'consolidated' || entry.action === 'later') continue
       // Perioden har börjat och fakturan saknas i Fortnox: utkastet står kvar
       // för godkännande, planen ändrar ingenting automatiskt.
@@ -1501,6 +1719,8 @@ export class ContractInvoiceGenerator {
         invoice_marking: entry?.marking ?? customer.billing_reference ?? null,
         notes,
         created_at: createdAt,
+        // Nya tilläggsregler: märkningsnyckeln (en tilläggsfaktura per referenskod)
+        ...(entry?.markingKey !== undefined ? { marking_key: entry.markingKey } : {}),
       })
       .select('id')
       .single()
@@ -1804,6 +2024,7 @@ export class ContractInvoiceGenerator {
     }
     if (contractId) updatePayload.contract_id = contractId
     if (entry?.marking !== undefined) updatePayload.invoice_marking = entry.marking
+    if (entry?.markingKey !== undefined) updatePayload.marking_key = entry.markingKey
     if (entry?.consolidated) updatePayload.is_consolidated = true
     if (planned.kind) updatePayload.contract_invoice_kind = planned.kind
     // En redan godkänd faktura vars rader ändras ska granskas igen
