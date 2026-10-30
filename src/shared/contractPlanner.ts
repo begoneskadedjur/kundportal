@@ -9,6 +9,14 @@
 // saknar steg. Utrustning "per styck och år" (§ 5) blir egna rader på samma
 // faktura, skalade per period precis som premien.
 
+import {
+  addMonthsClampedIso,
+  exactPeriodIndexContaining,
+  exactPeriods,
+  isStartDayMode,
+  periodStepMonths,
+} from './contractPeriods'
+
 export type BillingFrequency = 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'on_demand'
 
 /**
@@ -39,6 +47,11 @@ export interface PlanningContract {
    * beräknade kapningen: kunden betalar till och med detta datum.
    */
   effective_end_date?: string | null
+  /**
+   * 'start_day' = perioderna börjar på exakta avtalsdagen (contractPeriods.ts).
+   * NULL = dagens regel: perioden börjar den 1:a, årsvis i ankarmånaden.
+   */
+  billing_anchor_mode?: string | null
 }
 
 /** Ett steg i premietrappan: årsvärdet som gäller från och med datumet. */
@@ -463,6 +476,7 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
   // Slutet är en rullande horisont (inte avtalets eget slutdatum eller en
   // uppsägning): då får perioden börja före horisonten utan att rymmas helt.
   const endIsHorizon = !win && !cutoff && !!horizonIso && (!declaredEnd || declaredEnd < effectiveEnd)
+  const exactMode = isStartDayMode(contract)
   let intervals: Array<{ periodStart: Date; periodEnd: Date }>
   if (win) {
     // Bindningstid: en period hör till den bindningsperiod där största delen
@@ -470,10 +484,16 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
     // avtalet slutar t.ex. den 14:e: perioden 1 okt till 30 sep efter ett
     // slutdatum 14 okt är nästa års, inte årets. Tills vidare: perioder som
     // börjar före fönstrets slut.
-    const raw = iterPeriodsPure(start, effectiveEnd, freq, contract.billing_anchor_month, false)
+    // Exakt avtalsdag: samma fönster och mittpunkt, perioderna räknas från
+    // startdagen (contractPeriods.ts).
+    const raw = exactMode
+      ? exactPeriods(contract.contract_start_date as string, effectiveEnd, effectiveEnd, periodStepMonths(freq), false)
+      : iterPeriodsPure(start, effectiveEnd, freq, contract.billing_anchor_month, false)
     intervals = win.openEnded ? raw : raw.filter((r) => midpointBefore(r.periodStart, r.periodEnd, effectiveEnd))
   } else {
-    intervals = iterPeriodsPure(start, effectiveEnd, freq, contract.billing_anchor_month, !endIsHorizon)
+    intervals = exactMode
+      ? exactPeriods(contract.contract_start_date as string, effectiveEnd, effectiveEnd, periodStepMonths(freq), !endIsHorizon)
+      : iterPeriodsPure(start, effectiveEnd, freq, contract.billing_anchor_month, !endIsHorizon)
   }
   const currentEndDate = win?.currentEnd ? parseLocalDate(win.currentEnd) : null
   const isRenewal = (periodStart: Date, periodEnd: Date): boolean => {
@@ -588,8 +608,17 @@ export function computePlannedMonthlyEquipmentPeriods(contract: PlanningContract
     .map((e) => e.billing_start_date)
     .filter((d): d is string => !!d)
     .sort()[0]
+  // Exakt avtalsdag: månadsperioder från avtalsdagen, första perioden den
+  // som innehåller max(idag, tidigaste billing_start_date).
+  const exactStart = isStartDayMode(contract) ? (contract.contract_start_date as string) : null
+  let exactK = 0
   let cur = startOfCurrentMonth
-  if (earliestStart) {
+  if (exactStart) {
+    const todayIsoFirst = toLocalIsoDate(today)
+    const firstDay = earliestStart && earliestStart > todayIsoFirst ? earliestStart : todayIsoFirst
+    exactK = exactPeriodIndexContaining(exactStart, 1, firstDay)
+    cur = parseLocalDate(addMonthsClampedIso(exactStart, exactK))
+  } else if (earliestStart) {
     const es = parseLocalDate(earliestStart)
     const esMonth = new Date(es.getFullYear(), es.getMonth(), 1)
     if (esMonth > cur) cur = esMonth
@@ -612,7 +641,9 @@ export function computePlannedMonthlyEquipmentPeriods(contract: PlanningContract
   let idx = 0
   while (cur <= end) {
     const periodStartIso = toLocalIsoDate(cur)
-    const periodEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0)
+    const periodEnd = exactStart
+      ? addDays(parseLocalDate(addMonthsClampedIso(exactStart, exactK + 1)), -1)
+      : new Date(cur.getFullYear(), cur.getMonth() + 1, 0)
     // Bindningstid: månaden hör dit största delen av den ligger, som premien
     if (win && !win.openEnded && !midpointBefore(cur, periodEnd, end)) break
     const rows: PlannedEquipmentRow[] = monthly
@@ -660,7 +691,12 @@ export function computePlannedMonthlyEquipmentPeriods(contract: PlanningContract
           : false,
       })
     }
-    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
+    if (exactStart) {
+      exactK += 1
+      cur = parseLocalDate(addMonthsClampedIso(exactStart, exactK))
+    } else {
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
+    }
   }
   for (const p of out) p.totalSequenceCount = out.length
   return out

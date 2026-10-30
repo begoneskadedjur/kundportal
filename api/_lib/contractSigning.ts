@@ -958,6 +958,7 @@ async function planInvoices(ctx: Ctx, contract: Row, customerId: string, contrac
     billing_active: contract.billing_active === false ? false : null,
     notice_period_months: num(contract.notice_period_months),
     renewal_mode: str(contract.renewal_mode),
+    billing_anchor_mode: str(contract.billing_anchor_mode),
   }
   // Samma anrop som ContractInvoiceGenerator.planForContract: hela den
   // nuvarande bindningstiden planeras direkt. Förlängningen efter

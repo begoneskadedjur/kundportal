@@ -209,7 +209,7 @@ type Sources = {
 // ---------------------------------------------------------------------------
 
 const CONTRACT_COLS =
-  'id, customer_id, type, label, display_name, contract_type, invoice_reference, diary_number, annual_value, contract_start_date, contract_end_date, terminated_at, effective_end_date, billing_frequency, billing_anchor_month, billing_active, notice_period_months, renewal_mode, status, template_id, oneflow_contract_id, display_order, created_at'
+  'id, customer_id, type, label, display_name, contract_type, invoice_reference, diary_number, annual_value, contract_start_date, contract_end_date, terminated_at, effective_end_date, billing_frequency, billing_anchor_month, billing_active, notice_period_months, renewal_mode, status, template_id, oneflow_contract_id, display_order, created_at, billing_anchor_mode'
 
 console.log(`Läser prod (endast SELECT), idag = ${TODAY}, sha = ${GIT_SHA}`)
 

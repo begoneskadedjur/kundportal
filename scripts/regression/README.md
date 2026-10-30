@@ -41,3 +41,13 @@ Skriver skillnader per avtal: tillagda, borttagna och ändrade perioder med fäl
 ## Vad det bevisar
 
 Samma sha och samma `--today` ger samma hash. Efter en ändring i koden (samma `--today`, ny sha) visar `compare.mjs` exakt vilka perioder, belopp och åtgärder som ändrats. Databasen ändras mellan körningarna (cronen, fakturor som skickas), så jämför körningar som gjorts nära varandra i tid, eller kör båda versionerna samma dag.
+
+## Periodregeln, TS mot SQL (steg 6)
+
+```bash
+npx tsx --env-file=.env scripts/regression/periods-twin.mts
+```
+
+Jämför `periodContaining` i `src/shared/contractPeriods.ts` (exakt avtalsdag) med SQL-funktionen `contract_period_on_pure` för 400 fasta kombinationer (20 startdagar, fyra frekvenser, fem frågedatum, fast frö). `--starts=N` ger fler. Exitkod 0 vid noll skillnader. Funktionen är ren och läser ingen tabell.
+
+`avtalsar-perioder.test.sql` provar SQL-grenarna för exakt läge på FEV:s avtal i ett block som alltid rullas tillbaka (raise exception med resultatet).

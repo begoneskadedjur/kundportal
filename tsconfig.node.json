@@ -38,6 +38,8 @@
 
     // Delad periodmatematik för årspremiefakturor (generate-continuing-contracts)
     "src/shared/contractPlanner.ts",
+    // Periodregeln med exakt avtalsdag (importeras av planeraren)
+    "src/shared/contractPeriods.ts",
     // Matchningen planerade perioder mot befintliga fakturor (cronen, signeringen)
     "src/shared/contractInvoiceMatch.ts",
 
