@@ -73,6 +73,35 @@ function formatAnnualSum(v: number): string {
 type QuickView = 'all' | 'atgard' | 'inkomplett'
 const LEGACY_INCOMPLETE = ['fortnox', 'karta_saknas', 'karta_ofullstandig', 'inkomplett']
 
+// Sortering: grupperad (standard) eller en platt lista med nyast först, så att
+// ingen ny kund göms i en hopfälld grupp. ?sort=tillagd|signerad i URL:en.
+type SortMode = 'standard' | 'tillagd' | 'signerad'
+
+function maxIso(values: Array<string | null | undefined>): string | null {
+  let best: string | null = null
+  for (const v of values) if (v && (!best || v > best)) best = v
+  return best
+}
+
+// Tillagd i portalen: senaste raden i organisationen (huvudkontor eller enhet),
+// så att en nyupplagd enhet också syns överst.
+function addedAt(c: ConsolidatedCustomer): string | null {
+  return maxIso([c.created_at, c.headquarterCustomer?.created_at, ...c.sites.map((s) => s.created_at)])
+}
+
+// Signerad: senaste signeringsdatumet bland organisationens avtal.
+// signed_at finns i databasen men inte i den genererade typen.
+function signedAt(c: ConsolidatedCustomer): string | null {
+  return maxIso(c.allContracts.map((k) => (k as { signed_at?: string | null }).signed_at))
+}
+
+// ÅÅÅÅ-MM-DD i svensk tid. signed_at är ett rent datum, created_at en tidsstämpel i UTC.
+function isoDay(iso: string | null): string | null {
+  if (!iso) return null
+  if (iso.length === 10) return iso
+  return new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' })
+}
+
 function isOpenState(s: SetupSummary | null, key?: SetupKey | null): boolean {
   if (!s || s.terminated || s.complete) return false
   if (!key) return true
@@ -195,6 +224,13 @@ export default function Customers() {
     if (q === 'atgard') return 'atgard'
     return q && LEGACY_INCOMPLETE.includes(q) ? 'inkomplett' : 'all'
   })
+  const sortParam = searchParams.get('sort')
+  const sortMode: SortMode = sortParam === 'tillagd' || sortParam === 'signerad' ? sortParam : 'standard'
+  const setSortMode = (mode: SortMode) => setSearchParams(prev => {
+    if (mode === 'standard') prev.delete('sort')
+    else prev.set('sort', mode)
+    return prev
+  }, { replace: true })
   // Ikonfiltret i Inte kompletta: visa bara de som saknar en viss del
   const [setupFilter, setSetupFilter] = useState<SetupKey | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
@@ -257,6 +293,21 @@ export default function Customers() {
       (a.company_name ?? '').localeCompare(b.company_name ?? '', 'sv')
     )
 
+    // Nyast först: en platt lista utan grupper, så att inget göms i en hopfälld grupp.
+    // Kunder utan signeringsdatum hamnar sist, sorterade på när de lades till.
+    if (sortMode !== 'standard') {
+      const desc = (a: string | null, b: string | null) =>
+        a && b ? b.localeCompare(a) : a ? -1 : b ? 1 : 0
+      const rows = byName.sort((a, b) =>
+        sortMode === 'signerad'
+          ? desc(signedAt(a), signedAt(b)) || desc(addedAt(a), addedAt(b))
+          : desc(addedAt(a), addedAt(b))
+      )
+      return rows.length > 0
+        ? [{ key: sortMode, label: sortMode === 'signerad' ? 'Senast signerade' : 'Senast tillagda', rows, sum: null as number | null }]
+        : []
+    }
+
     // Inte kompletta: en lista, flest kvar först
     if (quickView === 'inkomplett') {
       const rows = byName.sort((a, b) => (setupFor(b)?.remaining ?? 0) - (setupFor(a)?.remaining ?? 0))
@@ -292,7 +343,20 @@ export default function Customers() {
       { key: 'pausade', label: 'Pausade', rows: pausade, sum: null as number | null },
       { key: 'uppsagda', label: 'Uppsagda', rows: uppsagda, sum: null as number | null },
     ].filter(g => g.rows.length > 0)
-  }, [filteredCustomers, addonFor, quickView, setupFor])
+  }, [filteredCustomers, addonFor, quickView, setupFor, sortMode])
+
+  // Datumet som förklarar ordningen, bredvid kundnamnet
+  const dateNoteFor = (c: ConsolidatedCustomer): string | null => {
+    if (sortMode === 'tillagd') {
+      const d = isoDay(addedAt(c))
+      return d ? `Tillagd ${d}` : null
+    }
+    if (sortMode === 'signerad') {
+      const d = isoDay(signedAt(c))
+      return d ? `Signerad ${d}` : 'Signeringsdatum saknas'
+    }
+    return null
+  }
 
   // Ingen paginering: grupperna renderas i sin helhet så att alla statusar
   // alltid går att öppna direkt. Pausade/Uppsagda är kollapsade by default.
@@ -759,6 +823,7 @@ export default function Customers() {
             )}
           </div>
 
+          <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2">
           {/* Snabbvyer: platt text, aktiv vy understruken (inga piller) */}
           <nav aria-label="Snabbvy" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-slate-400">
             <span className="text-slate-500">Snabbvy:</span>
@@ -790,6 +855,34 @@ export default function Customers() {
               )
             })}
           </nav>
+
+          {/* Sortering: samma platta stil som snabbvyerna */}
+          <div role="group" aria-label="Sortera" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-slate-400">
+            <span className="text-slate-500">Sortera:</span>
+            {([
+              { key: 'standard', label: 'Grupperad' },
+              { key: 'tillagd', label: 'Senast tillagda' },
+              { key: 'signerad', label: 'Senast signerade' },
+            ] as const).map((s) => {
+              const active = sortMode === s.key
+              return (
+                <button
+                  key={s.key}
+                  type="button"
+                  onClick={() => setSortMode(s.key)}
+                  aria-pressed={active}
+                  className={`rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+                    active
+                      ? 'font-semibold text-emerald-400 underline decoration-2 underline-offset-[5px]'
+                      : 'hover:text-white'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              )
+            })}
+          </div>
+          </div>
 
           {/* Inte kompletta: ikonfilter */}
           {quickView === 'inkomplett' && (
@@ -866,6 +959,7 @@ export default function Customers() {
                         }}
                         setup={setupFor(org)}
                         onSetupNavigate={goToSetupTarget}
+                        dateNote={dateNoteFor(org)}
                         highlighted={
                           activeCustomerId === org.id ||
                           (peekCustomerId != null && peekIdFor(org) === peekCustomerId)

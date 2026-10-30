@@ -256,6 +256,8 @@ interface Props {
   setup?: SetupSummary | null
   /** Klick på en statusikon eller nästa åtgärd */
   onSetupNavigate?: (target: SetupTarget) => void
+  /** Sorterat på datum: "Tillagd 2026-10-22" eller "Signerad 2026-10-08" bredvid namnet */
+  dateNote?: string | null
 }
 
 export default function CustomerListRow({
@@ -272,6 +274,7 @@ export default function CustomerListRow({
   setup = null,
   onSetupNavigate,
   highlighted = false,
+  dateNote = null,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -338,6 +341,9 @@ export default function CustomerListRow({
         {/* Namn + enhetsbadge + expandering */}
         <span className="flex items-center gap-2 flex-1 min-w-0 pr-7 lg:pr-0">
           <span className="text-sm text-slate-100 truncate">{org.company_name}</span>
+          {dateNote && (
+            <span className="text-xs text-slate-500 tabular-nums whitespace-nowrap shrink-0">{dateNote}</span>
+          )}
           {isMultisite && (
             <button
               onClick={(e) => {

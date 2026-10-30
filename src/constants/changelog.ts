@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.109.0',
+    date: '2026-10-30',
+    title: 'Befintliga kunder sorteras på nyast',
+    items: [
+      { kind: 'nyhet', text: 'I Befintliga kunder kan du välja Sortera: Senast tillagda eller Senast signerade. Då visas alla kunder i en lista med den nyaste överst och datumet bredvid namnet, så att ingen ny kund missas.' },
+    ],
+  },
+  {
     version: '3.108.3',
     date: '2026-10-29',
     title: 'Hovertexten för frånvaro syns överst i schemat',
