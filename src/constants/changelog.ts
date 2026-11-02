@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.114.3',
+    date: '2026-11-02',
+    title: 'Borttagna avtalsrader räknas inte',
+    items: [
+      { kind: 'buggfix', text: 'Avtalsrader som tagits bort (till exempel en gammal premierad som avtalskartan ersatt) räknas inte längre i Avtalsöversikten, kundkortet, avtalsinsikterna, faktureringsinställningarna, offertvyerna eller när ett avtal förnyas.' },
+    ],
+  },
+  {
     version: '3.114.2',
     date: '2026-11-02',
     title: 'Nattens fakturor som Planera fakturor',

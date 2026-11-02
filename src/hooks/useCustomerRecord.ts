@@ -892,6 +892,9 @@ export function useCustomerRecord(customerId: string | undefined) {
     )
     const workItems: RecordWorkItem[] = rawWorkItems
       .filter((w) => w.case_type !== 'contract' || !replacedContractIds.has(w.case_id))
+      // Makulerat avtalsinnehåll (t.ex. en § 4-rad ersatt av avtalskartans
+      // rad) är inte längre en del av avtalet och räknas inte
+      .filter((w) => !(w.case_type === 'contract' && w.status === 'cancelled' && !techByCase.has(w.case_id)))
       .map((w) => {
       // Ärendeträffen avgör, inte case_type: finns raden i cases/business_cases/
       // private_cases är det UTFÖRT ARBETE och tillhör teknikern som gjorde det.

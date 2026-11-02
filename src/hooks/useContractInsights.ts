@@ -421,6 +421,7 @@ export function useContractInsights(): ContractInsights {
           .select('service_name, total_price')
           .eq('case_type', 'contract')
           .eq('item_type', 'service')
+          .neq('status', 'cancelled')
 
         const productMap = new Map<string, { occurrences: number; totalValue: number }>()
         ;(contractServiceItems || []).forEach((item: any) => {
@@ -514,6 +515,7 @@ export async function fetchCustomersForService(
     .select('customer_id, total_price, quantity')
     .eq('case_type', 'contract')
     .eq('item_type', 'service')
+    .neq('status', 'cancelled')
     .eq('service_name', serviceName)
   return (data || []).map((r: any) => ({
     customerId: r.customer_id,

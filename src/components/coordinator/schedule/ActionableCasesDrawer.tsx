@@ -197,6 +197,8 @@ function DrawerRow({ caseRow: c, action, onScheduleCase, onActionUpdate, onOpenH
           .select('total_price, vat_rate')
           .eq('case_id', contract.id)
           .eq('item_type', 'service')
+          // Makulerade rader (t.ex. ersatta av avtalskartans rad) räknas inte
+          .neq('status', 'cancelled')
           .then(({ data: items }) => {
             if (items?.length) {
               const incl = items.reduce(

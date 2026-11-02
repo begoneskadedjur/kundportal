@@ -199,7 +199,9 @@ export async function buildRenewalPrefill(contractId: string): Promise<RenewalPr
     .select('*')
     .eq('case_id', contractId)
     .eq('case_type', 'contract')
-  const items = (itemsData ?? []) as unknown as BillingItemRow[]
+    // Makulerade rader följer inte med till det nya avtalet
+    .neq('status', 'cancelled')
+  const items =(itemsData ?? []) as unknown as BillingItemRow[]
 
   // Artikel → tjänst-kopplingen rekonstrueras ur mapped_service_id, som pekar
   // på TJÄNSTERADENS id (inte services.id).

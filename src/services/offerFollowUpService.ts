@@ -558,6 +558,8 @@ export class OfferFollowUpService {
       .select('*, article:articles(*), service:services(*)')
       .eq('case_id', contractId)
       .eq('case_type', 'contract')
+      // Makulerade rader (t.ex. ersatta av avtalskartans rad) visas inte
+      .neq('status', 'cancelled')
       .order('created_at', { ascending: true })
 
     if (error) throw error

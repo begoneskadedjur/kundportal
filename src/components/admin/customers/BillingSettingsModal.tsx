@@ -319,6 +319,8 @@ export default function BillingSettingsModal({
           .select('id, item_type, service_name, article_name, quantity, unit_price, total_price, mapped_service_id')
           .in('case_id', contractIds)
           .eq('case_type', 'contract')
+          // Makulerade rader (t.ex. ersatta av avtalskartans rad) räknas inte
+          .neq('status', 'cancelled')
 
         if (!items) {
           setContractServices([])

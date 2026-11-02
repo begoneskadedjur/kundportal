@@ -289,6 +289,8 @@ export class ContractService {
       )
       .in('case_id', contractIds)
       .eq('case_type', 'contract')
+      // Makulerade rader (t.ex. ersatta av avtalskartans rad) räknas inte
+      .neq('status', 'cancelled')
 
     if (error) {
       console.warn('getContractBillingAggregate fel:', error)
