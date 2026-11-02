@@ -84,6 +84,7 @@ import {
 import { markingKey, markingKeyColumn } from '../../src/shared/addonMarking'
 import { loadAddonV2Inputs, type AddonV2Inputs } from '../../src/shared/addonV2Loader'
 import { buildContractInvoiceRows } from '../../src/shared/contractInvoiceRows'
+import { cronPremiumRowTotals } from '../../src/shared/premiumShares'
 
 export const config = { maxDuration: 300 }
 
@@ -186,7 +187,7 @@ type Sources = {
   additionNotes: Array<{ effective_from: string; note: string }>
   /** Var § 6 per år-rader hamnar: premiefakturan eller egna fakturor */
   equipmentInvoiceMode: EquipmentInvoiceMode
-  premium: Array<{ id: string; code: string | null; name: string; quantity: number; unit_price: number; total_price: number; vat_rate: number; discount_percent: number }>
+  premium: Array<{ id: string; code: string | null; name: string; quantity: number; unit_price: number; total_price: number; vat_rate: number; discount_percent: number; is_premium_carrier: boolean; premium_share: number | null }>
   equipment: EquipmentLine[]
 }
 
@@ -224,7 +225,7 @@ async function loadSources(ctx: RunCtx, contractId: string): Promise<Sources> {
     supabase.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contractId),
     supabase
       .from('case_billing_items')
-      .select('id, article_code, article_name, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, billing_model, billing_start_date, site_customer_id, station_type_id')
+      .select('id, article_code, article_name, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, billing_model, billing_start_date, site_customer_id, station_type_id, is_premium_carrier, premium_share')
       .eq('case_id', contractId)
       .eq('case_type', 'contract')
       .eq('item_type', 'service')
@@ -245,6 +246,8 @@ async function loadSources(ctx: RunCtx, contractId: string): Promise<Sources> {
     billing_start_date?: string | null
     site_customer_id?: string | null
     station_type_id?: string | null
+    is_premium_carrier?: boolean | null
+    premium_share?: number | string | null
   }
   type StepRow = { effective_from: string; annual_value: number | string; event_type?: string | null; note?: string | null }
   const rows = (items ?? []) as Item[]
@@ -268,6 +271,8 @@ async function loadSources(ctx: RunCtx, contractId: string): Promise<Sources> {
         total_price: Number(r.total_price),
         vat_rate: Number(r.vat_rate),
         discount_percent: Number(r.discount_percent ?? 0),
+        is_premium_carrier: !!r.is_premium_carrier,
+        premium_share: r.premium_share == null ? null : Number(r.premium_share),
       })),
     equipment: rows
       .filter((r) => r.billing_model === 'per_year' || r.billing_model === 'per_month')
@@ -311,24 +316,43 @@ function buildRows(contract: ContractRow, sources: Sources, p: PlannedPeriod): R
     }
     return rows
   }
-  if (sources.premium.length > 0) {
-    const divisor = periodDivisor(contract.billing_frequency ?? null)
-    const scaled = sources.premium.map((it) => ({ it, total: Math.round((it.total_price * 100) / divisor) / 100 }))
-    const sum = scaled.reduce((s, r) => s + r.total, 0)
-    const factor = sum > 0 && Math.abs(sum - p.amount) >= 0.5 ? p.amount / sum : 1
-    for (const r of scaled) {
-      const total = Math.round(r.total * factor * 100) / 100
+  // § 4-radernas belopp: skalade radpriser som förut; summerar raderna till
+  // 0 kr fördelas premien efter andelarna (src/shared/premiumShares.ts).
+  const premiumTotals =
+    sources.premium.length > 0
+      ? cronPremiumRowTotals(sources.premium, p.amount, periodDivisor(contract.billing_frequency ?? null))
+      : null
+  if (premiumTotals) {
+    for (const it of sources.premium) {
+      const total = premiumTotals.totals.get(it.id) ?? 0
+      if (premiumTotals.byShares && total <= 0) {
+        // Ingår utan debitering: textrad, 0 kr (som Planera fakturor)
+        rows.push({
+          contract_id: contract.id,
+          line_kind: 'index_note',
+          case_billing_item_id: it.id,
+          article_code: it.code,
+          article_name: `${it.name}, ingår i avtalet${it.quantity > 1 ? `, ${it.quantity} st` : ''}`,
+          quantity: 0,
+          unit_price: 0,
+          total_price: 0,
+          vat_rate: it.vat_rate,
+          discount_percent: 0,
+        })
+        continue
+      }
+      const quantity = premiumTotals.byShares && it.is_premium_carrier ? 1 : it.quantity
       rows.push({
         contract_id: contract.id,
         line_kind: 'premium',
-        case_billing_item_id: r.it.id,
-        article_code: r.it.code,
-        article_name: `${r.it.name}, årspremie ${period}${diary}`,
-        quantity: r.it.quantity,
-        unit_price: r.it.quantity > 0 ? Math.round((total / r.it.quantity) * 100) / 100 : total,
+        case_billing_item_id: it.id,
+        article_code: it.code,
+        article_name: `${it.name}, årspremie ${period}${diary}`,
+        quantity,
+        unit_price: quantity > 0 ? Math.round((total / quantity) * 100) / 100 : total,
         total_price: total,
-        vat_rate: r.it.vat_rate,
-        discount_percent: r.it.discount_percent,
+        vat_rate: it.vat_rate,
+        discount_percent: premiumTotals.byShares ? 0 : it.discount_percent,
       })
     }
   } else if (p.amount > 0) {

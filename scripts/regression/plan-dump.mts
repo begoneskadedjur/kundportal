@@ -44,6 +44,7 @@ import {
   type PlanningContract,
   type PremiumStep,
 } from '../../src/shared/contractPlanner.ts'
+import { cronPremiumRowTotals } from '../../src/shared/premiumShares.ts'
 import {
   buildContractDiff,
   consolidationGroupKey,
@@ -215,7 +216,7 @@ type LedgerRow = { station_id: string; kind: string; unit_id: string; station_ty
 type Sources = {
   steps: PremiumStep[]
   additionNotes: Array<{ effective_from: string; note: string }>
-  premium: Array<{ id: string; code: string | null; name: string; quantity: number; unit_price: number; total_price: number; vat_rate: number; discount_percent: number }>
+  premium: Array<{ id: string; code: string | null; name: string; quantity: number; unit_price: number; total_price: number; vat_rate: number; discount_percent: number; is_premium_carrier: boolean; premium_share: number | null }>
   equipment: EquipmentLine[]
 }
 
@@ -339,6 +340,8 @@ function sourcesFor(contractId: string): Sources {
         total_price: Number(r.total_price),
         vat_rate: Number(r.vat_rate),
         discount_percent: Number(r.discount_percent ?? 0),
+        is_premium_carrier: !!r.is_premium_carrier,
+        premium_share: r.premium_share == null ? null : Number(r.premium_share),
       })),
     equipment: rows
       .filter((r) => r.billing_model === 'per_year' || r.billing_model === 'per_month')
@@ -881,14 +884,18 @@ function buildRows(contract: ContractRow, sources: Sources, p: PlannedPeriod): R
     }
     return rows
   }
-  if (sources.premium.length > 0) {
-    const divisor = periodDivisor(contract.billing_frequency ?? null)
-    const scaled = sources.premium.map((it) => ({ it, total: Math.round((it.total_price * 100) / divisor) / 100 }))
-    const sum = scaled.reduce((s, r) => s + r.total, 0)
-    const factor = sum > 0 && Math.abs(sum - p.amount) >= 0.5 ? p.amount / sum : 1
-    for (const r of scaled) {
-      const total = Math.round(r.total * factor * 100) / 100
-      rows.push({ line_kind: 'premium', quantity: r.it.quantity, total_price: total })
+  const premiumTotals =
+    sources.premium.length > 0
+      ? cronPremiumRowTotals(sources.premium, p.amount, periodDivisor(contract.billing_frequency ?? null))
+      : null
+  if (premiumTotals) {
+    for (const it of sources.premium) {
+      const total = premiumTotals.totals.get(it.id) ?? 0
+      if (premiumTotals.byShares && total <= 0) {
+        rows.push({ line_kind: 'index_note', quantity: 0, total_price: 0 })
+        continue
+      }
+      rows.push({ line_kind: 'premium', quantity: premiumTotals.byShares && it.is_premium_carrier ? 1 : it.quantity, total_price: total })
     }
   } else if (p.amount > 0) {
     rows.push({ line_kind: 'premium', quantity: 1, total_price: p.amount })

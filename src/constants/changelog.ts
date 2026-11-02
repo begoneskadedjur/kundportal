@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.114.1',
+    date: '2026-11-02',
+    title: 'Förlängningsfakturor får premien',
+    items: [
+      { kind: 'buggfix', text: 'Förlängningsfakturor som nattjobbet skapar får avtalets premie även när tjänsteraden i avtalskartan står på 0 kr. Tidigare kunde fakturan bli 0 kr, som för Brf Årsta Torg.' },
+    ],
+  },
+  {
     version: '3.114.0',
     date: '2026-10-30',
     title: 'Nya avtal följer avtalsdagen',

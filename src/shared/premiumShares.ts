@@ -75,3 +75,42 @@ export function allocateByShares(amount: number, order: string[], shares: Map<st
   })
   return out
 }
+
+export interface CronPremiumItem extends ShareInput {
+  total_price: number
+}
+
+/**
+ * Premiebeloppet per § 4-rad i cronens förlängningsfakturor
+ * (api/cron/generate-continuing-contracts.ts, buildRows).
+ *
+ * Som förut: radpriserna delas med perioddelaren och skalas mot periodens
+ * premie när summan avviker med minst 50 öre. Summerar § 4-raderna till 0 kr
+ * (avtalskartans rader bär andelar, inte belopp) kunde inget skalas och
+ * fakturan blev 0 kr trots premie i § 6 (Årsta Torg INV-202611-0002). Då
+ * fördelas premien efter andelarna som i Planera fakturor: bärande raden får
+ * restposten, rader utan andel ingår (0 kr, byShares = true). Returnerar null när ingen rad har
+ * någon andel; cronen skriver då en vanlig premierad med hela beloppet.
+ */
+export function cronPremiumRowTotals(
+  items: CronPremiumItem[],
+  amount: number,
+  divisor: number
+): { totals: Map<string, number>; byShares: boolean } | null {
+  const scaled = items.map((it) => ({ id: it.id, total: Math.round((it.total_price * 100) / divisor) / 100 }))
+  const sum = scaled.reduce((s, r) => s + r.total, 0)
+  const out = new Map<string, number>()
+  if (sum > 0 || amount <= 0) {
+    const factor = sum > 0 && Math.abs(sum - amount) >= 0.5 ? amount / sum : 1
+    for (const r of scaled) out.set(r.id, Math.round(r.total * factor * 100) / 100)
+    return { totals: out, byShares: false }
+  }
+  const { shares } = resolvePremiumShares(items)
+  const order = [...items]
+    .sort((a, b) => Number(!!b.is_premium_carrier) - Number(!!a.is_premium_carrier))
+    .map((it) => it.id)
+  if (!order.some((id) => (shares.get(id) ?? 0) > 0)) return null
+  const amounts = allocateByShares(amount, order, shares)
+  for (const it of items) out.set(it.id, amounts.get(it.id) ?? 0)
+  return { totals: out, byShares: true }
+}
