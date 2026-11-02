@@ -104,7 +104,7 @@ export default function TillaggRakneexempel() {
           {/* Nu */}
           <div className={SECTION}>
             <p className="text-sm font-semibold text-[#20c58f]">Nu, {monthsLabel(r.stations.months)}</p>
-            <p className="text-xs text-slate-400 mb-2">{r.stations.days} dagar av 365 · på merförsäljningsfakturan</p>
+            <p className="text-xs text-slate-400 mb-2">{r.stations.days} dagar av 365 · pro rata på ärendet där stationerna sattes ut</p>
             <Rad label={`${EXEMPEL.count} × ${formatKr(r.stations.perUnitNow)}`} value={formatKr(r.stations.totalNow)} />
             {timmar > 0 && <Rad label={`Arbetstid ${timmar} h × ${formatKr(r.labour.perUnitNow)}`} value={formatKr(r.labour.totalNow)} />}
             <Rad label="På fakturan nu" value={formatKr(r.nowTotal)} strong />
@@ -112,7 +112,7 @@ export default function TillaggRakneexempel() {
           {/* Sedan */}
           <div className={SECTION}>
             <p className="text-sm font-semibold text-slate-200">Från {arFran}, varje avtalsår</p>
-            <p className="text-xs text-slate-400 mb-2">egen faktura i samband med årsfakturan</p>
+            <p className="text-xs text-slate-400 mb-2">egen tilläggsfaktura för samma period som årsfakturan</p>
             <Rad label={`${EXEMPEL.count} × ${formatKr(EXEMPEL.stationPrice)}`} value={formatKr(r.stations.totalAnnual)} />
             {timmar > 0 && <Rad label={`Arbetstid ${timmar} h × ${formatKr(EXEMPEL.hourlyPrice)}`} value={formatKr(r.labour.totalAnnual)} />}
             <Rad label="Per år" value={formatKr(r.annualTotal)} strong />

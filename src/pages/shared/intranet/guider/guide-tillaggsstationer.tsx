@@ -8,7 +8,8 @@
 // per kontroll, Kräver att kunden har ett avtal i avtalskartan, pris saknas) med
 // ADDON_BILLING_MODEL_HELP, useEtableringsflode (toasten Utrustning placerad!) och
 // ChangeStationTypeSheet (Byt stationstyp, Byt till X, Tidigare kontroller står kvar
-// som X). Kontrollerat 2026-10-24. Påhittad kund, inga priser visas.
+// som X). Kontrollerat 2026-10-24. Stationen kopplas till ärendet (placementCaseMessage,
+// useEtableringsflode) och tilläggsreglerna kontrollerade 2026-11-02. Påhittad kund, inga priser visas.
 
 import { useState } from 'react'
 import { OvningRam, type OvningSvar } from '../skarmkit'
@@ -120,7 +121,7 @@ function Ovning() {
       else if (!p.gps) { setL({ ...l, p: { ...p, fel: 'GPS-position krävs. Tryck på Hämta GPS.' } }); miss('Portalen sparar inte utan position. Tryck Hämta GPS först.') }
       else {
         setL({ ...l, vy: 'placerad', toast: 'Utrustning placerad!' })
-        setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Betongstationen står som tillägg utöver avtal, per månad. Den faktureras månadsvis med priset ur kundens prislista. Avtalets stationer påverkas inte.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'}, det gör inget.` : ''}` })
+        setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Betongstationen står som tillägg utöver avtal, per månad, och kopplas till kundens öppna etableringsärende. Kontoret får en notis och beslutar hur den faktureras. Avtalets stationer påverkas inte.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'}, det gör inget.` : ''}` })
       }
     } else if (id === 'form-stang' || id === 'avbryt') {
       miss('Krysset och Avbryt avslutar placeringen. Placera stationen först.')

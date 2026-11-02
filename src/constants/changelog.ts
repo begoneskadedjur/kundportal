@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.115.0',
+    date: '2026-11-02',
+    title: 'Guiderna om tilläggsstationer',
+    items: [
+      { kind: 'andring', text: 'Guiden Besluta och fakturera tilläggsstationer visar arbetslistan på avtalskartan, notisen "att göra på avtalskartan", betald till och med per station och skillnaden mellan tilläggsreglerna Följer premien och Som tidigare.' },
+      { kind: 'andring', text: 'Guiderna Sätt ut en tilläggsstation och Boka etablering för tilläggsstationer berättar att stationen kopplas till etableringsärendet där den sätts ut.' },
+    ],
+  },
+  {
     version: '3.114.3',
     date: '2026-11-02',
     title: 'Borttagna avtalsrader räknas inte',

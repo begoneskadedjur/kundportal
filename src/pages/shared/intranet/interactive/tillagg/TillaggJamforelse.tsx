@@ -1,12 +1,14 @@
 // src/pages/shared/intranet/interactive/tillagg/TillaggJamforelse.tsx
 // Guiden Tilläggsstationer: de två besluten sida vid sida. Texterna följer
 // AddonDropPrompt och ContractScopeService (addAddonStationsSeparate,
-// addAddonStationsToPremium, decideAddonLabour).
+// addAddonStationsToPremium, decideAddonLabour). Tilläggsregler och pro rata
+// enligt 3.111 till 3.114 kontrollerade 2026-11-02.
 
 const RADER: { fraga: string; tillagg: string; iAvtalet: string }[] = [
   { fraga: 'När väljs det?', tillagg: 'Förvalt. Välj det om inget annat är sagt med kunden.', iAvtalet: 'När kunden och vi är överens om att stationerna ska ingå i avtalet.' },
   { fraga: 'Årspremien', tillagg: 'Rörs inte.', iAvtalet: 'Höjs med stationerna och arbetstiden, från datumet du väljer i Gäller från.' },
-  { fraga: 'Faktura', tillagg: 'Egen faktura i samband med avtalets årsfaktura, varje avtalsår.', iAvtalet: 'Ingen egen faktura. Tillägget faktureras med avtalet.' },
+  { fraga: 'Faktura', tillagg: 'Tilläggsregler Som tidigare: egen faktura i samband med årsfakturan. Följer premien: i premiens takt, på månadsfakturan vid månadspremie, annars egen tilläggsfaktura per period och enhetens referenskod.', iAvtalet: 'Ingen egen faktura. Tillägget faktureras med avtalet.' },
+  { fraga: 'Första perioden', tillagg: 'Pro rata fram till nästa periodstart. Som tidigare: på enhetens öppna ärende redan vid utsättningen. Följer premien: först efter beslutet, på ärendet där stationen sattes ut. Är det ärendet stängt blir det fakturan Tillägg från utsättning.', iAvtalet: 'Ingen pro rata. Premien höjs från datumet i Gäller från.' },
   { fraga: 'Avtalets innehåll', tillagg: 'Oförändrat. Tillägget ligger bredvid avtalet, i § 5.', iAvtalet: 'Stationerna och arbetstiden blir en del av avtalet. Kostnaden läggs i § 4.' },
   { fraga: 'Antal stationer', tillagg: 'Räknas om före varje faktura. Färre stationer ger lägre belopp.', iAvtalet: 'Ingår i premien.' },
   { fraga: 'När slutar det?', tillagg: 'När avtalet slutar.', iAvtalet: 'Som resten av avtalet.' },

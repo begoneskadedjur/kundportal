@@ -8,6 +8,7 @@ import AddonBillingTimeline from '../../../../../components/shared/AddonBillingT
 import { Icon } from '../../../../../components/icons/Icon'
 import { formatKr, monthsLabel, premiumRaise } from '../../../../../shared/addonEconomics'
 import { EXEMPEL, raknaExempel } from './tillaggExempel'
+import { addonDecideInstruction } from '../../../../../shared/contractWorkItems'
 import { FakeCheckbox, FakeInput, FakeRadio, MiniScreen, SECTION, SUB_SECTION } from './tillaggShared'
 
 const ex = raknaExempel()
@@ -96,10 +97,10 @@ export function SkarmNotisOchLista() {
         <div className={SUB_SECTION}>
           <p className="flex items-center gap-1.5 font-semibold text-white">
             <span className="w-2 h-2 rounded-full bg-[#20c58f]" aria-hidden />
-            Tillägg att besluta · {EXEMPEL.customerName}
+            1 att göra på avtalskartan · {EXEMPEL.customerName}
           </p>
           <p className="text-slate-400 mt-0.5">
-            {EXEMPEL.count} tilläggsstationer på 1 avtal väntar på beslut om fakturering, {tal(annual)} kr/år.
+            {addonDecideInstruction(EXEMPEL.count, EXEMPEL.unitName, true)}
           </p>
         </div>
         <div className={SUB_SECTION}>
@@ -269,24 +270,29 @@ export function SkarmMerforsaljning() {
   )
 }
 
-/** Steg 6: uppgiftsremsan i avtalskartan */
+/** Steg 6: arbetslistan överst i avtalskartan (ContractWorkList) */
 export function SkarmUppgiftsremsa() {
   const annual = EXEMPEL.stationPrice * EXEMPEL.count
   return (
     <MiniScreen where="Kundkortet › Avtalskarta">
-      <div className="px-3 py-2 rounded-xl border border-amber-500/40 bg-amber-500/10 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-[12.5px] font-semibold text-amber-200">{EXEMPEL.count} tillägg att besluta · {tal(annual)} kr/år</p>
-          <p className="text-[11px] text-amber-200/80 mt-0.5">Tekniker har satt ut stationer utöver avtalet. Bestäm per rad om de ska faktureras som tillägg eller bakas in i premien.</p>
-          <p className="text-[11px] text-amber-200/70 mt-0.5">Avtal 1 av 1 · {EXEMPEL.count} här</p>
+      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10">
+        <div className="px-3 pt-2 pb-1.5 flex flex-wrap items-baseline gap-x-3">
+          <span className="text-[12.5px] font-semibold text-amber-200">1 att göra på avtalskartan</span>
+          <span className="text-[11px] text-amber-200/80 tabular-nums">{EXEMPEL.count} tillägg att besluta · {tal(annual)} kr/år</span>
         </div>
-        <span className="shrink-0 text-[12px] px-3 py-1 rounded-md bg-[#20c58f] text-[#0b1220] font-semibold">Öppna § 5</span>
-      </div>
-      <div className="mt-2 p-3 rounded-xl border border-amber-500/30 bg-slate-800/30 text-xs">
-        <p className="text-white mb-1.5">{EXEMPEL.count} st {EXEMPEL.stationType} · {EXEMPEL.unitName} · per år</p>
-        <div className="flex flex-wrap gap-2">
-          <span className="px-2.5 py-1 rounded-md border border-slate-600 text-slate-200">Lägg till i avtalet</span>
-          <span className="px-2.5 py-1 rounded-md bg-[#20c58f] text-[#0b1220] font-semibold">Tillägg utöver avtalet</span>
+        <div className="px-3 py-2 border-t border-amber-500/15 flex flex-wrap items-start gap-x-3 gap-y-2">
+          <Icon name="kund.beslut" size={20} className="shrink-0 mt-0.5 text-amber-300" />
+          <div className="min-w-0 flex-1 basis-56">
+            <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-white">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" aria-hidden />
+              Tillägg att besluta <span className="text-slate-400 font-normal">· {EXEMPEL.unitName}</span>
+            </p>
+            <p className="text-[12px] text-slate-200 mt-0.5">{addonDecideInstruction(EXEMPEL.count, EXEMPEL.unitName, true)}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="text-[12px] px-3 py-1 rounded-md bg-[#20c58f] text-white font-semibold">Tillägg utöver avtalet</span>
+            <span className="text-[12px] px-3 py-1 rounded-md border border-slate-600 text-slate-200">Ingår i premien</span>
+          </div>
         </div>
       </div>
     </MiniScreen>

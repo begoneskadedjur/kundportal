@@ -1,6 +1,7 @@
 // src/pages/shared/intranet/interactive/tillagg/tillaggSteg.tsx
 // De åtta stegen i guiden Tilläggsstationer: text, roller och skärmbilder.
 // Används av TillaggKedja (tidslinjen) och TillaggRoller (vem gör vad).
+// Uppdaterad 2026-11-02: arbetslistan, notisen och tilläggsreglerna (3.111 till 3.114).
 
 import type { ReactNode } from 'react'
 import type { TillaggRole } from './tillaggRoles'
@@ -68,7 +69,8 @@ export const STEG: Steg[] = [
         <Punkter
           items={[
             <>Stationen blir en <B>bricka att besluta</B> i kundens avtalskarta.</>,
-            'Alla med behörigheten att godkänna fakturor får en notis: Tillägg att besluta.',
+            'Alla med behörigheten att godkänna fakturor får en notis: N att göra på avtalskartan och kundens namn.',
+            'Stationen kopplas till ärendet där den sattes ut. Har enheten flera öppna etableringsärenden kopplas den till det senast skapade, och teknikern får ett meddelande om det.',
             <>Kunden hamnar under <B>Kräver åtgärd</B> i listan Befintliga kunder, och menyraden Befintliga kunder får en markering.</>,
           ]}
         />
@@ -136,6 +138,7 @@ export const STEG: Steg[] = [
         <p className="text-sm leading-relaxed text-slate-300">
           När ärendet stängs faktureras tiden fram till avtalets nästa periodstart, alltså det som står under Betalas nu i Ekonomi-fliken. Stationerna och arbetstiden blir fakturarader under <B>Fakturering › Merförsäljning Avtal</B>. En merförsäljningsfaktura skapas direkt, eller läggs på månadens samlingsfaktura om kunden är inställd så.
         </p>
+        <Obs>Avtal med Tilläggsregler Följer premien (nya avtal från 2026-10-30, FEV, WBAB och Falu kommun) får ingen pro rata förrän tillägget är beslutat i avtalskartan. Stängdes ärendet innan dess blir det i stället en faktura av typen Tillägg från utsättning.</Obs>
         <Punkter
           items={[
             'Interna kostnader (produkterna och den interna arbetstiden) blir aldrig fakturarader.',
@@ -154,7 +157,7 @@ export const STEG: Steg[] = [
     body: (
       <>
         <p className="text-sm leading-relaxed text-slate-300">
-          Klicka på notisen eller på kunden under Kräver åtgärd. Du hamnar i kundens <B>Avtalskarta</B> med en gul remsa överst. Tryck <B>Öppna § 5</B> och välj en av de två knapparna vid brickan. Då öppnas <B>Besluta tillägg</B>, som visar:
+          Klicka på notisen eller på kunden under Kräver åtgärd. Du hamnar i kundens <B>Avtalskarta</B> med arbetslistan överst. Tryck <B>Tillägg utöver avtalet</B> eller <B>Ingår i premien</B> på raden Tillägg att besluta. Då öppnas <B>Besluta tillägg</B>, som visar:
         </p>
         <Punkter
           items={[
@@ -170,7 +173,7 @@ export const STEG: Steg[] = [
             <><B>Lägg till i avtalet</B>: årspremien höjs från det datum du väljer och tillägget faktureras med avtalet. Stationerna och arbetstiden blir en del av avtalets innehåll och kostnaden läggs i § 4.</>,
           ]}
         />
-        <Obs>Utan beslut blir det aldrig någon årsdebitering. Kunden betalar då bara för tiden fram till avtalets nästa periodstart, och tillägget följer inte med till nästa avtalsår.</Obs>
+        <Obs>Utan beslut blir det aldrig någon årsdebitering. Med Tilläggsregler Som tidigare betalar kunden då bara för tiden fram till avtalets nästa periodstart. Med Följer premien betalar kunden ingenting förrän tillägget är beslutat.</Obs>
       </>
     ),
     screens: (
@@ -187,7 +190,7 @@ export const STEG: Steg[] = [
     body: (
       <>
         <p className="text-sm leading-relaxed text-slate-300">
-          Varje natt skapar systemet de avtalsfakturor som saknas: inom bindningstiden när fakturadatumet är inne, och nästa avtalsperiods fakturor dagen efter sista uppsägningsdag. Först räknar det om tilläggen efter stationerna som står ute. Tilläggsfakturan dyker upp som en <B>egen planerad faktura bredvid årsfakturan</B>, för samma period.
+          Varje natt skapar systemet de avtalsfakturor som saknas: inom bindningstiden när fakturadatumet är inne, och nästa avtalsperiods fakturor dagen efter sista uppsägningsdag. Först räknar det om tilläggen efter stationerna som står ute. Med Tilläggsregler Som tidigare dyker tilläggsfakturan upp som en <B>egen planerad faktura bredvid årsfakturan</B>, för samma period. Med Följer premien följer tilläggen premiens takt: på månadsfakturan vid månadspremie, annars en egen tilläggsfaktura per period och enhetens referenskod, och utan premie årsvis på avtalsdagen.
         </p>
         <Punkter
           items={[
@@ -207,7 +210,7 @@ export const STEG: Steg[] = [
       <>
         <Punkter
           items={[
-            'Tillägget faktureras varje avtalsår i samband med årsfakturan, på sin egen faktura, så länge avtalet löper.',
+            'Tillägget faktureras så länge avtalet löper: med Som tidigare varje avtalsår i samband med årsfakturan, med Följer premien i premiens takt.',
             'Tas stationer bort blir raden mindre vid nästa fakturering. Tas den sista tilläggsstationen på enheten bort går arbetstiden till 0.',
             'Det blir inga krediteringar. Det som redan är fakturerat står kvar.',
             'När avtalet har slutat avslutas tilläggets rader och inga fler tilläggsfakturor planeras. Tillägget slutar samtidigt som avtalet.',

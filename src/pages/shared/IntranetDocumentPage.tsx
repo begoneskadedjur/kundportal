@@ -36,6 +36,8 @@ import TillaggKedja from './intranet/interactive/tillagg/TillaggKedja'
 import TillaggRoller from './intranet/interactive/tillagg/TillaggRoller'
 import TillaggRakneexempel from './intranet/interactive/tillagg/TillaggRakneexempel'
 import TillaggJamforelse from './intranet/interactive/tillagg/TillaggJamforelse'
+import TillaggRegler from './intranet/interactive/tillagg/TillaggRegler'
+import TillaggArbetslistan from './intranet/interactive/tillagg/TillaggArbetslistan'
 import SokIkoner from './intranet/interactive/sok/SokIkoner'
 import SokOvning from './intranet/interactive/sok/SokOvning'
 import LeadsStegDemo from './intranet/interactive/leads/LeadsStegDemo'
@@ -77,6 +79,8 @@ const INTERACTIVE_COMPONENTS: Record<string, ComponentType<{ variant?: string }>
   'tillagg-kedja': TillaggKedja,
   'tillagg-rakneexempel': TillaggRakneexempel,
   'tillagg-jamforelse': TillaggJamforelse,
+  'tillagg-regler': TillaggRegler,
+  'tillagg-arbetslistan': TillaggArbetslistan,
   'sok-ikoner': SokIkoner,
   'sok-ovning': SokOvning,
   'leads-steg': LeadsStegDemo,
