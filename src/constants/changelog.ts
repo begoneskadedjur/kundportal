@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.114.2',
+    date: '2026-11-02',
+    title: 'Nattens fakturor som Planera fakturor',
+    items: [
+      { kind: 'andring', text: 'Fakturor som skapas automatiskt på natten ser nu ut precis som de som skapas med Planera fakturor: samma radtexter, samma fördelning av premien, samma märkning och anteckning.' },
+    ],
+  },
+  {
     version: '3.114.1',
     date: '2026-11-02',
     title: 'Förlängningsfakturor får premien',

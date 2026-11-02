@@ -5,7 +5,7 @@
 // (api/_lib/contractSigning.ts). Ändra radernas utseende HÄR, aldrig i en kopia.
 
 import { resolvePremiumShares, allocateByShares } from './premiumShares'
-import type { EquipmentLine, PlannedPeriod } from './contractPlanner'
+import type { EquipmentLine, PlannedPeriod, PremiumStep } from './contractPlanner'
 import { gapRowName, GAP_INVOICE_NOTE, isV2Row, v2AddonRowName } from './addonPlanV2'
 
 export interface ContractServiceItem {
@@ -55,6 +55,131 @@ export interface ContractRowSources {
   additionNotes: Array<{ effective_from: string; note: string }>
   label: string | null
   diaryNumber: string | null
+}
+
+// ------- Källor -------
+// Samma mappning från databasraderna till radbyggarens källor i Planera
+// fakturor (ContractInvoiceGenerator.loadContractSources) och nattjobbet
+// (api/cron/generate-continuing-contracts.ts), så att båda bygger samma rader.
+
+/** Kolumnerna på case_billing_items som källorna läser (§ 4, § 6) */
+export const CONTRACT_SOURCE_ITEM_COLUMNS =
+  'id, article_id, article_code, article_name, service_id, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, rot_rut_type, fastighetsbeteckning, billing_model, billing_start_date, site_customer_id, station_type_id, status, is_premium_carrier, premium_share'
+
+export interface ContractSourceItemRow {
+  id: string
+  article_id?: string | null
+  article_code: string | null
+  article_name: string | null
+  service_code?: string | null
+  service_name?: string | null
+  quantity: number | string
+  unit_price: number | string
+  total_price: number | string
+  vat_rate: number | string
+  discount_percent: number | string | null
+  rot_rut_type?: string | null
+  fastighetsbeteckning?: string | null
+  billing_model: string | null
+  billing_start_date?: string | null
+  site_customer_id?: string | null
+  station_type_id?: string | null
+  is_premium_carrier?: boolean | null
+  premium_share?: number | string | null
+}
+
+export interface ContractSourceStepRow {
+  effective_from: string
+  annual_value: number | string
+  event_type?: string | null
+  note?: string | null
+}
+
+export interface ContractSourceLedgerRow {
+  station_id: string
+  unit_id: string
+  station_type_id: string | null
+  removed_at: string | null
+}
+
+export interface ContractSourceContract {
+  display_name?: string | null
+  label?: string | null
+  contract_type?: string | null
+  invoice_reference?: string | null
+  diary_number?: string | null
+}
+
+export interface ContractSourcesData extends ContractRowSources {
+  steps: PremiumStep[]
+  invoiceReference: string | null
+}
+
+/** Avtalets namn på fakturaraden: användarsatt namn, label, typ */
+export function contractRowLabel(c: ContractSourceContract | null | undefined): string | null {
+  return (c?.display_name && c.display_name.trim()) || c?.label || c?.contract_type || null
+}
+
+/** Premietrappa, § 4-rader (premium) och § 6-rader (per_year, per_month) som radbyggarens källor. */
+export function contractSourcesFromRows(
+  contractId: string,
+  contract: ContractSourceContract | null | undefined,
+  steps: ContractSourceStepRow[],
+  items: ContractSourceItemRow[],
+  ledger: ContractSourceLedgerRow[]
+): ContractSourcesData {
+  // Stationerna bakom varje § 6-rad (enhet + stationstyp), fryses på fakturaraden
+  const stationIdsByRow = new Map<string, string[]>()
+  for (const l of ledger) {
+    if (l.removed_at) continue
+    const k = `${l.unit_id}|${l.station_type_id ?? ''}`
+    stationIdsByRow.set(k, [...(stationIdsByRow.get(k) ?? []), l.station_id])
+  }
+  const premiumItems: ContractServiceItem[] = items
+    .filter((r) => (r.billing_model ?? 'premium') === 'premium')
+    .map((s) => ({
+      case_billing_item_id: s.id,
+      article_id: s.article_id ?? null,
+      display_code: s.service_code ?? s.article_code ?? null,
+      display_name: s.service_name ?? s.article_name ?? 'Avtalstjänst',
+      quantity: Number(s.quantity),
+      unit_price: Number(s.unit_price),
+      total_price: Number(s.total_price),
+      vat_rate: Number(s.vat_rate),
+      discount_percent: Number(s.discount_percent ?? 0),
+      rot_rut_type: s.rot_rut_type ?? null,
+      fastighetsbeteckning: s.fastighetsbeteckning ?? null,
+      is_premium_carrier: !!s.is_premium_carrier,
+      premium_share: s.premium_share == null ? null : Number(s.premium_share),
+    }))
+  const equipment: EquipmentLine[] = items
+    .filter((r) => r.billing_model === 'per_year' || r.billing_model === 'per_month')
+    .map((s) => ({
+      id: s.id,
+      contract_id: contractId,
+      name: s.service_name ?? s.article_name ?? 'Utrustning',
+      code: s.service_code ?? s.article_code ?? null,
+      quantity: Number(s.quantity),
+      unit_price_annual: s.billing_model === 'per_month' ? Number(s.unit_price) * 12 : Number(s.unit_price),
+      unit_price_month: s.billing_model === 'per_month' ? Number(s.unit_price) : Number(s.unit_price) / 12,
+      vat_rate: Number(s.vat_rate),
+      billing_model: s.billing_model === 'per_month' ? ('per_month' as const) : ('per_year' as const),
+      billing_start_date: s.billing_start_date ?? null,
+      station_ids: s.site_customer_id ? (stationIdsByRow.get(`${s.site_customer_id}|${s.station_type_id ?? ''}`) ?? null) : null,
+      site_customer_id: s.site_customer_id ?? null,
+      station_type_id: s.station_type_id ?? null,
+    }))
+  return {
+    steps: steps.map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value), event_type: s.event_type ?? null })),
+    additionNotes: steps
+      .filter((s) => s.event_type === 'addition' && !!s.note)
+      .map((s) => ({ effective_from: s.effective_from, note: s.note as string })),
+    premiumItems,
+    equipment,
+    label: contractRowLabel(contract),
+    invoiceReference: contract?.invoice_reference ?? null,
+    diaryNumber: contract?.diary_number ?? null,
+  }
 }
 
 export function periodLabel(p: Pick<PlannedPeriod, 'periodStart' | 'periodEnd'>): string {
@@ -241,6 +366,21 @@ export function buildContractInvoiceNotes(planned: PlannedPeriod, label: string 
   return `Årspremie${label ? ` ${label}` : ''} · Betalning ${planned.sequenceNumber}/${planned.totalSequenceCount} · Period ${periodLabel(planned)}${
     diary ? ` · ${diary}` : ''
   }`
+}
+
+/**
+ * Samlingsfakturans anteckning: avtalens namn och diarienummer i gruppen
+ * (beslut 2026-09-02: huvudkundens referens i huvudet, avtalen som rader).
+ */
+export function buildConsolidatedInvoiceNotes(planned: Pick<PlannedPeriod, 'periodStart' | 'periodEnd'>, labels: string[], diaries: string[]): string {
+  return `Årspremie · Period ${periodLabel(planned)} · Avtal: ${labels.join(', ')}${diaries.length ? ` · ${diaries.join(', ')}` : ''}`
+}
+
+/** Samlingsfakturans märkning: kundens referens, annars avtalens gemensamma referens */
+export function consolidatedInvoiceMarking(customerReference: string | null | undefined, contractReferences: Array<string | null>): string | null {
+  const first = contractReferences[0] ?? null
+  const allSameRef = contractReferences.every((r) => r && r === first)
+  return customerReference ?? (allSameRef ? first : null)
 }
 
 /** invoice_items-rader för en faktura */

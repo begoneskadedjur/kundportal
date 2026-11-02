@@ -93,3 +93,19 @@ npx tsx --env-file=.env scripts/regression/rolling-twin.mts
 ```
 
 Jämför på alla levande avtal och åtta datum `contract_next_period_start` med `nextPeriodStart` och (avtal i exakt läge) `contract_period_on` med `periodContaining`. Krav: noll skillnader, exitkod 0. Skriver också ut, som information, där `contract_next_unplanned_period` (kompletthetens "Fakturaplan") skiljer sig från planerarens bindningsfönster: funktionen kräver att perioden ryms i fönstret (`v_full`) medan planeraren använder mittpunkten, i båda lägena.
+
+## Nattjobbet mot Planera fakturor (2026-11-02)
+
+Nattjobbet bygger sedan 3.114.2 sina rader med samma kod som Planera fakturor (`contractSourcesFromRows` och `buildContractInvoiceRows` i `src/shared/contractInvoiceRows.ts`). Två skript visar det:
+
+```bash
+# Nattjobbets torrkörning med skrivspärr, valfritt flyttat datum
+npx tsx --env-file=.env scripts/regression/cron-dry.mts --today=2027-01-15 --out=scripts/regression/out/x.json
+
+# Nattjobbets rader mot Planera fakturor (generatorn i provläge) per faktura
+sh scripts/regression/cron-vs-plan.sh scripts/regression/out/jamfor 2026-12-23 2027-01-15
+```
+
+`cron-dry.mts` skriver per läge (skarp och v2) antal, `would_create` och `would_refresh` med summa, märkning, anteckning och rader. `CRON_MOD=<sökväg>` kör en annan kopia av nattjobbet (t.ex. en worktree på en äldre commit), så före och efter kan köras samma minut.
+
+`cron-vs-plan.mts` körs med vite-node (generatorn läser `import.meta.env`); skalskriptet sätter service role-nyckeln ur `.env`. För varje faktura som nattjobbet skulle skapa eller uppdatera jämförs raderna (text, antal, à-pris, summa, moms, rabatt, artikel, radtyp, stationer), märkningen och anteckningen med Planera fakturor för samma period. Kunder utan avtalsrad (synth) planeras inte med avtalsvägen i Planera fakturor och visas som "saknas i Planera fakturor". Exitkod 0 när allt är identiskt. Båda skripten stoppar alla skrivningar (bara GET och läsande RPC:er släpps); `sync_addon_*` stoppas, så § 6-raderna läses som de ligger.

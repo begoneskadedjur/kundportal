@@ -29,10 +29,17 @@ import { ContractScopeService } from './contractScopeService'
 import { ContractService, isSyntheticContract } from './contractService'
 import { resolveOrganizationNumber } from '../utils/multisiteHelpers'
 import {
+  buildConsolidatedInvoiceNotes,
   buildContractInvoiceNotes,
   buildContractInvoiceRows,
+  consolidatedInvoiceMarking,
+  contractSourcesFromRows,
+  CONTRACT_SOURCE_ITEM_COLUMNS,
   periodLabel,
   toInvoiceItemRows,
+  type ContractSourceItemRow,
+  type ContractSourceLedgerRow,
+  type ContractSourceStepRow,
   type ContractServiceItem,
   type InvoiceRowSpec,
 } from '../shared/contractInvoiceRows'
@@ -869,10 +876,11 @@ export class ContractInvoiceGenerator {
         if (!e.planned) return { ...e, kind: 'premium' as const, contractId: null, consolidated: true }
         const slot = byPeriod.get(e.planned.periodStart)!
         // Beslut 2026-09-02: huvudkundens referens i huvudet, avtalen som rader.
-        const allSameRef = perContract.every(
-          (pc) => pc.sources.invoiceReference && pc.sources.invoiceReference === perContract[0].sources.invoiceReference
+        // Samma text och märkning som nattjobbet (src/shared/contractInvoiceRows.ts).
+        const marking = consolidatedInvoiceMarking(
+          billingCustomer.billing_reference,
+          perContract.map((pc) => pc.sources.invoiceReference)
         )
-        const marking = billingCustomer.billing_reference ?? (allSameRef ? perContract[0].sources.invoiceReference : null)
         return {
           ...e,
           kind: 'premium' as const,
@@ -880,9 +888,7 @@ export class ContractInvoiceGenerator {
           consolidated: true,
           rows: slot.rows,
           marking,
-          notes: `Årspremie · Period ${periodLabel(e.planned)} · Avtal: ${slot.labels.join(', ')}${
-            slot.diaries.length ? ` · ${slot.diaries.join(', ')}` : ''
-          }`,
+          notes: buildConsolidatedInvoiceNotes(e.planned, slot.labels, slot.diaries),
         }
       })
 
@@ -972,102 +978,27 @@ export class ContractInvoiceGenerator {
       supabase.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contractId),
       supabase
         .from('case_billing_items')
-        .select(
-          'id, article_id, article_code, article_name, service_id, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, rot_rut_type, fastighetsbeteckning, billing_model, billing_start_date, site_customer_id, station_type_id, status, is_premium_carrier, premium_share'
-        )
+        .select(CONTRACT_SOURCE_ITEM_COLUMNS)
         .eq('case_id', contractId)
         .eq('case_type', 'contract')
         .eq('item_type', 'service')
         .neq('status', 'cancelled'),
       supabase.rpc('contract_addon_ledger', { p_contract_id: contractId }),
     ])
-    type Item = {
-      id: string
-      article_id: string | null
-      article_code: string | null
-      article_name: string | null
-      service_id: string | null
-      service_code: string | null
-      service_name: string | null
-      quantity: number
-      unit_price: number
-      total_price: number
-      vat_rate: number
-      discount_percent: number | null
-      rot_rut_type: string | null
-      fastighetsbeteckning: string | null
-      billing_model: string | null
-      billing_start_date?: string | null
-      site_customer_id?: string | null
-      station_type_id?: string | null
-      is_premium_carrier?: boolean | null
-      premium_share?: number | string | null
-    }
-    const rows = (items ?? []) as unknown as Item[]
-    // Stationerna bakom varje § 5-rad (enhet + stationstyp), fryses på fakturaraden
-    const stationIdsByRow = new Map<string, string[]>()
-    for (const l of (ledgerRows ?? []) as Array<{ station_id: string; unit_id: string; station_type_id: string | null; removed_at: string | null }>) {
-      if (l.removed_at) continue
-      const k = `${l.unit_id}|${l.station_type_id ?? ''}`
-      stationIdsByRow.set(k, [...(stationIdsByRow.get(k) ?? []), l.station_id])
-    }
-    const premiumItems: ContractServiceItem[] = rows
-      .filter((r) => (r.billing_model ?? 'premium') === 'premium')
-      .map((s) => ({
-        case_billing_item_id: s.id,
-        article_id: s.article_id,
-        display_code: s.service_code ?? s.article_code ?? null,
-        display_name: s.service_name ?? s.article_name ?? 'Avtalstjänst',
-        quantity: Number(s.quantity),
-        unit_price: Number(s.unit_price),
-        total_price: Number(s.total_price),
-        vat_rate: Number(s.vat_rate),
-        discount_percent: Number(s.discount_percent ?? 0),
-        rot_rut_type: s.rot_rut_type ?? null,
-        fastighetsbeteckning: s.fastighetsbeteckning ?? null,
-        is_premium_carrier: !!s.is_premium_carrier,
-        premium_share: s.premium_share == null ? null : Number(s.premium_share),
-      }))
-    const equipment: EquipmentLine[] = rows
-      .filter((r) => r.billing_model === 'per_year' || r.billing_model === 'per_month')
-      .map((s) => ({
-        id: s.id,
-        contract_id: contractId,
-        name: s.service_name ?? s.article_name ?? 'Utrustning',
-        code: s.service_code ?? s.article_code ?? null,
-        quantity: Number(s.quantity),
-        unit_price_annual: s.billing_model === 'per_month' ? Number(s.unit_price) * 12 : Number(s.unit_price),
-        unit_price_month: s.billing_model === 'per_month' ? Number(s.unit_price) : Number(s.unit_price) / 12,
-        vat_rate: Number(s.vat_rate),
-        billing_model: s.billing_model === 'per_month' ? ('per_month' as const) : ('per_year' as const),
-        billing_start_date: s.billing_start_date ?? null,
-        station_ids: s.site_customer_id ? (stationIdsByRow.get(`${s.site_customer_id}|${s.station_type_id ?? ''}`) ?? null) : null,
-        site_customer_id: s.site_customer_id ?? null,
-        station_type_id: s.station_type_id ?? null,
-      }))
-    const c = contract as {
-      label?: string | null
-      contract_type?: string | null
-      display_name?: string | null
-      invoice_reference?: string | null
-      diary_number?: string | null
-    } | null
-    type StepRow = { effective_from: string; annual_value: number | string; event_type?: string | null; note?: string | null }
+    // Samma mappning som nattjobbet (src/shared/contractInvoiceRows.ts)
+    const sources = contractSourcesFromRows(
+      contractId,
+      contract,
+      (steps ?? []) as ContractSourceStepRow[],
+      (items ?? []) as unknown as ContractSourceItemRow[],
+      (ledgerRows ?? []) as ContractSourceLedgerRow[]
+    )
     return {
-      steps: ((steps ?? []) as StepRow[]).map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value), event_type: s.event_type ?? null })),
-      additionNotes: ((steps ?? []) as StepRow[])
-        .filter((s) => s.event_type === 'addition' && !!s.note)
-        .map((s) => ({ effective_from: s.effective_from, note: s.note as string })),
-      premiumItems,
-      equipment,
+      ...sources,
       // Tillägg ligger bredvid avtalet och faktureras ALLTID på en egen faktura
       // i samband med årsfakturan (beslut 2026-09-30). customers.addon_invoice_mode
       // ('with_contract') läses inte längre, kolumnen finns kvar som historik.
       equipmentInvoiceMode: 'separate',
-      // Avtalets namn på fakturaraden: användarsatt namn → label → typ
-      label: (c?.display_name && c.display_name.trim()) || c?.label || c?.contract_type || null,
-      invoiceReference: c?.invoice_reference ?? null,
-      diaryNumber: c?.diary_number ?? null,
     }
   }
 

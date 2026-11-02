@@ -25,6 +25,10 @@
 // per_year) och samma faktureringsläge (customers.contract_invoice_mode:
 // samlad faktura med en rad per avtal, eller en faktura per avtal).
 // Cronen SKAPAR bara saknade perioder; den uppdaterar och raderar aldrig.
+// Raderna, anteckningen och märkningen byggs med samma kod som Planera
+// fakturor (src/shared/contractInvoiceRows.ts): källorna med
+// contractSourcesFromRows, raderna med buildContractInvoiceRows. Ingen egen
+// radbyggare här (sedan 2026-11-02).
 // Kunder utan avtalsrad (synth) planeras från kundraden som förut, men
 // perioder som redan passerat skapas aldrig här.
 
@@ -58,7 +62,6 @@ import {
   type EquipmentInvoiceMode,
   isDueForCreation,
   parseLocalDate,
-  periodDivisor,
   rollingHorizonEnd,
   toLocalIsoDate,
   todayLocal,
@@ -76,15 +79,26 @@ import {
   computeAddonPlanV2,
   decorateV2Period,
   isAddonRulesV2,
-  isV2Row,
   planGapGroups,
-  v2AddonRowName,
   type AddonPlanV2,
 } from '../../src/shared/addonPlanV2'
 import { markingKey, markingKeyColumn } from '../../src/shared/addonMarking'
 import { loadAddonV2Inputs, type AddonV2Inputs } from '../../src/shared/addonV2Loader'
-import { buildContractInvoiceRows } from '../../src/shared/contractInvoiceRows'
-import { cronPremiumRowTotals } from '../../src/shared/premiumShares'
+import {
+  buildConsolidatedInvoiceNotes,
+  buildContractInvoiceNotes,
+  buildContractInvoiceRows,
+  consolidatedInvoiceMarking,
+  contractSourcesFromRows,
+  CONTRACT_SOURCE_ITEM_COLUMNS,
+  invoiceTotals,
+  toInvoiceItemRows,
+  type ContractSourceItemRow,
+  type ContractSourceLedgerRow,
+  type ContractSourceStepRow,
+  type ContractSourcesData,
+  type InvoiceRowSpec,
+} from '../../src/shared/contractInvoiceRows'
 
 export const config = { maxDuration: 300 }
 
@@ -122,6 +136,7 @@ type ContractRow = PlanningContract & {
   id: string
   customer_id: string
   label: string | null
+  display_name?: string | null
   contract_type: string | null
   invoice_reference: string | null
   diary_number: string | null
@@ -145,6 +160,11 @@ export type PlannedWrite = {
   periodEnd: string
   subtotal: number
   action: 'create' | 'refresh'
+  /** Fakturans märkning och anteckning (bara i minnet, för jämförelsen med Planera fakturor) */
+  marking?: string | null
+  notes?: string
+  /** Raderna (bara i minnet, loggas inte i cron_runs) */
+  rows?: InvoiceRowSpec[]
 }
 
 /**
@@ -166,29 +186,13 @@ async function write<T>(ctx: RunCtx, entry: PlannedWrite, dryValue: T, fn: () =>
   return fn()
 }
 
-type RowSpec = {
-  contract_id: string | null
-  line_kind: string
-  case_billing_item_id?: string | null
-  article_code: string | null
-  article_name: string
-  quantity: number
-  unit_price: number
-  total_price: number
-  vat_rate: number
-  discount_percent: number
-  /** Nya tilläggsregler: stationerna raden avser (täckningen skrivs vid sändning) */
-  station_ids?: string[] | null
-}
+/** Fakturarad: samma typ som Planera fakturor */
+type RowSpec = InvoiceRowSpec
 
-type Sources = {
-  steps: PremiumStep[]
-  /** Tilläggssteg i trappan med text: textrad på periodens premiefaktura */
-  additionNotes: Array<{ effective_from: string; note: string }>
+/** Avtalets källor: samma som Planera fakturor (contractSourcesFromRows) */
+type Sources = ContractSourcesData & {
   /** Var § 6 per år-rader hamnar: premiefakturan eller egna fakturor */
   equipmentInvoiceMode: EquipmentInvoiceMode
-  premium: Array<{ id: string; code: string | null; name: string; quantity: number; unit_price: number; total_price: number; vat_rate: number; discount_percent: number; is_premium_carrier: boolean; premium_share: number | null }>
-  equipment: EquipmentLine[]
 }
 
 async function resolveOrgNr(customer: CustomerRow): Promise<string | null> {
@@ -209,7 +213,8 @@ function isImported(c: ContractRow): boolean {
   return c.template_id === 'imported' || (c.oneflow_contract_id ?? '').startsWith('imported-')
 }
 
-async function loadSources(ctx: RunCtx, contractId: string): Promise<Sources> {
+async function loadSources(ctx: RunCtx, contract: ContractRow): Promise<Sources> {
+  const contractId = contract.id
   // Antal tilläggsstationer vid debiteringstillfället: synka § 6-raderna
   // från utplacerade stationer innan planen räknas (service role).
   // Synken skriver, så torrkörningen hoppar över den och läser raderna som de är.
@@ -221,186 +226,35 @@ async function loadSources(ctx: RunCtx, contractId: string): Promise<Sources> {
       console.warn('Antalssynk av tilläggsstationer misslyckades:', err)
     }
   }
-  const [{ data: steps }, { data: items }] = await Promise.all([
-    supabase.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contractId),
+  const [{ data: steps }, { data: items }, { data: ledger }] = await Promise.all([
+    supabase.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contract.id),
     supabase
       .from('case_billing_items')
-      .select('id, article_code, article_name, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, billing_model, billing_start_date, site_customer_id, station_type_id, is_premium_carrier, premium_share')
-      .eq('case_id', contractId)
+      .select(CONTRACT_SOURCE_ITEM_COLUMNS)
+      .eq('case_id', contract.id)
       .eq('case_type', 'contract')
       .eq('item_type', 'service')
       .neq('status', 'cancelled'),
+    supabase.rpc('contract_addon_ledger', { p_contract_id: contract.id }),
   ])
-  type Item = {
-    id: string
-    article_code: string | null
-    article_name: string | null
-    service_code: string | null
-    service_name: string | null
-    quantity: number
-    unit_price: number
-    total_price: number
-    vat_rate: number
-    discount_percent: number | null
-    billing_model: string | null
-    billing_start_date?: string | null
-    site_customer_id?: string | null
-    station_type_id?: string | null
-    is_premium_carrier?: boolean | null
-    premium_share?: number | string | null
-  }
-  type StepRow = { effective_from: string; annual_value: number | string; event_type?: string | null; note?: string | null }
-  const rows = (items ?? []) as Item[]
   return {
+    ...contractSourcesFromRows(
+      contract.id,
+      contract,
+      (steps ?? []) as ContractSourceStepRow[],
+      (items ?? []) as unknown as ContractSourceItemRow[],
+      (ledger ?? []) as ContractSourceLedgerRow[]
+    ),
     // Tillägg ligger bredvid avtalet och faktureras ALLTID på en egen faktura
     // i samband med årsfakturan (beslut 2026-09-30). customers.addon_invoice_mode
     // läses inte längre, kolumnen finns kvar som historik.
     equipmentInvoiceMode: 'separate',
-    additionNotes: ((steps ?? []) as StepRow[])
-      .filter((s) => s.event_type === 'addition' && !!s.note)
-      .map((s) => ({ effective_from: s.effective_from, note: s.note as string })),
-    steps: ((steps ?? []) as StepRow[]).map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value), event_type: s.event_type ?? null })),
-    premium: rows
-      .filter((r) => (r.billing_model ?? 'premium') === 'premium')
-      .map((r) => ({
-        id: r.id,
-        code: r.service_code ?? r.article_code ?? null,
-        name: r.service_name ?? r.article_name ?? 'Avtalstjänst',
-        quantity: Number(r.quantity),
-        unit_price: Number(r.unit_price),
-        total_price: Number(r.total_price),
-        vat_rate: Number(r.vat_rate),
-        discount_percent: Number(r.discount_percent ?? 0),
-        is_premium_carrier: !!r.is_premium_carrier,
-        premium_share: r.premium_share == null ? null : Number(r.premium_share),
-      })),
-    equipment: rows
-      .filter((r) => r.billing_model === 'per_year' || r.billing_model === 'per_month')
-      .map((r) => ({
-        id: r.id,
-        contract_id: contractId,
-        name: r.service_name ?? r.article_name ?? 'Utrustning',
-        code: r.service_code ?? r.article_code ?? null,
-        quantity: Number(r.quantity),
-        unit_price_annual: r.billing_model === 'per_month' ? Number(r.unit_price) * 12 : Number(r.unit_price),
-        unit_price_month: r.billing_model === 'per_month' ? Number(r.unit_price) : Number(r.unit_price) / 12,
-        vat_rate: Number(r.vat_rate),
-        billing_model: r.billing_model === 'per_month' ? ('per_month' as const) : ('per_year' as const),
-        billing_start_date: r.billing_start_date ?? null,
-        site_customer_id: r.site_customer_id ?? null,
-        station_type_id: r.station_type_id ?? null,
-      })),
   }
 }
 
+/** Fakturaraderna för en period: samma rader som Planera fakturor (src/shared/contractInvoiceRows.ts). */
 function buildRows(contract: ContractRow, sources: Sources, p: PlannedPeriod): RowSpec[] {
-  const period = `${p.periodStart} t.o.m. ${p.periodEnd}`
-  const diary = contract.diary_number ? ` (${contract.diary_number})` : ''
-  const label = contract.label ?? contract.contract_type ?? 'avtal'
-  const rows: RowSpec[] = []
-  // Egna tilläggsfakturor: bara utrustningsraderna
-  if (p.kind === 'equipment' || p.kind === 'equipment_monthly') {
-    for (const eq of p.equipmentRows) {
-      rows.push({
-        contract_id: contract.id,
-        line_kind: p.kind === 'equipment_monthly' ? 'equipment_monthly' : 'equipment_annual',
-        case_billing_item_id: eq.source_id,
-        article_code: eq.code,
-        article_name: `${eq.name}, tillägg utöver avtal ${label}, ${period}, ${eq.quantity} st`,
-        quantity: eq.quantity,
-        unit_price: eq.unit_price,
-        total_price: eq.total_price,
-        vat_rate: eq.vat_rate,
-        discount_percent: 0,
-      })
-    }
-    return rows
-  }
-  // § 4-radernas belopp: skalade radpriser som förut; summerar raderna till
-  // 0 kr fördelas premien efter andelarna (src/shared/premiumShares.ts).
-  const premiumTotals =
-    sources.premium.length > 0
-      ? cronPremiumRowTotals(sources.premium, p.amount, periodDivisor(contract.billing_frequency ?? null))
-      : null
-  if (premiumTotals) {
-    for (const it of sources.premium) {
-      const total = premiumTotals.totals.get(it.id) ?? 0
-      if (premiumTotals.byShares && total <= 0) {
-        // Ingår utan debitering: textrad, 0 kr (som Planera fakturor)
-        rows.push({
-          contract_id: contract.id,
-          line_kind: 'index_note',
-          case_billing_item_id: it.id,
-          article_code: it.code,
-          article_name: `${it.name}, ingår i avtalet${it.quantity > 1 ? `, ${it.quantity} st` : ''}`,
-          quantity: 0,
-          unit_price: 0,
-          total_price: 0,
-          vat_rate: it.vat_rate,
-          discount_percent: 0,
-        })
-        continue
-      }
-      const quantity = premiumTotals.byShares && it.is_premium_carrier ? 1 : it.quantity
-      rows.push({
-        contract_id: contract.id,
-        line_kind: 'premium',
-        case_billing_item_id: it.id,
-        article_code: it.code,
-        article_name: `${it.name}, årspremie ${period}${diary}`,
-        quantity,
-        unit_price: quantity > 0 ? Math.round((total / quantity) * 100) / 100 : total,
-        total_price: total,
-        vat_rate: it.vat_rate,
-        discount_percent: premiumTotals.byShares ? 0 : it.discount_percent,
-      })
-    }
-  } else if (p.amount > 0) {
-    rows.push({
-      contract_id: contract.id,
-      line_kind: 'premium',
-      article_code: null,
-      article_name: `Årspremie ${label}, ${period}${diary}`,
-      quantity: 1,
-      unit_price: p.amount,
-      total_price: p.amount,
-      vat_rate: 25,
-      discount_percent: 0,
-    })
-  }
-  for (const eq of p.equipmentRows) {
-    // Nya tilläggsregler med månadspremie: enhetens namn och stationerna på raden
-    const v2 = isV2Row(eq)
-    rows.push({
-      contract_id: contract.id,
-      line_kind: 'equipment_annual',
-      case_billing_item_id: eq.source_id,
-      article_code: eq.code,
-      article_name: v2 ? v2AddonRowName(eq, null, period) : `${eq.name}, tillägg utöver avtal, ${period}`,
-      quantity: eq.quantity,
-      unit_price: eq.unit_price,
-      total_price: eq.total_price,
-      vat_rate: eq.vat_rate,
-      discount_percent: 0,
-      ...(v2 ? { station_ids: eq.station_ids ?? null } : {}),
-    })
-  }
-  // Inbakade tillägg: textrad (0 kr) på perioden där steget träder i kraft
-  for (const step of sources.additionNotes) {
-    if (step.effective_from < p.periodStart || step.effective_from > p.periodEnd) continue
-    rows.push({
-      contract_id: contract.id,
-      line_kind: 'index_note',
-      article_code: null,
-      article_name: step.note.slice(0, 200),
-      quantity: 0,
-      unit_price: 0,
-      total_price: 0,
-      vat_rate: 25,
-      discount_percent: 0,
-    })
-  }
-  return rows
+  return buildContractInvoiceRows(contract.id, sources, p)
 }
 
 /** En befintlig faktura som intervall: ägare = avtalets id, '__none__' (utan avtal) eller '__consolidated__'. */
@@ -511,7 +365,7 @@ async function insertInvoice(
   opts: { contractId: string | null; consolidated: boolean; marking: string | null; notes: string; markingKey?: string | null }
 ): Promise<boolean> {
   if (rows.length === 0) return false
-  const subtotal = Math.round(rows.reduce((s, r) => s + r.total_price, 0) * 100) / 100
+  const { subtotal } = invoiceTotals(rows)
   const entry: PlannedWrite = {
     customer_id: customer.id,
     company_name: customer.company_name,
@@ -521,6 +375,9 @@ async function insertInvoice(
     periodEnd: p.periodEnd,
     subtotal,
     action: 'create',
+    marking: opts.marking,
+    notes: opts.notes,
+    rows,
   }
   return write(ctx, entry, true, () => insertInvoiceNow(customer, orgNr, p, rows, opts, subtotal))
 }
@@ -533,7 +390,7 @@ async function insertInvoiceNow(
   opts: { contractId: string | null; consolidated: boolean; marking: string | null; notes: string; markingKey?: string | null },
   subtotal: number
 ): Promise<boolean> {
-  const vat = Math.round(rows.reduce((s, r) => s + (r.total_price * r.vat_rate) / 100, 0) * 100) / 100
+  const { vat } = invoiceTotals(rows)
   const invNum = await generateInvoiceNumber()
   const { data: inv, error } = await supabase
     .from('invoices')
@@ -572,27 +429,8 @@ async function insertInvoiceNow(
     console.error('Kunde inte skapa faktura:', error?.message)
     return false
   }
-  await supabase.from('invoice_items').insert(rows.map((r) => itemRow(inv.id, r)))
+  await supabase.from('invoice_items').insert(toInvoiceItemRows(inv.id, rows))
   return true
-}
-
-/** invoice_items-raden. station_ids skrivs bara när raden bär dem (nya tilläggsregler). */
-function itemRow(invoiceId: string, r: RowSpec): Record<string, unknown> {
-  return {
-    invoice_id: invoiceId,
-    contract_id: r.contract_id,
-    line_kind: r.line_kind,
-    case_billing_item_id: r.case_billing_item_id ?? null,
-    article_id: null,
-    article_code: r.article_code,
-    article_name: r.article_name,
-    quantity: r.quantity,
-    unit_price: r.unit_price,
-    total_price: r.total_price,
-    vat_rate: r.vat_rate,
-    discount_percent: r.discount_percent,
-    ...(r.station_ids !== undefined ? { station_ids: r.station_ids } : {}),
-  }
 }
 
 /** Nya tilläggsregler för ett avtal i cronen (steg 11). */
@@ -605,27 +443,6 @@ type CronV2 = {
 }
 
 type Planned = { contract: ContractRow; sources: Sources; periods: PlannedPeriod[]; equipmentPeriods: PlannedPeriod[]; v2?: CronV2 }
-
-/** Tilläggsraderna i v2 (samma rader som Planera fakturor, src/shared/contractInvoiceRows.ts). */
-function v2Rows(contract: ContractRow, sources: Sources, v2: CronV2, p: PlannedPeriod): RowSpec[] {
-  return buildContractInvoiceRows(
-    contract.id,
-    { premiumItems: [], equipment: v2.inputs.lines, additionNotes: sources.additionNotes, label: contract.label ?? contract.contract_type ?? null, diaryNumber: contract.diary_number },
-    p
-  ).map((r) => ({
-    contract_id: r.contract_id,
-    line_kind: r.line_kind,
-    case_billing_item_id: r.case_billing_item_id ?? null,
-    article_code: r.article_code,
-    article_name: r.article_name,
-    quantity: r.quantity,
-    unit_price: r.unit_price,
-    total_price: r.total_price,
-    vat_rate: r.vat_rate,
-    discount_percent: r.discount_percent,
-    station_ids: r.station_ids ?? null,
-  }))
-}
 
 /**
  * Avtal med addon_rules = 'v2': premien som förut (med tilläggen på
@@ -641,23 +458,13 @@ async function planContractV2(
   covered: Covered,
   fortnoxOpts: { mode: ReturnType<typeof matchModeFor>; v2: boolean }
 ): Promise<Planned> {
-  const { data: ledger } = await supabase.rpc('contract_addon_ledger', { p_contract_id: contract.id })
-  const idsBy = new Map<string, string[]>()
-  for (const l of (ledger ?? []) as Array<{ station_id: string; unit_id: string; station_type_id: string | null; removed_at: string | null }>) {
-    if (l.removed_at) continue
-    const k = `${l.unit_id}|${l.station_type_id ?? ''}`
-    idsBy.set(k, [...(idsBy.get(k) ?? []), l.station_id])
-  }
-  const lines = sources.equipment.map((l) => ({
-    ...l,
-    station_ids: l.site_customer_id ? (idsBy.get(`${l.site_customer_id}|${l.station_type_id ?? ''}`) ?? null) : null,
-  }))
-  const marking = contract.invoice_reference ?? customer.billing_reference
+  // § 6-raderna bär redan stationerna ur contract_addon_ledger (loadSources)
+  const marking = sources.invoiceReference ?? customer.billing_reference ?? null
   const inputs = await loadAddonV2Inputs(supabase, {
     contractId: contract.id,
     contractCustomerId: contract.customer_id,
-    invoiceReference: contract.invoice_reference,
-    lines,
+    invoiceReference: sources.invoiceReference,
+    lines: sources.equipment,
   })
   if (inputs.gapError) console.warn('Glappen kunde inte läsas:', inputs.gapError)
   const plan = computeAddonPlanV2(contract, inputs.lines, { ...planOpts, split: inputs.split, fallbackMarking: marking, coverage: inputs.coverage })
@@ -704,12 +511,12 @@ async function createGapInvoices(ctx: RunCtx, customer: CustomerRow, orgNr: stri
       (r) => r.start === g.period.periodStart && r.end === g.period.periodEnd && markingKey(r.marking_key ?? '') === g.markingKey
     )
     if (dup) continue
-    const ok = await insertInvoice(ctx, customer, orgNr, g.period, v2Rows(pl.contract, pl.sources, v2, g.period), {
+    const ok = await insertInvoice(ctx, customer, orgNr, g.period, buildRows(pl.contract, pl.sources, g.period), {
       contractId: pl.contract.id,
       consolidated: false,
       marking: g.marking,
       markingKey: markingKeyColumn(g.markingKey),
-      notes: `Tilläggsstationer från utsättning till nästa periodstart · Period ${g.period.periodStart} t.o.m. ${g.period.periodEnd}`,
+      notes: buildContractInvoiceNotes(g.period, pl.sources.label, pl.sources.diaryNumber),
     })
     if (ok) created++
   }
@@ -727,7 +534,7 @@ async function generateForCustomerContracts(ctx: RunCtx, customer: CustomerRow, 
 
   const planned: Planned[] = []
   for (const contract of contracts) {
-    const sources = await loadSources(ctx, contract.id)
+    const sources = await loadSources(ctx, contract)
     const fortnoxOpts = { mode: matchModeFor(contract), v2: ctx.v2 }
     const planOpts = {
       steps: sources.steps,
@@ -779,16 +586,18 @@ async function generateForCustomerContracts(ctx: RunCtx, customer: CustomerRow, 
       }
       // Alla avtal i gruppen har samma läge (nyckeln skiljer lägena åt)
       const groupMode = matchModeFor(group[0].contract)
-      const byPeriod = new Map<string, { p: PlannedPeriod; rows: RowSpec[]; labels: string[] }>()
+      const byPeriod = new Map<string, { p: PlannedPeriod; rows: RowSpec[]; labels: string[]; diaries: string[] }>()
       for (const pl of group) {
         for (const p of pl.periods) {
-          const slot = byPeriod.get(p.periodStart) ?? { p: { ...p }, rows: [], labels: [] }
+          const slot = byPeriod.get(p.periodStart) ?? { p: { ...p }, rows: [], labels: [], diaries: [] }
           slot.rows.push(...buildRows(pl.contract, pl.sources, p))
           if (p.renewal) slot.p.renewal = true
           if (p.invoiceDate < slot.p.invoiceDate) slot.p.invoiceDate = p.invoiceDate
           if (p.dueDate < slot.p.dueDate) slot.p.dueDate = p.dueDate
           if (p.periodEnd > slot.p.periodEnd) slot.p.periodEnd = p.periodEnd
-          slot.labels.push(pl.contract.label ?? pl.contract.contract_type ?? 'Avtal')
+          // Samma anteckning som Planera fakturor (planConsolidatedForCustomer)
+          if (pl.sources.label) slot.labels.push(pl.sources.label)
+          if (pl.sources.diaryNumber && !slot.diaries.includes(pl.sources.diaryNumber)) slot.diaries.push(pl.sources.diaryNumber)
           byPeriod.set(p.periodStart, slot)
         }
       }
@@ -808,8 +617,11 @@ async function generateForCustomerContracts(ctx: RunCtx, customer: CustomerRow, 
         const ok = await insertInvoice(ctx, customer, orgNr, slot.p, slot.rows, {
           contractId: null,
           consolidated: true,
-          marking: customer.billing_reference,
-          notes: `Årspremie · Period ${slot.p.periodStart} t.o.m. ${slot.p.periodEnd} · Avtal: ${slot.labels.join(', ')}`,
+          marking: consolidatedInvoiceMarking(
+            customer.billing_reference,
+            group.map((pl) => pl.sources.invoiceReference)
+          ),
+          notes: buildConsolidatedInvoiceNotes(slot.p, slot.labels, slot.diaries),
         })
         if (ok) created++
       }
@@ -844,15 +656,13 @@ async function createPerContract(
       )
       if (isCovered({ start: p.periodStart, end: p.periodEnd }, existing, mode)) continue
       if (!dueToday(p, today)) continue
-      const rows = v2Rows(pl.contract, pl.sources, pl.v2!, p)
+      const rows = buildRows(pl.contract, pl.sources, p)
       const ok = await insertInvoice(ctx, customer, orgNr, p, rows, {
         contractId: pl.contract.id,
         consolidated: false,
         marking: meta.marking,
         markingKey: meta.keyColumn,
-        notes: `Tilläggsstationer utöver avtal ${pl.contract.label ?? ''} · Period ${p.periodStart} t.o.m. ${p.periodEnd}${
-          pl.contract.diary_number ? ` · ${pl.contract.diary_number}` : ''
-        }`.replace('  ', ' '),
+        notes: buildContractInvoiceNotes(p, pl.sources.label, pl.sources.diaryNumber),
       })
       if (ok) created++
       continue
@@ -865,18 +675,12 @@ async function createPerContract(
       if (own.has(key) || legacy.has(key)) continue
     }
     if (!dueToday(p, today)) continue
-    const isEquipment = p.kind === 'equipment' || p.kind === 'equipment_monthly'
+    // Samma rader, märkning och anteckning som Planera fakturor (planForContract)
     const ok = await insertInvoice(ctx, customer, orgNr, p, buildRows(pl.contract, pl.sources, p), {
       contractId: pl.contract.id,
       consolidated: false,
-      marking: pl.contract.invoice_reference ?? customer.billing_reference,
-      notes: isEquipment
-        ? `Tilläggsstationer utöver avtal ${pl.contract.label ?? ''} · Period ${p.periodStart} t.o.m. ${p.periodEnd}${
-            pl.contract.diary_number ? ` · ${pl.contract.diary_number}` : ''
-          }`.replace('  ', ' ')
-        : `Årspremie ${pl.contract.label ?? ''} · Betalning ${p.sequenceNumber}/${p.totalSequenceCount} · Period ${p.periodStart} t.o.m. ${p.periodEnd}${
-            pl.contract.diary_number ? ` · ${pl.contract.diary_number}` : ''
-          }`.replace('  ', ' '),
+      marking: pl.sources.invoiceReference ?? customer.billing_reference ?? null,
+      notes: buildContractInvoiceNotes(p, pl.sources.label, pl.sources.diaryNumber),
     })
     if (ok) created++
   }
@@ -932,13 +736,12 @@ async function refreshEditableEquipmentInvoices(
     )
     const plannedPeriod = findPlannedFor(candidates, { start: inv.billing_period_start, end: inv.billing_period_end }, mode)
     if (!plannedPeriod) continue
-    const rows = pl.v2?.meta.has(plannedPeriod) ? v2Rows(pl.contract, pl.sources, pl.v2, plannedPeriod) : buildRows(pl.contract, pl.sources, plannedPeriod)
+    const rows = buildRows(pl.contract, pl.sources, plannedPeriod)
     const existingRows = inv.invoice_items ?? []
     if (sig(rows) === sig(existingRows)) continue
     // Andra rader än utrustning måste vara oförändrade (annars manuellt justerad faktura)
     if (sig(rows.filter((r) => !isEq(r.line_kind))) !== sig(existingRows.filter((r) => !isEq(r.line_kind)))) continue
-    const subtotal = Math.round(rows.reduce((s, r) => s + r.total_price, 0) * 100) / 100
-    const vat = Math.round(rows.reduce((s, r) => s + (r.total_price * r.vat_rate) / 100, 0) * 100) / 100
+    const { subtotal, vat, total } = invoiceTotals(rows)
     const entry: PlannedWrite = {
       customer_id: customer.id,
       company_name: customer.company_name,
@@ -948,16 +751,17 @@ async function refreshEditableEquipmentInvoices(
       periodEnd: plannedPeriod.periodEnd,
       subtotal,
       action: 'refresh',
+      rows,
     }
     await write(ctx, entry, undefined, async () => {
       await supabase.from('invoice_items').delete().eq('invoice_id', inv.id)
-      await supabase.from('invoice_items').insert(rows.map((r) => itemRow(inv.id, r)))
+      await supabase.from('invoice_items').insert(toInvoiceItemRows(inv.id, rows))
       await supabase
         .from('invoices')
         .update({
           subtotal,
           vat_amount: vat,
-          total_amount: Math.round((subtotal + vat) * 100) / 100,
+          total_amount: total,
           // Godkänd faktura vars rader ändrats ska granskas igen
           ...(inv.status === 'ready' ? { status: 'pending_approval' } : {}),
         })
@@ -1023,6 +827,15 @@ async function generateForSynthCustomer(ctx: RunCtx, customer: CustomerRow, toda
 /** Högst så många poster i would_create och would_refresh i cron_runs. */
 const PLANNED_LOG_LIMIT = 500
 
+/** Posten i cron_runs: utan rader och anteckning (de finns bara i minnet) */
+function logEntry(w: PlannedWrite): PlannedWrite {
+  const { rows, notes, marking, ...rest } = w
+  void rows
+  void notes
+  void marking
+  return rest
+}
+
 /**
  * Själva körningen, utan loggning. Exporteras för torrkörningsposten och för
  * lokal torrkörning (då skrivs inte ens loggraden i cron_runs).
@@ -1037,7 +850,7 @@ export async function runContinuingContracts(ctx: RunCtx) {
   let contractQuery = supabase
     .from('contracts')
     .select(
-      'id, customer_id, label, contract_type, invoice_reference, diary_number, annual_value, contract_start_date, contract_end_date, terminated_at, effective_end_date, billing_frequency, billing_anchor_month, billing_active, notice_period_months, renewal_mode, status, template_id, oneflow_contract_id, display_order, billing_anchor_mode, addon_rules'
+      'id, customer_id, label, display_name, contract_type, invoice_reference, diary_number, annual_value, contract_start_date, contract_end_date, terminated_at, effective_end_date, billing_frequency, billing_anchor_month, billing_active, notice_period_months, renewal_mode, status, template_id, oneflow_contract_id, display_order, billing_anchor_mode, addon_rules'
     )
     .in('status', LIVE_STATUSES)
     .eq('type', 'contract')
@@ -1120,8 +933,8 @@ export async function runContinuingContracts(ctx: RunCtx) {
         ? {
             would_create_count: wouldCreate.length,
             would_refresh_count: wouldRefresh.length,
-            would_create: wouldCreate.slice(0, PLANNED_LOG_LIMIT),
-            would_refresh: wouldRefresh.slice(0, PLANNED_LOG_LIMIT),
+            would_create: wouldCreate.slice(0, PLANNED_LOG_LIMIT).map(logEntry),
+            would_refresh: wouldRefresh.slice(0, PLANNED_LOG_LIMIT).map(logEntry),
           }
         : {}),
     },

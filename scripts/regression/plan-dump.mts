@@ -34,7 +34,6 @@ import {
   computePlannedPeriods,
   isDueForCreation,
   parseLocalDate,
-  periodDivisor,
   rollingHorizonEnd,
   toLocalIsoDate,
   todayLocal,
@@ -44,7 +43,7 @@ import {
   type PlanningContract,
   type PremiumStep,
 } from '../../src/shared/contractPlanner.ts'
-import { cronPremiumRowTotals } from '../../src/shared/premiumShares.ts'
+import { buildContractInvoiceRows, contractSourcesFromRows, type ContractSourcesData } from '../../src/shared/contractInvoiceRows.ts'
 import {
   buildContractDiff,
   consolidationGroupKey,
@@ -218,6 +217,8 @@ type Sources = {
   additionNotes: Array<{ effective_from: string; note: string }>
   premium: Array<{ id: string; code: string | null; name: string; quantity: number; unit_price: number; total_price: number; vat_rate: number; discount_percent: number; is_premium_carrier: boolean; premium_share: number | null }>
   equipment: EquipmentLine[]
+  /** Radbyggarens källor, samma mappning som generatorn och cronen (contractSourcesFromRows) */
+  rowSources: ContractSourcesData
 }
 
 // ---------------------------------------------------------------------------
@@ -317,6 +318,8 @@ for (const s of steps) stepsByContract.set(s.contract_id, [...(stepsByContract.g
 const itemsByContract = new Map<string, BillingItem[]>()
 for (const it of items) itemsByContract.set(it.case_id, [...(itemsByContract.get(it.case_id) ?? []), it])
 
+const contractById = new Map(contracts.map((c) => [c.id, c]))
+
 function sourcesFor(contractId: string): Sources {
   const st = (stepsByContract.get(contractId) ?? []).slice().sort((a, b) => byStr(a.effective_from, b.effective_from) || byStr(String(a.annual_value), String(b.annual_value)))
   const rows = (itemsByContract.get(contractId) ?? []).slice().sort((a, b) => byStr(a.id, b.id))
@@ -358,6 +361,7 @@ function sourcesFor(contractId: string): Sources {
         billing_start_date: r.billing_start_date ?? null,
         station_ids: r.site_customer_id ? (stationIdsByRow.get(`${r.site_customer_id}|${r.station_type_id ?? ''}`) ?? null) : null,
       })),
+    rowSources: contractSourcesFromRows(contractId, contractById.get(contractId), st, rows, ledgerByContract.get(contractId) ?? []),
   }
 }
 
@@ -875,37 +879,17 @@ function rangesFor(covered: CronCovered, owners: string[], kind: string): CronRa
 
 type RowSpec = { line_kind: string; quantity: number; total_price: number }
 
-/** buildRows, rad 204 till 290. Bara fälten som behövs för radantal och signatur. */
+/**
+ * Cronens rader sedan 2026-11-02: samma radbyggare som Planera fakturor
+ * (buildContractInvoiceRows med contractSourcesFromRows). Bara fälten som
+ * behövs för radantal och signatur.
+ */
 function buildRows(contract: ContractRow, sources: Sources, p: PlannedPeriod): RowSpec[] {
-  const rows: RowSpec[] = []
-  if (p.kind === 'equipment' || p.kind === 'equipment_monthly') {
-    for (const eq of p.equipmentRows) {
-      rows.push({ line_kind: p.kind === 'equipment_monthly' ? 'equipment_monthly' : 'equipment_annual', quantity: eq.quantity, total_price: eq.total_price })
-    }
-    return rows
-  }
-  const premiumTotals =
-    sources.premium.length > 0
-      ? cronPremiumRowTotals(sources.premium, p.amount, periodDivisor(contract.billing_frequency ?? null))
-      : null
-  if (premiumTotals) {
-    for (const it of sources.premium) {
-      const total = premiumTotals.totals.get(it.id) ?? 0
-      if (premiumTotals.byShares && total <= 0) {
-        rows.push({ line_kind: 'index_note', quantity: 0, total_price: 0 })
-        continue
-      }
-      rows.push({ line_kind: 'premium', quantity: premiumTotals.byShares && it.is_premium_carrier ? 1 : it.quantity, total_price: total })
-    }
-  } else if (p.amount > 0) {
-    rows.push({ line_kind: 'premium', quantity: 1, total_price: p.amount })
-  }
-  for (const eq of p.equipmentRows) rows.push({ line_kind: 'equipment_annual', quantity: eq.quantity, total_price: eq.total_price })
-  for (const step of sources.additionNotes) {
-    if (step.effective_from < p.periodStart || step.effective_from > p.periodEnd) continue
-    rows.push({ line_kind: 'index_note', quantity: 0, total_price: 0 })
-  }
-  return rows
+  return buildContractInvoiceRows(contract.id, sources.rowSources, p).map((r) => ({
+    line_kind: r.line_kind,
+    quantity: r.quantity,
+    total_price: r.total_price,
+  }))
 }
 
 type CronPlanned = { contract: ContractRow; sources: Sources; periods: PlannedPeriod[]; equipmentPeriods: PlannedPeriod[] }
