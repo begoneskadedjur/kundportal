@@ -63,12 +63,16 @@ import {
   buildContractDiff,
   consolidationGroupKey,
   EDITABLE_STATUSES,
+  isAutoDeletable,
   LOCKED_STATUSES,
   matchModeFor,
   periodOverlapShare,
   SAME_PERIOD_SHARE,
+  terminationDeletableIds,
+  type DeletionGuardFields,
   type MatchMode,
 } from '../shared/contractInvoiceMatch'
+
 import {
   computePlannedEquipmentPeriods,
   computePlannedMonthlyEquipmentPeriods,
@@ -87,6 +91,10 @@ import {
   type PlanningContract,
   type PremiumStep,
 } from '../shared/contractPlanner'
+
+/** Kolumnerna som raderingsspärren (isAutoDeletable) läser. */
+const DELETION_GUARD_COLUMNS = 'id, status, billing_period_start, fortnox_document_number, is_historical, invoice_number'
+type GuardRow = DeletionGuardFields & { id: string; billing_period_start: string | null }
 
 export type { BillingFrequency } from '../shared/contractPlanner'
 // Radtyperna bor i src/shared/contractInvoiceRows.ts (delas med signeringen server-side)
@@ -912,7 +920,7 @@ export class ContractInvoiceGenerator {
         const slotStart = coversSlot(ex)
         if (!slotStart) continue
         const status = ex.status ?? 'draft'
-        if (EDITABLE_STATUSES.has(status)) {
+        if (isAutoDeletable(ex)) {
           entries.push({
             action: 'delete',
             existingId: ex.id,
@@ -921,7 +929,8 @@ export class ContractInvoiceGenerator {
             contractId: ex.contract_id ?? null,
             reason: 'Ersätts av samlingsfakturan',
           })
-        } else if (LOCKED_STATUSES.has(status)) {
+        } else if (LOCKED_STATUSES.has(status) || EDITABLE_STATUSES.has(status)) {
+          // Redigerbar men med Fortnox-nummer eller historik: rörs inte, som låst
           entries.push({
             action: 'locked',
             existingId: ex.id,
@@ -1133,10 +1142,8 @@ export class ContractInvoiceGenerator {
     // för samma period (gamla unika indexet, överlappsvakten).
     const v2Deletes = entries.filter((e) => e.addonRulesV2 && e.action === 'delete' && e.existingId)
     for (const entry of v2Deletes) {
-      await supabase.from('invoice_items').delete().eq('invoice_id', entry.existingId!)
-      const { error } = await supabase.from('invoices').delete().eq('id', entry.existingId!)
-      if (error) throw new Error(`Kunde inte radera faktura: ${error.message}`)
-      result.deletedIds.push(entry.existingId!)
+      if (await this.deleteDraftInvoice(entry.existingId!)) result.deletedIds.push(entry.existingId!)
+      else result.skippedLocked++
     }
 
     for (const entry of entries) {
@@ -1171,10 +1178,8 @@ export class ContractInvoiceGenerator {
         continue
       }
       if (entry.action === 'delete' && entry.existingId) {
-        await supabase.from('invoice_items').delete().eq('invoice_id', entry.existingId)
-        const { error } = await supabase.from('invoices').delete().eq('id', entry.existingId)
-        if (error) throw new Error(`Kunde inte radera faktura: ${error.message}`)
-        result.deletedIds.push(entry.existingId)
+        if (await this.deleteDraftInvoice(entry.existingId)) result.deletedIds.push(entry.existingId)
+        else result.skippedLocked++
         continue
       }
       if (entry.action === 'create' && entry.planned) {
@@ -1234,25 +1239,53 @@ export class ContractInvoiceGenerator {
     // bara perioder som börjar EFTER det tas bort. Utan slutdatum är cutoff
     // dagen då avtalet upphör, och en period som startar där tas bort.
     const lastDayKnown = !!(customer as CustomerRow).effective_end_date
-    const base = supabase
+    // Makulerade, Fortnox-kopplade och historiska fakturor rörs aldrig (isAutoDeletable)
+    const { data: candidates, error: fErr } = await supabase
       .from('invoices')
-      .select('id, status, billing_period_start')
+      .select(DELETION_GUARD_COLUMNS)
       .eq('customer_id', customerId)
       .eq('invoice_type', 'contract')
-    const { data: toDelete, error: fErr } = lastDayKnown
-      ? await base.gt('billing_period_start', toLocalIsoDate(cutoff))
-      : await base.gte('billing_period_start', toLocalIsoDate(cutoff))
+      .neq('status', 'cancelled')
+      .gte('billing_period_start', toLocalIsoDate(cutoff))
 
     if (fErr) throw new Error(fErr.message)
 
     let deleted = 0
-    for (const inv of toDelete ?? []) {
-      if (LOCKED_STATUSES.has(inv.status ?? '')) continue
-      await supabase.from('invoice_items').delete().eq('invoice_id', inv.id)
-      const { error: dErr } = await supabase.from('invoices').delete().eq('id', inv.id)
-      if (!dErr) deleted++
+    for (const id of terminationDeletableIds((candidates ?? []) as unknown as GuardRow[], toLocalIsoDate(cutoff), !lastDayKnown)) {
+      try {
+        if (await this.deleteDraftInvoice(id)) deleted++
+      } catch (err) {
+        console.error('[ContractInvoiceGenerator] Kunde inte radera framtida faktura:', err)
+      }
     }
     return deleted
+  }
+
+  /**
+   * Radera ett utkast, bara om isAutoDeletable säger ja enligt databasens
+   * aktuella värden: aldrig makulerade (cancelled), skickade/bokförda/betalda,
+   * fakturor med Fortnox-nummer, historik eller Fortnox-importer (F-).
+   * Raderingen villkoras på status och Fortnox-nummer också i själva DELETE.
+   * Returnerar true när fakturan raderades.
+   */
+  private static async deleteDraftInvoice(invoiceId: string): Promise<boolean> {
+    const { data: current, error: readErr } = await supabase
+      .from('invoices')
+      .select(DELETION_GUARD_COLUMNS)
+      .eq('id', invoiceId)
+      .maybeSingle()
+    if (readErr) throw new Error(`Kunde inte läsa fakturan: ${readErr.message}`)
+    if (!current || !isAutoDeletable(current as unknown as GuardRow)) return false
+    await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
+    const { data: gone, error } = await supabase
+      .from('invoices')
+      .delete()
+      .eq('id', invoiceId)
+      .in('status', [...EDITABLE_STATUSES])
+      .is('fortnox_document_number', null)
+      .select('id')
+    if (error) throw new Error(`Kunde inte radera faktura: ${error.message}`)
+    return (gone ?? []).length > 0
   }
 
   /**
@@ -1266,41 +1299,48 @@ export class ContractInvoiceGenerator {
   static async cancelFutureForContract(contractId: string, effectiveEndDate: string): Promise<number> {
     if (!contractId || contractId.startsWith('synth-') || contractId.startsWith('kundrad-')) return 0
 
-    const { data: toDelete, error } = await supabase
+    // Makulerade, Fortnox-kopplade och historiska fakturor rörs aldrig (isAutoDeletable)
+    const { data: candidates, error } = await supabase
       .from('invoices')
-      .select('id, status, billing_period_start')
+      .select(DELETION_GUARD_COLUMNS)
       .eq('contract_id', contractId)
       .eq('invoice_type', 'contract')
+      .neq('status', 'cancelled')
       .gt('billing_period_start', effectiveEndDate)
     if (error) throw new Error(`Kunde inte hämta framtida fakturor: ${error.message}`)
 
     let deleted = 0
-    for (const inv of toDelete ?? []) {
-      if (LOCKED_STATUSES.has(inv.status ?? '')) continue
-      await supabase.from('invoice_items').delete().eq('invoice_id', inv.id)
-      const { error: dErr } = await supabase.from('invoices').delete().eq('id', inv.id)
-      if (!dErr) deleted++
+    for (const id of terminationDeletableIds((candidates ?? []) as unknown as GuardRow[], effectiveEndDate, false)) {
+      try {
+        if (await this.deleteDraftInvoice(id)) deleted++
+      } catch (err) {
+        console.error('[ContractInvoiceGenerator] Kunde inte radera framtida faktura:', err)
+      }
     }
 
-    // Samlade fakturor: ta bort avtalets rader, räkna om, radera tomma
+    // Samlade fakturor: ta bort avtalets rader, räkna om, radera tomma.
+    // Bara på samlingsfakturor som själva får raderas (aldrig makulerade).
     const { data: consolidatedRows } = await supabase
       .from('invoice_items')
-      .select('id, invoice_id, invoice:invoices!inner(id, status, billing_period_start, is_consolidated)')
+      .select(`id, invoice_id, invoice:invoices!inner(${DELETION_GUARD_COLUMNS}, is_consolidated)`)
       .eq('contract_id', contractId)
-    type ConsRow = { id: string; invoice_id: string; invoice: { id: string; status: string | null; billing_period_start: string | null; is_consolidated: boolean | null } | null }
+    type ConsRow = { id: string; invoice_id: string; invoice: (GuardRow & { is_consolidated: boolean | null }) | null }
     const touched = new Set<string>()
     for (const r of (consolidatedRows ?? []) as unknown as ConsRow[]) {
       const inv = r.invoice
       if (!inv?.is_consolidated || !inv.billing_period_start || inv.billing_period_start <= effectiveEndDate) continue
-      if (LOCKED_STATUSES.has(inv.status ?? '')) continue
+      if (!isAutoDeletable(inv)) continue
       await supabase.from('invoice_items').delete().eq('id', r.id)
       touched.add(inv.id)
     }
     for (const invoiceId of touched) {
       const { data: left } = await supabase.from('invoice_items').select('id').eq('invoice_id', invoiceId).limit(1)
       if (!left || left.length === 0) {
-        const { error: dErr } = await supabase.from('invoices').delete().eq('id', invoiceId)
-        if (!dErr) deleted++
+        try {
+          if (await this.deleteDraftInvoice(invoiceId)) deleted++
+        } catch (err) {
+          console.error('[ContractInvoiceGenerator] Kunde inte radera tom samlingsfaktura:', err)
+        }
       } else {
         await this.recalculateInvoiceTotals(invoiceId)
       }
@@ -1917,8 +1957,10 @@ export class ContractInvoiceGenerator {
     }
     if (contractId) updatePayload.contract_id = contractId
 
-    const { error } = await supabase.from('invoices').update(updatePayload).eq('id', invoiceId)
+    // Makulerade fakturor ändras aldrig
+    const { data: hit, error } = await supabase.from('invoices').update(updatePayload).eq('id', invoiceId).neq('status', 'cancelled').select('id')
     if (error) throw new Error(`Kunde inte backfilla historisk: ${error.message}`)
+    if (!hit || hit.length === 0) return
 
     await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
     const { error: itemErr } = await supabase.from('invoice_items').insert(this.toItemRows(invoiceId, rows))
@@ -1961,8 +2003,10 @@ export class ContractInvoiceGenerator {
     // En redan godkänd faktura vars rader ändras ska granskas igen
     if (entry?.existingStatus === 'ready') updatePayload.status = 'pending_approval'
 
-    const { error } = await supabase.from('invoices').update(updatePayload).eq('id', invoiceId)
+    // Makulerade fakturor ändras aldrig
+    const { data: hit, error } = await supabase.from('invoices').update(updatePayload).eq('id', invoiceId).neq('status', 'cancelled').select('id')
     if (error) throw new Error(`Kunde inte uppdatera faktura: ${error.message}`)
+    if (!hit || hit.length === 0) return
 
     await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
     const { error: itemErr } = await supabase.from('invoice_items').insert(this.toItemRows(invoiceId, rows))

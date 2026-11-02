@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.115.1',
+    date: '2026-11-02',
+    title: 'Makulerade fakturor ligger kvar',
+    items: [
+      { kind: 'buggfix', text: 'När ett avtal sägs upp, eller när Planera fakturor tar bort utkast som inte längre behövs, ligger makulerade fakturor nu kvar med sin anteckning. Förut kunde ett makulerat utkast efter slutdatumet raderas. Fakturor med Fortnox-nummer och historiska fakturor raderas inte heller.' },
+    ],
+  },
+  {
     version: '3.115.0',
     date: '2026-11-02',
     title: 'Guiderna om tilläggsstationer',

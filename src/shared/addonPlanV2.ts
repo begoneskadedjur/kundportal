@@ -38,7 +38,7 @@ import {
   type PremiumStep,
 } from './contractPlanner'
 import { addonMarkingFor, markingKey } from './addonMarking'
-import { EDITABLE_STATUSES, LOCKED_STATUSES, type MatchableInvoice, type ContractDiffEntry } from './contractInvoiceMatch'
+import { EDITABLE_STATUSES, isAutoDeletable, LOCKED_STATUSES, type MatchableInvoice, type ContractDiffEntry } from './contractInvoiceMatch'
 
 export const ADDON_RULES_V2 = 'v2'
 
@@ -381,8 +381,10 @@ export const GAP_INVOICE_NOTE = 'Tilläggsstationer från utsättning till näst
 export function buildGapDiff(planned: GapGroup[], existing: MarkedInvoice[]): Array<ContractDiffEntry & { gap?: GapGroup }> {
   const used = new Set<string>()
   const out: Array<ContractDiffEntry & { gap?: GapGroup }> = []
+  // Makulerade glappfakturor är historik: varken matchas, ändras eller raderas
+  const live = existing.filter((e) => e.status !== 'cancelled')
   for (const g of planned) {
-    const ex = existing.find(
+    const ex = live.find(
       (e) =>
         !used.has(e.id) &&
         markingKey(e.marking_key ?? '') === g.markingKey &&
@@ -399,10 +401,10 @@ export function buildGapDiff(planned: GapGroup[], existing: MarkedInvoice[]): Ar
     if (LOCKED_STATUSES.has(status)) out.push({ ...base, action: 'locked', reason: 'Glappfakturan är redan skickad' })
     else out.push({ ...base, action: Math.abs(Number(ex.subtotal) - g.period.subtotal) < 0.5 ? 'keep' : 'update' })
   }
-  for (const e of existing) {
+  for (const e of live) {
     if (used.has(e.id)) continue
     const status = e.status ?? 'draft'
-    if (EDITABLE_STATUSES.has(status)) {
+    if (isAutoDeletable(e)) {
       out.push({ action: 'delete', existingId: e.id, existingStatus: status, existingAmount: e.total_amount, existingSubtotal: e.subtotal, reason: 'Glappet finns inte längre' })
     }
   }

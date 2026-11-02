@@ -8,6 +8,7 @@ import {
   daysInclusive,
   findPlannedFor,
   fortnoxCovers,
+  isAutoDeletable,
   isCovered,
   matchModeFor,
   matchPeriods,
@@ -15,8 +16,10 @@ import {
   overlapShare,
   periodKey,
   periodOverlapShare,
+  terminationDeletableIds,
   type MatchableInvoice,
 } from './contractInvoiceMatch'
+import { buildGapDiff } from './addonPlanV2'
 
 const period = (periodStart: string, periodEnd: string, over: Partial<PlannedPeriod> = {}): PlannedPeriod => ({
   kind: 'premium',
@@ -384,5 +387,80 @@ describe('cronens och signeringens hjälpare', () => {
     expect(findPlannedFor(planned, { start: '2027-07-01', end: '2028-06-30' }, 'legacy')).toBeUndefined()
     expect(findPlannedFor(planned, { start: '2027-06-30', end: '2028-06-29' }, 'legacy')).toBe(planned[1])
     expect(findPlannedFor(planned, { start: '2027-07-01', end: '2028-06-30' }, 'overlap')).toBe(planned[1])
+  })
+})
+
+describe('makulerade och Fortnox-kopplade fakturor raderas aldrig automatiskt (steg 1 2026-11-02)', () => {
+  it('isAutoDeletable: bara redigerbara utkast utan Fortnox-nummer, historik eller F-nummer', () => {
+    expect(isAutoDeletable({ status: 'pending_approval' })).toBe(true)
+    expect(isAutoDeletable({ status: 'draft' })).toBe(true)
+    expect(isAutoDeletable({ status: 'ready' })).toBe(true)
+    expect(isAutoDeletable({ status: 'cancelled' })).toBe(false)
+    for (const s of ['booked', 'sent', 'overdue', 'paid']) expect(isAutoDeletable({ status: s })).toBe(false)
+    expect(isAutoDeletable({ status: 'pending_approval', fortnox_document_number: '1116' })).toBe(false)
+    expect(isAutoDeletable({ status: 'pending_approval', is_historical: true })).toBe(false)
+    expect(isAutoDeletable({ status: 'draft', invoice_number: 'F-494' })).toBe(false)
+    expect(isAutoDeletable({ status: 'okand' })).toBe(false)
+  })
+
+  it('uppsägningen: makulerat utkast efter slutdatumet lämnas orört (Erika Eriksson INV-202610-0003)', () => {
+    const rows = [
+      { id: 'makulerad', status: 'cancelled', billing_period_start: '2026-11-04' },
+      { id: 'utkast', status: 'pending_approval', billing_period_start: '2026-11-04' },
+      { id: 'fortnox', status: 'pending_approval', billing_period_start: '2027-11-04', fortnox_document_number: '1106' },
+      { id: 'historik', status: 'paid', billing_period_start: '2027-11-04', is_historical: true },
+      { id: 'skickad', status: 'sent', billing_period_start: '2027-11-04' },
+      { id: 'fore', status: 'pending_approval', billing_period_start: '2026-11-03' },
+    ]
+    expect(terminationDeletableIds(rows, '2026-11-03', false)).toEqual(['utkast'])
+    // Utan satt slutdatum räknas perioden som startar på datumet också
+    expect(terminationDeletableIds(rows, '2026-11-03', true)).toEqual(['utkast', 'fore'])
+  })
+
+  it('Planera fakturor: makulerat utkast utanför planen får aldrig delete, och matchas inte', () => {
+    const diff = buildContractDiff(
+      [period('2026-11-01', '2027-10-31')],
+      [
+        invoice('m1', '2027-11-01', '2028-10-31', { status: 'cancelled' }),
+        invoice('m2', '2026-11-01', '2027-10-31', { status: 'cancelled' }),
+      ],
+      { real: true }
+    )
+    expect(diff.map((e) => e.action)).toEqual(['create'])
+    expect(diff.some((e) => e.existingId === 'm1' || e.existingId === 'm2')).toBe(false)
+  })
+
+  it('Planera fakturor: utkast med Fortnox-nummer eller historik utanför planen blir locked, inte delete', () => {
+    const diff = buildContractDiff(
+      [],
+      [
+        invoice('fx', '2027-11-01', '2028-10-31', { fortnox_document_number: '1130' }),
+        invoice('hi', '2027-11-01', '2028-10-31', { status: 'draft', is_historical: true }),
+        invoice('ok', '2027-11-01', '2028-10-31'),
+      ],
+      { real: true }
+    )
+    const byId = new Map(diff.map((e) => [e.existingId, e.action]))
+    expect(byId.get('fx')).toBe('locked')
+    expect(byId.get('hi')).toBe('locked')
+    expect(byId.get('ok')).toBe('delete')
+  })
+
+  it('glappfakturor: makulerad glappfaktura raderas inte', () => {
+    const base = {
+      marking_key: 'YX201',
+      billing_period_start: '2026-11-10',
+      billing_period_end: '2027-06-30',
+      total_amount: 100,
+      subtotal: 80,
+      is_historical: false,
+      invoice_type: 'contract',
+    }
+    const diff = buildGapDiff([], [
+      { ...base, id: 'g-makulerad', status: 'cancelled' },
+      { ...base, id: 'g-fortnox', status: 'pending_approval', fortnox_document_number: '1200' },
+      { ...base, id: 'g-utkast', status: 'pending_approval' },
+    ])
+    expect(diff.map((e) => [e.existingId, e.action])).toEqual([['g-utkast', 'delete']])
   })
 })

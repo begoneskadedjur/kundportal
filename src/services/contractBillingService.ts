@@ -1618,6 +1618,9 @@ export class ContractBillingService {
         .eq('customer_id', customerId)
         .eq('invoice_type', 'contract')
         .not('invoice_number', 'ilike', 'F-%')
+        // Makulerade fakturor och fakturor som gått till Fortnox raderas aldrig
+        .neq('status', 'cancelled')
+        .is('fortnox_document_number', null)
         .or(orFilter)
 
       const orphanedIds = (orphaned ?? []).map((o: any) => o.id)

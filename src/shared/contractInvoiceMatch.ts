@@ -29,6 +29,48 @@ export const LOCKED_STATUSES: ReadonlySet<string> = new Set(['booked', 'sent', '
 /** Fakturan är ett utkast som planen får uppdatera eller radera. */
 export const EDITABLE_STATUSES: ReadonlySet<string> = new Set(['draft', 'pending_approval', 'ready'])
 
+/** De fält som avgör om en faktura får raderas av en automatisk väg. */
+export interface DeletionGuardFields {
+  status?: string | null
+  fortnox_document_number?: string | null
+  is_historical?: boolean | null
+  invoice_number?: string | null
+}
+
+/**
+ * Får en automatisk väg radera fakturan? Gäller uppsägningen
+ * (cancelFutureAfterTermination, cancelFutureForContract), Planera fakturor
+ * ('delete' i diffen och apply), glappfakturorna och samlingsfakturans
+ * ersättning. Bara redigerbara utkast utan Fortnox-nummer som inte är
+ * historik eller Fortnox-import. Makulerade fakturor (cancelled) är historik,
+ * ofta med anteckning om varför, och raderas eller ändras aldrig automatiskt
+ * (steg 1 2026-11-02: uppsägningen raderade makulerade utkast).
+ */
+export function isAutoDeletable(e: DeletionGuardFields): boolean {
+  if ((e.status ?? 'draft') === 'cancelled') return false
+  if (!EDITABLE_STATUSES.has(e.status ?? 'draft')) return false
+  if (e.fortnox_document_number) return false
+  if (e.is_historical === true) return false
+  if ((e.invoice_number ?? '').startsWith('F-')) return false
+  return true
+}
+
+/**
+ * Uppsägningen: vilka avtalsfakturor efter slutdatumet som får raderas.
+ * inclusive = perioder som startar PÅ datumet räknas också (kunden utan satt
+ * slutdatum, där datumet är dagen avtalet upphör). Övriga lämnas orörda.
+ */
+export function terminationDeletableIds<T extends DeletionGuardFields & { id: string; billing_period_start: string | null }>(
+  invoices: T[],
+  after: string,
+  inclusive: boolean
+): string[] {
+  return invoices
+    .filter((inv) => !!inv.billing_period_start && (inclusive ? inv.billing_period_start >= after : inv.billing_period_start > after))
+    .filter((inv) => isAutoDeletable(inv))
+    .map((inv) => inv.id)
+}
+
 /** Hur planerade perioder paras med befintliga fakturor. */
 export type MatchMode = 'legacy' | 'overlap'
 
@@ -362,7 +404,11 @@ export function buildContractDiff(
       ? planned
       : planned.filter((p) => !fortnoxCovers(p, coveredRanges, mode))
 
-  const contractInvoices = existing.filter((e) => e.invoice_type === 'contract' && !(e.invoice_number ?? '').startsWith('F-'))
+  // Makulerade fakturor täcker ingen period och rörs aldrig (varken update
+  // eller delete). Anroparna hämtar dem inte, men matchningen får inte bero på det.
+  const contractInvoices = existing.filter(
+    (e) => e.invoice_type === 'contract' && !(e.invoice_number ?? '').startsWith('F-') && e.status !== 'cancelled'
+  )
   // legacy: nyckel = periodens MÅNAD. Importerade fakturor bär ofta avtalets
   // startdag (2025-11-18) medan planen räknar från den 1:a (2025-11-01); samma
   // period ska matcha, annars flaggas den som saknad och fakturan som utanför plan.
@@ -498,6 +544,8 @@ export function buildContractDiff(
     const status = ex.status ?? 'draft'
     if (LOCKED_STATUSES.has(status)) {
       entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: 'Utanför nuvarande plan men redan bokförd/skickad/betald' })
+    } else if (EDITABLE_STATUSES.has(status) && !isAutoDeletable(ex)) {
+      entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: 'Utanför nuvarande plan men har Fortnox-nummer eller är historik - rör ej' })
     } else if (EDITABLE_STATUSES.has(status)) {
       // Ett utkast efter planens sista period är en förlängning som skapats
       // för tidigt: den planeras igen dagen efter sista uppsägningsdag.

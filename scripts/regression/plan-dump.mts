@@ -52,6 +52,7 @@ import {
   EDITABLE_STATUSES,
   findPlannedFor,
   fortnoxCovers,
+  isAutoDeletable,
   isCovered,
   LOCKED_STATUSES,
   matchModeFor,
@@ -780,9 +781,9 @@ function genConsolidated(headId: string) {
       const slotStart = coversSlot(ex)
       if (!slotStart) continue
       const status = ex.status ?? 'draft'
-      if (EDITABLE_STATUSES.has(status)) {
+      if (isAutoDeletable(ex)) {
         entries.push({ action: 'delete', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: 'Ersätts av samlingsfakturan' })
-      } else if (LOCKED_STATUSES.has(status)) {
+      } else if (LOCKED_STATUSES.has(status) || EDITABLE_STATUSES.has(status)) {
         entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: 'Redan skickad per avtal, samlingsfakturan hoppar över perioden' })
         const idx = entries.findIndex((en) => en.planned?.periodStart === slotStart && en.action === 'create')
         if (idx >= 0) entries.splice(idx, 1)
