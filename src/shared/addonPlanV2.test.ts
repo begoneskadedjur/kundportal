@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   addonCadence,
+  addonCadenceFor,
   buildGapDiff,
   computeAddonPlanV2,
   decorateV2Period,
   existingByMarkingGroup,
   planGapGroups,
   stationFullyCovered,
+  v2AddonRowName,
   type GapCandidate,
 } from './addonPlanV2'
 import { computePlannedPeriods, type EquipmentLine, type PlanningContract } from './contractPlanner'
@@ -123,7 +125,7 @@ describe('A4: en tilläggsfaktura per avtal och referenskod', () => {
 })
 
 describe('antal minus stationer med täckning för hela perioden', () => {
-  it('täckt station räknas inte, delvis täckt räknas', () => {
+  it('täckt station räknas inte, delvis täckt faktureras för de otäckta dagarna', () => {
     const cov = [
       { station_id: 's1', from: '2027-07-01', to: '2028-03-31' },
       { station_id: 's1', from: '2028-04-01', to: '2028-06-30' },
@@ -131,9 +133,91 @@ describe('antal minus stationer med täckning för hela perioden', () => {
     ]
     expect(stationFullyCovered('s1', '2027-07-01', '2028-06-30', cov)).toBe(true)
     expect(stationFullyCovered('s2', '2027-07-01', '2028-06-30', cov)).toBe(false)
-    const plan = computeAddonPlanV2(contract(), [line({ quantity: 2, station_ids: ['s1', 's2'] })], { ...opts, coverage: cov })
+    const plan = computeAddonPlanV2(contract(), [line({ quantity: 3, station_ids: ['s1', 's2', 's3'] })], { ...opts, coverage: cov })
     const p = plan.groups[0].periods.find((x) => x.periodStart === '2027-07-01')!
-    expect(p.equipmentRows[0]).toMatchObject({ quantity: 1, station_ids: ['s2'], total_price: 1686 })
+    // s3 hela året, s2 2028-01-01 t.o.m. 2028-06-30 = 182 av 366 dagar
+    expect(p.equipmentRows).toHaveLength(2)
+    expect(p.equipmentRows[0]).toMatchObject({ quantity: 1, station_ids: ['s3'], total_price: 1686 })
+    expect(p.equipmentRows[0].billed_period).toBeUndefined()
+    expect(p.equipmentRows[1]).toMatchObject({
+      quantity: 1,
+      station_ids: ['s2'],
+      unit_price: 838.39,
+      billed_period: { from: '2028-01-01', to: '2028-06-30' },
+    })
+    expect(p.subtotal).toBe(2524.39)
+  })
+})
+
+describe('steg 0: Maserfrakt, tillägg per månad och delvis täckta ljusfällor', () => {
+  // Förebyggande 4c40f714: årsvis 72 240 från 2026-03-01, exakt avtalsdag
+  const c = contract({
+    annual_value: 72240,
+    billing_frequency: 'annual',
+    billing_anchor_month: 3,
+    billing_anchor_mode: 'start_day',
+    contract_start_date: '2026-03-01',
+    contract_end_date: '2029-02-28',
+    notice_period_months: 2,
+  })
+  const mek = line({ id: 'MEK', name: 'Mekanisk fälla', quantity: 2, billing_model: 'per_month', unit_price_month: 325, unit_price_annual: 3900, billing_start_date: '2026-12-01', station_ids: ['m1', 'm2'], unit_name: 'Gjutargatan', marking: null })
+  const bete = line({ id: 'BETE', name: 'Betesstation', quantity: 2, billing_model: 'per_month', unit_price_month: 165, unit_price_annual: 1980, billing_start_date: '2026-12-01', station_ids: ['b1', 'b2'], unit_name: 'Gjutargatan', marking: null })
+  const ljusB = line({ id: 'LB', name: 'Ljusfälla', quantity: 1, unit_price_annual: 2850, unit_price_month: 237.5, billing_start_date: '2027-03-01', station_ids: ['lb'], unit_name: 'Gjutargatan', marking: null })
+  const ljusG = line({ id: 'LG', name: 'Ljusfälla', quantity: 1, unit_price_annual: 2850, unit_price_month: 237.5, billing_start_date: '2027-03-01', station_ids: ['lg'], unit_name: 'Katrineborgsgatan', marking: null })
+  const cov = [
+    ...['m1', 'm2', 'b1', 'b2'].map((s) => ({ station_id: s, from: '2026-09-23', to: '2026-11-30' })),
+    { station_id: 'lb', from: '2026-08-10', to: '2027-08-09' },
+    { station_id: 'lg', from: '2026-08-10', to: '2027-08-09' },
+  ]
+  const plan = computeAddonPlanV2(c, [mek, bete, ljusB, ljusG], { ...opts, today: '2026-11-03', split: false, fallbackMarking: null, coverage: cov })
+
+  it('takten per rad: per månad egen månadstakt, per år följer premien', () => {
+    expect(addonCadenceFor(mek, c, [])).toBe('monthly')
+    expect(addonCadenceFor(ljusB, c, [])).toBe('premium_periods')
+    // Månadspremie: per månad ligger kvar på premiefakturan
+    expect(addonCadenceFor(mek, { annual_value: 11388, billing_frequency: 'monthly' }, [])).toBe('with_premium')
+    // Ingen premie: per månad ändå månadsvis
+    expect(addonCadenceFor(mek, { annual_value: 0, billing_frequency: null }, [])).toBe('monthly')
+  })
+
+  it('månadsfakturor 980 kr från 2026-12-01, november täckt', () => {
+    expect(plan.monthlyLines.map((l) => l.id)).toEqual(['MEK', 'BETE'])
+    expect(plan.monthly[0]).toMatchObject({ kind: 'equipment_monthly', periodStart: '2026-12-01', periodEnd: '2026-12-31', subtotal: 980 })
+    expect(plan.monthly.every((p) => p.subtotal === 980)).toBe(true)
+    expect(plan.monthly[plan.monthly.length - 1].periodEnd).toBe('2029-02-28')
+    expect(plan.monthly).toHaveLength(27)
+  })
+
+  it('ljusfällorna 2027-03-01: bara 2027-08-10 t.o.m. 2028-02-29, 2 850 × 204 / 366 = 1 588,52 per fälla', () => {
+    const periods = plan.groups[0].periods
+    expect(periods.map((p) => [p.kind, p.periodStart, p.periodEnd, p.subtotal])).toEqual([
+      ['equipment', '2027-03-01', '2028-02-29', 3177.04],
+      ['equipment', '2028-03-01', '2029-02-28', 5700],
+    ])
+    const rows = periods[0].equipmentRows
+    expect(rows.map((r) => [r.unit_price, r.quantity, r.billed_period])).toEqual([
+      [1588.52, 1, { from: '2027-08-10', to: '2028-02-29' }],
+      [1588.52, 1, { from: '2027-08-10', to: '2028-02-29' }],
+    ])
+    expect(v2AddonRowName(rows[0], 'Förebyggande', '2027-03-01 t.o.m. 2028-02-29')).toBe(
+      'Ljusfälla, Gjutargatan, tillägg utöver avtal Förebyggande, 2027-08-10 t.o.m. 2028-02-29, 1 st'
+    )
+  })
+
+  it('månadstakt med delvis täckt månad: täckt t.o.m. 2026-12-15 ger 16 av 31 dagar i december', () => {
+    const p = computeAddonPlanV2(c, [mek], {
+      ...opts,
+      today: '2026-11-03',
+      split: false,
+      fallbackMarking: null,
+      coverage: [{ station_id: 'm1', from: '2026-09-23', to: '2026-12-15' }, { station_id: 'm2', from: '2026-09-23', to: '2026-11-30' }],
+    })
+    const dec = p.monthly[0]
+    expect(dec.periodStart).toBe('2026-12-01')
+    expect(dec.equipmentRows.map((r) => [r.quantity, r.unit_price, r.billed_period ?? null])).toEqual([
+      [1, 325, null],
+      [1, 167.74, { from: '2026-12-16', to: '2026-12-31' }],
+    ])
   })
 })
 

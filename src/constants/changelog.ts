@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.116.0',
+    date: '2026-11-03',
+    title: 'Tillägg per månad faktureras månadsvis',
+    items: [
+      { kind: 'nyhet', text: 'Tilläggsstationer som är beslutade per månad faktureras nu på en egen faktura varje månad, också när avtalet har tilläggsreglerna Följer premien och premien går årsvis. Stationer per år följer premien som förut.' },
+      { kind: 'nyhet', text: 'En tilläggsstation som redan är betald för en del av perioden faktureras bara för resten. Raden visar vilka dagar som faktureras, till exempel 2027-08-10 t.o.m. 2028-02-29, och priset räknas på dagarna.' },
+    ],
+  },
+  {
     version: '3.115.2',
     date: '2026-11-03',
     title: 'Kundraden behåller prislistan',

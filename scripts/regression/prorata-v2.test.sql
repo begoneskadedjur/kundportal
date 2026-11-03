@@ -170,3 +170,29 @@ begin
 
   raise exception E'RESULT\n%', array_to_string(v_out, E'\n');
 end $$;
+
+-- T14 (steg 0, 2026-11-03): station per månad på v2-avtal räknar pro rata
+-- till nästa MÅNADSstart. Maserfrakt 4c40f714 (årspremie från 2026-03-01),
+-- station 8 c3f09a93 (Mekanisk fälla per månad, 3 900 kr/år, startdag
+-- 2026-09-23). Täckningen släpps i transaktionen så att dagarna syns:
+-- 2026-09-23 t.o.m. 2026-09-30 = 8 dagar, à 3 900 × 8 / 365 = 85,48.
+-- Med per år hade slutet blivit premiens nästa period 2027-03-01.
+-- Rullas alltid tillbaka.
+do $$
+declare
+  v_c uuid := '4c40f714-6174-45c1-8907-bf9fab7fdd99';
+  v_s uuid := 'c3f09a93-88a8-4d8c-912c-831ba31662c0';
+  e record;
+  v_days int;
+  v_out text := '';
+begin
+  update addon_station_coverage set released_at = now() where station_id = v_s and released_at is null;
+  select * into e from addon_prorata_v2_end(v_c, v_s, '2026-09-23');
+  v_days := addon_station_uncovered_days(v_s, 'outdoor', '2026-09-23', e.end_day - 1);
+  v_out := v_out || format(E'\nT14a per månad: slut %s, %s dagar, à %s %s', e.end_day, v_days, round(3900 * v_days / 365.0, 2),
+    case when e.end_day = '2026-10-01' and v_days = 8 then 'OK' else 'FEL' end);
+  update equipment_placements set addon_billing_model = 'per_year' where id = v_s;
+  select * into e from addon_prorata_v2_end(v_c, v_s, '2026-09-23');
+  v_out := v_out || format(E'\nT14b samma station per år: slut %s %s', e.end_day, case when e.end_day = '2027-03-01' then 'OK' else 'FEL' end);
+  raise exception 'PROV T14%', v_out;
+end $$;

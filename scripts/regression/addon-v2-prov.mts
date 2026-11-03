@@ -3,7 +3,8 @@
 // FEV (fyra avtal), WBAB (tre avtal) och Falu kommun får i MINNET
 // billing_anchor_mode = 'start_day' och addon_rules = 'v2' (Falu dessutom
 // målbilden ur datadokumentet: 2026-06-30 t.o.m. 2028-06-29, option, inget
-// intervall). Inget skrivs: bara SELECT och läsande SQL-funktioner
+// intervall). Steg 0 (2026-11-03): Maserfrakts två avtal (redan v2) och
+// tilläggens egna månadsfakturor (plan.monthly, kind equipment_monthly). Inget skrivs: bara SELECT och läsande SQL-funktioner
 // (contract_addon_ledger, invoice_marking_split_ready, addon_gap_candidates).
 //
 // Samma kod som Planera fakturor: computeAddonPlanV2, existingByMarkingGroup
@@ -38,7 +39,7 @@ const sb = createClient(
   { auth: { persistSession: false } }
 )
 
-const PREFIXES = ['72818957', 'ad96ab94', '7c1f0e59', 'bca4c235', 'c01e3ee6', '5c00b63c', 'd86fbf4e', '23a115e3']
+const PREFIXES = ['72818957', 'ad96ab94', '7c1f0e59', 'bca4c235', 'c01e3ee6', '5c00b63c', 'd86fbf4e', '23a115e3', '4c40f714', '9a93b4c8']
 const COLS =
   'id, customer_id, label, display_name, contract_type, invoice_reference, diary_number, annual_value, contract_start_date, contract_end_date, terminated_at, effective_end_date, billing_frequency, billing_anchor_month, billing_active, notice_period_months, renewal_mode, status, billing_anchor_mode, addon_rules'
 
@@ -175,6 +176,34 @@ for (const c0 of contracts.sort((a, b) => a.id.localeCompare(b.id))) {
         })
       }
     }
+    // Steg 0: egna månadsfakturor för § 6-rader per månad
+    const { data: monthlyRaw } = await sb
+      .from('invoices')
+      .select('id, invoice_number, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, invoice_type, contract_id, marking_key, fortnox_document_number, contract_invoice_kind')
+      .eq('customer_id', c.customer_id)
+      .in('invoice_type', ['contract', 'adhoc'])
+      .eq('contract_invoice_kind', 'equipment_monthly')
+      .neq('status', 'cancelled')
+      .or(`contract_id.eq.${c.id},contract_id.is.null`)
+    const existingMonthly = (monthlyRaw ?? []) as MarkedInvoice[]
+    for (const e of buildContractDiff(plan.monthly, existingMonthly, { real: true, mode: matchModeFor(c) })) {
+      const ex = existingMonthly.find((x) => x.id === e.existingId)
+      invoices.push({
+        marking: fallbackMarking,
+        marking_key_column: null,
+        kind: 'equipment_monthly',
+        action: e.action,
+        existing: ex ? `${ex.invoice_number} ${ex.billing_period_start}..${ex.billing_period_end} ${ex.status} ${ex.subtotal}` : null,
+        period: e.planned ? `${e.planned.periodStart} t.o.m. ${e.planned.periodEnd}` : null,
+        subtotal: e.planned?.subtotal ?? null,
+        rows: e.planned
+          ? buildContractInvoiceRows(c.id, { premiumItems: [], equipment: inputs.lines, additionNotes: [], label, diaryNumber: c.diary_number }, e.planned).map(
+              (r) => `${r.quantity} x ${r.unit_price} = ${r.total_price} | ${r.article_name}${r.station_ids ? ` | ${r.station_ids.length} stationer` : ''}`
+            )
+          : [],
+        snapped: [],
+      })
+    }
     ;(result.modes as unknown[]).push({ mode: m.name, cadence: plan.cadence, invoices })
   }
   out.push(result)
@@ -189,7 +218,7 @@ for (const r of out as Array<Record<string, unknown>>) {
   for (const m of r.modes as Array<{ mode: string; cadence: string; invoices: Array<Record<string, unknown>> }>) {
     console.log(`  [${m.mode}] takt ${m.cadence}`)
     for (const i of m.invoices) {
-      console.log(`    ${String(i.action).padEnd(7)} märkning ${i.marking || '(ingen)'} ${i.period ?? ''} ${i.subtotal ?? ''}${i.existing ? ` · befintlig ${i.existing}` : ''}${(i.snapped as string[]).length ? ` · snäppt ${(i.snapped as string[]).join(',')}` : ''}`)
+      console.log(`    ${String(i.action).padEnd(7)}${i.kind ? ` ${i.kind}` : ""} märkning ${i.marking || '(ingen)'} ${i.period ?? ''} ${i.subtotal ?? ''}${i.existing ? ` · befintlig ${i.existing}` : ''}${(i.snapped as string[]).length ? ` · snäppt ${(i.snapped as string[]).join(',')}` : ''}`)
       for (const row of i.rows as string[]) console.log(`        ${row}`)
     }
   }

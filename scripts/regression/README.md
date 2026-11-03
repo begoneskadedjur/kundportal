@@ -84,6 +84,8 @@ npx tsx --env-file=.env scripts/regression/plan-dump.mts --today=2026-10-30 --ou
 npx tsx --env-file=.env scripts/regression/addon-v2-prov.mts --today=2026-10-30 [--refs=beslut]
 ```
 
+Sedan steg 0 (2026-11-03, 3.116.0) är också Maserfrakts två avtal med i provet, och tilläggens egna månadsfakturor (§ 6-rader per månad, `plan.monthly`) visas som `equipment_monthly`. `tillaggsregler-v2.test.sql` T5 och `prorata-v2.test.sql` T14 provar månadstakten i SQL (nästa månadsstart för stationer per månad).
+
 `plan-dump.mts` speglar inte version 2 (inget avtal har `addon_rules` satt); provet ovan använder samma delade kod som Planera fakturor.
 
 ## Löpande avtal i exakt läge (datasteg 18, STRUL 1)

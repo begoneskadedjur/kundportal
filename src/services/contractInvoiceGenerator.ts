@@ -649,8 +649,9 @@ export class ContractInvoiceGenerator {
   /**
    * Tilläggsfakturor med nya tilläggsregler: en per märkning och period
    * (eller en per period med märkning per rad så länge databasen inte tar
-   * flera), plus glappfakturor. Utkast i gamla månadsfakturor (kind
-   * equipment_monthly) raderas: tilläggen följer premien.
+   * flera), plus glappfakturor. § 6-rader per månad (addonCadenceFor =
+   * monthly) får egna månadsfakturor (kind equipment_monthly) som diffas som
+   * vanligt: utkast behålls, uppdateras, skapas eller raderas, låsta lämnas.
    */
   private static async planEquipmentEntriesV2(
     contract: ContractWithBilling,
@@ -714,11 +715,16 @@ export class ContractInvoiceGenerator {
       out.push(...dedupeLockedWithoutPlan(groupEntries))
     }
 
-    // Gamla månadsfakturor för tillägg: tilläggen följer premien i v2
+    // Månadsfakturor för tillägg per månad (steg 0). Utan sådana rader blir
+    // planen tom och gamla utkast raderas som förut.
     const existingMonthly = await this.loadExisting(customerId, contract.id, { kind: 'equipment_monthly' })
-    if (existingMonthly.length > 0) {
+    if (v2.plan.monthly.length > 0 || existingMonthly.length > 0) {
       const byId = new Map(existingMonthly.map((e) => [e.id, e]))
-      out.push(...this.buildDiff([], existingMonthly, { real: true, mode }).map((e) => decorate(e, 'equipment_monthly', marking, null, byId)))
+      out.push(
+        ...this.buildDiff(v2.plan.monthly, existingMonthly, { real: true, mode }).map((e) =>
+          decorate(e, 'equipment_monthly', marking, null, byId)
+        )
+      )
     }
 
     // Glappfakturor

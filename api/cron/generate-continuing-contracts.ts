@@ -485,6 +485,12 @@ async function planContractV2(
       equipmentPeriods.push(p)
     }
   }
+  // Tillägg per månad (steg 0): egna månadsfakturor utan märkningsnyckel,
+  // samma väg som gamla reglernas equipment_monthly (avtalets märkning)
+  for (const p of plan.monthly) {
+    if (p.isHistorical || cronFortnoxCovers(p, covered.fortnoxRanges, fortnoxOpts)) continue
+    equipmentPeriods.push(p)
+  }
   return { contract, sources, periods, equipmentPeriods, v2: { inputs, plan, meta, marking } }
 }
 

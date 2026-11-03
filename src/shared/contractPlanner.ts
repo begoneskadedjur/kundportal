@@ -111,6 +111,11 @@ export interface PlannedEquipmentRow {
   /** Enhetens referenskod när den skiljer sig från fakturans (en faktura för hela avtalet) */
   unit_marking?: string | null
   /**
+   * v2, delvis täckt station: dagarna som faktureras (båda med). Radpriset är
+   * periodens pris × dagarna / periodens dagar.
+   */
+  billed_period?: { from: string; to: string }
+  /**
    * Exakt avtalsdag: § 6-radens billing_start_date (som låg strax efter
    * periodstart, ett arv från den 1:a) och raden togs med från periodstart.
    */

@@ -2,8 +2,9 @@
 // Guiden Besluta och fakturera tilläggsstationer: vad som händer med ett tillägg
 // beroende på avtalets Tilläggsregler (Som tidigare eller Följer premien), hur
 // premien faktureras och om ärendet där stationen sattes ut fortfarande är öppet.
-// Fakta kontrollerade mot koden 2026-11-02: ContractBillingModePanel,
-// sync_addon_prorata_line (legacy och v2), addonPlanV2 (addonCadence),
+// Fakta kontrollerade mot koden 2026-11-02 (tillägg per månad och delvis
+// täckta stationer 2026-11-03): ContractBillingModePanel,
+// sync_addon_prorata_line (legacy och v2), addonPlanV2 (addonCadence, addonCadenceFor),
 // contract_work_items_internal (gap_invoice) och ContractSettingsDrawer
 // (Tilläggen faktureras). Platt text med statuspunkt, inga piller.
 
@@ -47,8 +48,8 @@ export default function TillaggRegler() {
     : takt === 'manad'
       ? 'På premiens månadsfaktura, årspriset delat med tolv. Ingen egen tilläggsfaktura. Enhetens namn står på raden.'
       : takt === 'period'
-        ? 'Egen tilläggsfaktura för samma period som premien. En faktura per enhetens referenskod, och enhetens namn står på varje rad.'
-        : 'Egen tilläggsfaktura en gång per år, på avtalsdagen. En faktura per enhetens referenskod, och enhetens namn står på varje rad.'
+        ? 'Per år: egen tilläggsfaktura för samma period som premien, en per enhetens referenskod, och enhetens namn står på varje rad. Per månad: egen faktura varje månad. En station som redan är betald för en del av perioden faktureras bara för resten.'
+        : 'Per år: egen tilläggsfaktura en gång per år, på avtalsdagen, en per enhetens referenskod, och enhetens namn står på varje rad. Per månad: egen faktura varje månad. En station som redan är betald för en del av perioden faktureras bara för resten.'
 
   return (
     <div className="my-6 rounded-xl border border-slate-700 bg-slate-800/30 p-4">

@@ -9,6 +9,9 @@
 //   månadsfakturan (årspris / 12, oavsett stationens modell). Premie per
 //   kvartal, halvår eller år: egna tilläggsfakturor (kind equipment) med
 //   premiens perioder, radpris = årspris / antal perioder per år.
+// - Undantag (steg 0, 2026-11-03): en § 6-rad per månad (billing_model
+//   'per_month') faktureras månadsvis på egna månadsfakturor (kind
+//   equipment_monthly) när premien inte är månadsvis. Se addonCadenceFor.
 // - Kund utan premie (eller premie utan intervall): tilläggen årsvis på
 //   avtalets exakta årsdag, oavsett billing_frequency och billing_anchor_mode.
 // - En tilläggsfaktura per avtal och referenskod (addonMarking.ts), enhetens
@@ -17,7 +20,9 @@
 //   saknar täckning från startdagen till dagen före nästa ordinarie
 //   periodstart. Underlaget kommer ur SQL (addon_gap_candidates).
 // - Antal på en tilläggsfaktura = stationerna minus de som redan har
-//   täckning för hela perioden (addon_station_coverage).
+//   täckning för hela perioden (addon_station_coverage). En station med
+//   täckning för en del av perioden faktureras för de otäckta dagarna på en
+//   egen rad: à-pris = periodens pris × otäckta dagar / periodens dagar.
 //
 // Så länge drop-raderna från steg 5 inte är körda (invoice_marking_split_ready
 // falsk) kan databasen inte ta två tilläggsfakturor för samma avtal och
@@ -28,6 +33,7 @@
 
 import {
   computePlannedEquipmentPeriods,
+  computePlannedMonthlyEquipmentPeriods,
   parseLocalDate,
   toLocalIsoDate,
   type EquipmentLine,
@@ -62,7 +68,27 @@ export function addonCadence(contract: Pick<PlanningContract, 'annual_value' | '
   return 'anniversary'
 }
 
-/** Tilläggsraden i v2: alltid årspris, oavsett om § 6-raden är per år eller per månad. */
+/** Takten för en enskild § 6-rad: avtalets takt, eller egna månadsfakturor. */
+export type AddonLineCadence = AddonCadence | 'monthly'
+
+/**
+ * Takten för en § 6-rad i v2 (SQL: contract_addon_next_period_start med
+ * stationens modell). Per månad-rader faktureras månadsvis på egna
+ * månadsfakturor, utom när premien är månadsvis (då ligger de på
+ * premiefakturan som förut). Per år-rader följer avtalets takt.
+ * Utbyggnadspunkt: faktureringsgrupper per rad eller station avgörs här.
+ */
+export function addonCadenceFor(
+  line: Pick<EquipmentLine, 'billing_model'>,
+  contract: Pick<PlanningContract, 'annual_value' | 'billing_frequency'>,
+  steps: PremiumStep[] | undefined
+): AddonLineCadence {
+  const base = addonCadence(contract, steps)
+  if (line.billing_model === 'per_month' && base !== 'with_premium') return 'monthly'
+  return base
+}
+
+/** Tilläggsraden i v2 på avtalets takt: alltid årspris, oavsett om § 6-raden är per år eller per månad. */
 export function normalizeV2Line(l: EquipmentLine): EquipmentLine {
   const annual = l.billing_model === 'per_month' ? Number(l.unit_price_month ?? 0) * 12 || l.unit_price_annual : l.unit_price_annual
   return { ...l, billing_model: 'per_year', unit_price_annual: Math.round(annual * 100) / 100, unit_price_month: annual / 12 }
@@ -93,6 +119,30 @@ export function stationFullyCovered(stationId: string, from: string, to: string,
 
 const round2 = (v: number) => Math.round(v * 100) / 100
 
+/** Otäckta dagar för en station i [from, to]: antal, första och sista otäckta dag. */
+export function stationUncoveredSpan(
+  stationId: string,
+  from: string,
+  to: string,
+  coverage: CoverageRange[]
+): { days: number; first: string | null; last: string | null } {
+  const ranges = coverage
+    .filter((c) => c.station_id === stationId && c.to >= from && c.from <= to)
+    .map((c) => [dayNo(c.from), dayNo(c.to)] as const)
+  let days = 0
+  let first: number | null = null
+  let last: number | null = null
+  for (let d = dayNo(from); d <= dayNo(to); d++) {
+    if (ranges.some(([f, t]) => d >= f && d <= t)) continue
+    days++
+    if (first === null) first = d
+    last = d
+  }
+  // Dagnumret är lokal midnatt avrundad; mitt på dagen ger rätt datum
+  const iso = (n: number | null) => (n === null ? null : toLocalIsoDate(new Date(n * DAY + 12 * 3_600_000)))
+  return { days, first: iso(first), last: iso(last) }
+}
+
 function totals(p: PlannedPeriod, rows: PlannedEquipmentRow[]): PlannedPeriod {
   const equipmentSubtotal = rows.reduce((s, r) => s + r.total_price, 0)
   const subtotal = round2(p.amount + equipmentSubtotal)
@@ -102,7 +152,11 @@ function totals(p: PlannedPeriod, rows: PlannedEquipmentRow[]): PlannedPeriod {
 
 /**
  * Raderna i en v2-period: enhetens namn, stationerna och antalet minus
- * stationer med täckning för hela perioden. Rader med antal 0 tas bort.
+ * stationer med täckning för hela perioden. Stationer med täckning för en
+ * del av perioden faktureras för de otäckta dagarna på egen rad (samma
+ * otäckta dagar delar rad): à-pris = periodens à-pris × otäckta dagar /
+ * periodens dagar, avrundat till öre, och raden bär den fakturerade delen
+ * (billed_period). Rader med antal 0 tas bort.
  * invoiceMarking = fakturans märkning; skiljer sig enhetens kod läggs den på raden.
  */
 export function decorateV2Period(
@@ -113,21 +167,47 @@ export function decorateV2Period(
 ): PlannedPeriod {
   const byId = new Map(lines.map((l) => [l.id, l]))
   const rows: PlannedEquipmentRow[] = []
+  const periodDays = dayNo(p.periodEnd) - dayNo(p.periodStart) + 1
   for (const r of p.equipmentRows) {
     const line = byId.get(r.source_id)
     const ids = line?.station_ids ?? null
-    const covered = ids ? ids.filter((s) => stationFullyCovered(s, p.periodStart, p.periodEnd, coverage)) : []
-    const quantity = Math.max(0, r.quantity - covered.length)
-    if (quantity <= 0) continue
     const unitMarking = line?.marking ?? null
-    rows.push({
-      ...r,
-      quantity,
-      total_price: round2(r.unit_price * quantity),
+    const common = {
       unit_name: line?.unit_name ?? null,
-      station_ids: ids ? ids.filter((s) => !covered.includes(s)) : null,
       ...(unitMarking && markingKey(unitMarking) !== markingKey(invoiceMarking) ? { unit_marking: unitMarking } : {}),
-    })
+    }
+    const full: string[] = []
+    const partial = new Map<string, { days: number; first: string; last: string; ids: string[] }>()
+    let coveredCount = 0
+    for (const s of ids ?? []) {
+      const u = stationUncoveredSpan(s, p.periodStart, p.periodEnd, coverage)
+      if (u.days <= 0) coveredCount++
+      else if (u.days >= periodDays) full.push(s)
+      else {
+        const k = [u.days, u.first, u.last].join('|')
+        const slot = partial.get(k) ?? { days: u.days, first: u.first as string, last: u.last as string, ids: [] }
+        slot.ids.push(s)
+        partial.set(k, slot)
+      }
+    }
+    const partialCount = [...partial.values()].reduce((n, g) => n + g.ids.length, 0)
+    const quantity = Math.max(0, r.quantity - coveredCount - partialCount)
+    if (quantity > 0) {
+      rows.push({ ...r, quantity, total_price: round2(r.unit_price * quantity), ...common, station_ids: ids ? full : null })
+    }
+    // Delvis täckta: periodens pris × otäckta dagar / periodens dagar
+    for (const g of [...partial.values()].sort((a, b) => a.first.localeCompare(b.first) || a.days - b.days)) {
+      const unit = round2((r.unit_price * g.days) / periodDays)
+      rows.push({
+        ...r,
+        quantity: g.ids.length,
+        unit_price: unit,
+        total_price: round2(unit * g.ids.length),
+        ...common,
+        station_ids: g.ids,
+        billed_period: { from: g.first, to: g.last },
+      })
+    }
   }
   return totals(p, rows)
 }
@@ -145,6 +225,10 @@ export interface AddonPlanV2 {
   premiumEquipment: EquipmentLine[]
   /** Egna tilläggsfakturor, en grupp per märkning (en grupp när split är falsk) */
   groups: AddonMarkingGroup[]
+  /** § 6-rader med egen månadstakt (addonCadenceFor = monthly) */
+  monthlyLines: EquipmentLine[]
+  /** Egna månadsfakturor (kind equipment_monthly), en per månad och avtal */
+  monthly: PlannedPeriod[]
 }
 
 export interface AddonPlanV2Options extends Omit<PlanOptions, 'equipment' | 'equipmentMode'> {
@@ -161,15 +245,29 @@ export interface AddonPlanV2Options extends Omit<PlanOptions, 'equipment' | 'equ
  */
 export function computeAddonPlanV2(contract: PlanningContract, lines: EquipmentLine[], opts: AddonPlanV2Options): AddonPlanV2 {
   const cadence = addonCadence(contract, opts.steps)
-  const normalized = lines.map(normalizeV2Line)
-  if (cadence === 'with_premium') return { cadence, premiumEquipment: normalized, groups: [] }
+  const coverage = opts.coverage ?? []
+  const monthlyLines = lines.filter((l) => addonCadenceFor(l, contract, opts.steps) === 'monthly')
+  const normalized = lines.filter((l) => !monthlyLines.includes(l)).map(normalizeV2Line)
+  // Egna månadsfakturor: kalendermånader (exakt avtalsdag: månader från
+  // avtalsdagen) från innevarande månad, täckta stationer dras av
+  const monthly = monthlyLines.length
+    ? computePlannedMonthlyEquipmentPeriods(contract, {
+        paymentTermsDays: opts.paymentTermsDays,
+        today: opts.today,
+        window: opts.window,
+        horizonEnd: opts.horizonEnd,
+        equipment: monthlyLines,
+      })
+        .map((p) => decorateV2Period(p, monthlyLines, coverage, opts.fallbackMarking))
+        .filter((p) => p.equipmentRows.length > 0)
+    : []
+  if (cadence === 'with_premium') return { cadence, premiumEquipment: normalized, groups: [], monthlyLines, monthly }
 
   const variant: PlanningContract =
     cadence === 'anniversary'
       ? { ...contract, billing_frequency: 'annual', billing_anchor_mode: 'start_day', annual_value: 0 }
       : contract
   const steps = cadence === 'anniversary' ? [] : opts.steps
-  const coverage = opts.coverage ?? []
 
   const byKey = new Map<string, { marking: string | null; lines: EquipmentLine[] }>()
   for (const l of normalized) {
@@ -196,7 +294,7 @@ export function computeAddonPlanV2(contract: PlanningContract, lines: EquipmentL
       .map((p) => ({ ...p, amount: 0, subtotal: p.subtotal, kind: 'equipment' as const }))
     groups.push({ marking: g.marking, markingKey: key, lines: g.lines, periods })
   }
-  return { cadence, premiumEquipment: [], groups }
+  return { cadence, premiumEquipment: [], groups, monthlyLines, monthly }
 }
 
 /** Med v2-rader (enhetens namn finns) ska fakturaraderna få v2-text. */
@@ -206,10 +304,12 @@ export function isV2Row(r: Pick<PlannedEquipmentRow, 'unit_name'>): boolean {
 
 /** Radtexten i v2: "Ljusfälla, Återvinningscentralen, tillägg utöver avtal X, period, 2 st". */
 export function v2AddonRowName(
-  eq: Pick<PlannedEquipmentRow, 'name' | 'unit_name' | 'unit_marking' | 'quantity'>,
+  eq: Pick<PlannedEquipmentRow, 'name' | 'unit_name' | 'unit_marking' | 'quantity' | 'billed_period'>,
   label: string | null,
   period: string
 ): string {
+  // Delvis täckt station: bara den fakturerade delen av perioden
+  if (eq.billed_period) period = `${eq.billed_period.from} t.o.m. ${eq.billed_period.to}`
   const unit = eq.unit_name ? `, ${eq.unit_name}` : ''
   const ref = eq.unit_marking ? `, ref ${eq.unit_marking}` : ''
   return `${eq.name}${unit}${ref}, tillägg utöver avtal${label ? ` ${label}` : ''}, ${period}, ${eq.quantity} st`

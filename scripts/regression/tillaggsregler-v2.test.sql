@@ -159,3 +159,39 @@ begin
   exception when others then v_out := v_out || format(E'\nT4c FEL %s', sqlerrm); end;
   raise exception 'PROV T4%', v_out;
 end $$;
+
+-- T5 (steg 0, 2026-11-03): tillägg per månad i v2. Maserfrakt 4c40f714 har
+-- årspremie 72 240 från 2026-03-01 (exakt avtalsdag) och tilläggsstationer
+-- per månad på Gjutargatan (station 8 c3f09a93 satt 2026-09-23) och per år
+-- (ljusfällan c060f40c). Station per månad räknar till nästa månadsstart,
+-- station per år till premiens nästa period. Mora 9a93b4c8 har månadspremie:
+-- per månad följer premien (samma svar). Rullas alltid tillbaka.
+do $$
+declare
+  v_c uuid := '4c40f714-6174-45c1-8907-bf9fab7fdd99';
+  v_mora uuid := '9a93b4c8-da2b-482e-b5ea-3ca26b2da72e';
+  v_out text := '';
+  v_d date;
+  e record;
+begin
+  v_d := contract_addon_next_period_start(v_c, '2026-09-23', 'per_month');
+  v_out := v_out || format(E'\nT5a per månad från 2026-09-23: %s %s', v_d, case when v_d = '2026-10-01' then 'OK' else 'FEL' end);
+  v_d := contract_addon_next_period_start(v_c, '2026-09-23', 'per_year');
+  v_out := v_out || format(E'\nT5b per år från 2026-09-23: %s %s', v_d, case when v_d = '2027-03-01' then 'OK' else 'FEL' end);
+  v_d := contract_addon_next_period_start(v_c, '2026-09-23');
+  v_out := v_out || format(E'\nT5c utan modell (som förut): %s %s', v_d, case when v_d = '2027-03-01' then 'OK' else 'FEL' end);
+  v_d := contract_addon_next_period_start(v_mora, '2026-09-23', 'per_month');
+  v_out := v_out || format(E'\nT5d månadspremie, per månad: %s %s', v_d, case when v_d = '2026-10-01' then 'OK' else 'FEL' end);
+  select * into e from addon_prorata_v2_end(v_c, 'c3f09a93-88a8-4d8c-912c-831ba31662c0', '2026-09-23');
+  v_out := v_out || format(E'\nT5e pro rata-slut station 8 (per månad): ordinarie %s %s', e.ordinary, case when e.ordinary = '2026-10-01' then 'OK' else 'FEL' end);
+  select * into e from addon_prorata_v2_end(v_c, 'c060f40c-b774-4723-81e1-dc824c51f3e1', '2026-08-10');
+  v_out := v_out || format(E'\nT5f pro rata-slut ljusfällan (per år): ordinarie %s %s', e.ordinary, case when e.ordinary = '2027-03-01' then 'OK' else 'FEL' end);
+  -- Glappet för Gjutargatans stationer finns inte längre (täckta t.o.m. 2026-11-30, månadsfakturor från 2026-12-01)
+  v_out := v_out || format(E'\nT5g glapp på 4c40f714: %s %s', (select count(*) from addon_gap_candidates(v_c)),
+    case when (select count(*) from addon_gap_candidates(v_c)) = 0 then 'OK' else 'FEL' end);
+  -- Avtal utan exakt avtalsdag: kalendermånad
+  update contracts set billing_anchor_mode = null where id = v_c;
+  v_d := contract_addon_next_period_start(v_c, '2026-09-23', 'per_month');
+  v_out := v_out || format(E'\nT5h utan exakt avtalsdag: %s %s', v_d, case when v_d = '2026-10-01' then 'OK' else 'FEL' end);
+  raise exception 'PROV STEG 0%', v_out;
+end $$;
