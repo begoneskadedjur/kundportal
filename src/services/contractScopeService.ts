@@ -12,6 +12,7 @@ import { cancelVisitsAfterEnd, restoreVisitsAfterEnd } from './terminationVisits
 import { ContractService } from './contractService'
 import { describePlanChange, type PlanChangePreview, type PreviewExistingInvoice } from '../shared/contractAnchorPreview'
 import { materializedBillingFrequency } from '../shared/billingFrequencyDefault'
+import { buildCustomerMirrorPatch } from '../shared/customerMirrorPatch'
 import type { ContractWithBilling } from '../types/database'
 
 export interface ScopeRow {
@@ -258,7 +259,9 @@ export class ContractScopeService {
     if (error) throw new Error(`Kunde inte byta prislista: ${error.message}`)
     if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
 
-    if (data[0].customer_id) await this.mirrorSharedFields(data[0].customer_id)
+    if (data[0].customer_id) {
+      await this.mirrorSharedFields(data[0].customer_id, { allowClearPriceList: priceListId == null })
+    }
 
     const to = names?.to
     const from = names?.from
@@ -1219,30 +1222,18 @@ export class ContractScopeService {
    * värdet — annars finns inget entydigt kundvärde och raden lämnas orörd.
    * Fel sväljs: speglingen får aldrig fälla avtalsändringen.
    */
-  private static async mirrorSharedFields(customerId: string): Promise<void> {
+  private static async mirrorSharedFields(
+    customerId: string,
+    opts: { allowClearPriceList?: boolean } = {}
+  ): Promise<void> {
     try {
       const live = await this.liveContractsOnCustomer(customerId)
       if (live.length === 0) return
-      // annual_value på kundraden sätts av databasens trigger (summan av levande avtal)
-      const patch: Record<string, unknown> = {}
-      const shared = <T>(pick: (c: LiveContractRow) => T): T | undefined => {
-        const first = pick(live[0])
-        return live.every((c) => pick(c) === first) ? first : undefined
-      }
-      const freq = shared((c) => c.billing_frequency ?? null)
-      if (freq) patch.billing_frequency = freq
-      const anchor = shared((c) => c.billing_anchor_month ?? null)
-      if (anchor) patch.billing_anchor_month = anchor
-      const start = shared((c) => c.contract_start_date ?? null)
-      if (start) patch.contract_start_date = start
-      const end = shared((c) => c.contract_end_date ?? null)
-      if (end !== undefined) patch.contract_end_date = end
-      const notice = shared((c) => c.notice_period_months ?? null)
-      if (notice) patch.notice_period_months = notice
-      // Kundradens prislista styrs av avtalskartan: delad lista, annars första pappret i ordningen
-      const sharedList = shared((c) => c.price_list_id ?? null)
-      const primary = [...live].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))[0]
-      patch.price_list_id = sharedList !== undefined ? sharedList : (primary.price_list_id ?? null)
+      // annual_value på kundraden sätts av databasens trigger (summan av levande avtal).
+      // Speglingen skriver aldrig NULL över kundradens värden; prislistan töms
+      // bara när den uttryckligen tas bort (setPriceList), se customerMirrorPatch.
+      const patch = buildCustomerMirrorPatch(live, opts)
+      if (Object.keys(patch).length === 0) return
       const { error } = await supabase.from('customers').update(patch).eq('id', customerId)
       if (error) console.error('Kunde inte spegla avtalsfält till kundraden:', error.message)
     } catch (err) {

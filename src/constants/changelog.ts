@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.115.2',
+    date: '2026-11-03',
+    title: 'Kundraden behåller prislistan',
+    items: [
+      { kind: 'buggfix', text: 'När löptiden, premien eller annat sparas i avtalskartan behåller kundraden sin prislista, sitt slutdatum och sin uppsägningstid om avtalet saknar värdet. Förut kunde en löptidsändring tömma kundens prislista. Prislistan tas bara bort när någon tar bort den i avtalskartan.' },
+    ],
+  },
+  {
     version: '3.115.1',
     date: '2026-11-02',
     title: 'Makulerade fakturor ligger kvar',
