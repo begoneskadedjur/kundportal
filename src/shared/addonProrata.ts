@@ -23,6 +23,7 @@
 // som hela dagar.
 
 import { nextPeriodStart, type PeriodContract } from './contractPeriods'
+import { groupNextPeriodStart, type AddonBillingGroup } from './addonBillingGroups'
 
 export const PRORATA_YEAR_DAYS = 365
 
@@ -97,8 +98,12 @@ export function prorataEnd(
   startDay: string,
   contract: ProrataContract,
   lockedInvoices: ProrataLockedInvoice[],
+  /** Stationens faktureringsgrupp: ordinarie = gruppens nästa periodstart (SQL: contract_addon_next_period_start med grupp) */
+  group?: Pick<AddonBillingGroup, 'cadence' | 'anchor_date'> | null,
 ): ProrataEnd | null {
-  const ordinary = nextPeriodStart(contract, startDay)
+  const ordinary =
+    (group ? groupNextPeriodStart(group, { contract_start_date: contract.contract_start_date ?? null, billing_anchor_mode: contract.billing_anchor_mode ?? null, billing_anchor_month: contract.billing_anchor_month ?? null }, startDay) : null) ??
+    nextPeriodStart(contract, startDay)
   if (!ordinary) return null
   let end = ordinary
   let unknownInvoice: string | null = null

@@ -16,6 +16,9 @@ import { Loader2 } from 'lucide-react'
 import DateField from '../../../ui/DateField'
 import Button from '../../../ui/Button'
 import { AddonStationBillingService } from '../../../../services/addonStationBillingService'
+import { AddonBillingGroupService } from '../../../../services/addonBillingGroupService'
+import { describeBillingGroup } from '../../../../shared/addonBillingGroups'
+import type { ContractAddonBillingGroup } from '../../../../types/database'
 import { todayKey } from '../../../../utils/contractLifecycle'
 import {
   computeAddonCalc,
@@ -52,7 +55,10 @@ interface Props {
   prompt: AddonDropPromptState
   onClose: () => void
   /** Ett beslut per bricka, i ordning. Kastar den stannar körningen. */
-  onConfirmBrick: (item: AddonPromptBrick, input: { effectiveFrom: string; unitPriceAnnual: number; mode: AddonDecisionMode }) => Promise<void>
+  onConfirmBrick: (
+    item: AddonPromptBrick,
+    input: { effectiveFrom: string; unitPriceAnnual: number; mode: AddonDecisionMode; billingGroupId: string | null }
+  ) => Promise<void>
   /** Arbetstiden per enhet, efter stationsbesluten. Kastar den stannar körningen. */
   onConfirmLabour: (unit: { unitId: string; unitName: string }, input: { hours: number; mode: AddonDecisionMode; effectiveFrom: string }) => Promise<void>
   /** Allt beslutat: en enda toast */
@@ -79,6 +85,20 @@ export default function AddonDropPrompt({ prompt, onClose, onConfirmBrick, onCon
   const [progress, setProgress] = useState<{ done: number; failedKey: string | null; error: string | null } | null>(null)
   const items = prompt.bricks
   const included = mode === 'included'
+  // Faktureringsgrupper (bara avtal med nya tilläggsregler har några)
+  const [billingGroups, setBillingGroups] = useState<ContractAddonBillingGroup[]>([])
+  const [billingGroupId, setBillingGroupId] = useState<string>('')
+  useEffect(() => {
+    let cancelled = false
+    AddonBillingGroupService.list(prompt.contractId)
+      .then((g) => {
+        if (!cancelled) setBillingGroups(g)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [prompt.contractId])
 
   // Enheterna i brickorna, i brickornas ordning
   const units = useMemo(() => {
@@ -265,7 +285,12 @@ export default function AddonDropPrompt({ prompt, onClose, onConfirmBrick, onCon
       try {
         if (isBrick) {
           const item = items[i]
-          await onConfirmBrick(item, { effectiveFrom, unitPriceAnnual: price(brickKey(item.brick)), mode })
+          await onConfirmBrick(item, {
+            effectiveFrom,
+            unitPriceAnnual: price(brickKey(item.brick)),
+            mode,
+            billingGroupId: !included && billingGroupId ? billingGroupId : null,
+          })
         } else {
           const l = labourSteps[i - items.length]
           await onConfirmLabour({ unitId: l.unitId, unitName: l.unitName }, { hours: l.hours, mode, effectiveFrom })
@@ -481,6 +506,24 @@ export default function AddonDropPrompt({ prompt, onClose, onConfirmBrick, onCon
               </span>
             </span>
           </label>
+          {!included && billingGroups.length > 0 && (
+            <label className="block mb-2.5 pl-5">
+              <span className="block text-xs font-medium text-slate-400 mb-1">Faktureringsgrupp</span>
+              <select
+                value={billingGroupId}
+                onChange={(e) => setBillingGroupId(e.target.value)}
+                aria-label="Faktureringsgrupp"
+                className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+              >
+                <option value="">Vanliga regler (med avtalets tilläggsfaktura)</option>
+                {billingGroups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} · {describeBillingGroup(g)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="flex items-start gap-2 cursor-pointer">
             <input type="radio" name="addon-decision-mode" checked={mode === 'included'} onChange={() => setMode('included')} className={radioClass} />
             <span className="text-xs">

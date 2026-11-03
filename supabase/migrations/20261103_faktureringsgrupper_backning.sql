@@ -1,0 +1,30 @@
+-- Backning av 20261103_faktureringsgrupper.sql. Körs bara om faktureringsgrupperna
+-- ska bort helt. Innehåller DROP och måste köras i SQL-editorn (MCP nekar DROP).
+--
+-- Ordning: funktionerna som läser kolumnerna återställs först (definitionerna
+-- från 20261103_tillagg_manadstakt.sql, 20261030_tillaggsregler_v2_vakt.sql och
+-- 20261030_tillaggsregler_v2_funktioner.sql), därefter tas kolumnerna och tabellen bort.
+--
+-- 1. Kör om create or replace-delarna för addon_prorata_v2_end
+--    (20261103_tillagg_manadstakt.sql), addon_gap_candidates,
+--    guard_contract_invoice_overlap och vyn contract_invoice_overlaps
+--    (20261030_tillaggsregler_v2_*.sql), sync_addon_period_lines och
+--    sync_addon_prorata_line_v2 (senaste definitionerna före 2026-11-03).
+-- 2. Därefter:
+--
+-- drop function if exists public.set_addon_station_billing_group(uuid[], uuid[], uuid);
+-- drop function if exists public.set_addon_line_billing_group(uuid, uuid);
+-- drop function if exists public.contract_addon_next_period_start(uuid, date, text, uuid);
+-- drop function if exists public.addon_station_billing_group(uuid, uuid);
+-- drop function if exists public.contract_addon_billing_group_anchor(uuid);
+-- drop function if exists public.addon_billing_group_valid(uuid, uuid);
+-- drop function if exists public.invoice_group_split_ready();
+-- drop index if exists public.invoices_contract_period_group_key;
+-- alter table public.invoices drop column if exists addon_billing_group_id;
+-- alter table public.case_billing_items drop column if exists addon_billing_group_id;
+-- alter table public.indoor_stations drop column if exists addon_billing_group_id;
+-- alter table public.equipment_placements drop column if exists addon_billing_group_id;
+-- drop table if exists public.contract_addon_billing_groups;
+-- drop function if exists public.addon_billing_group_can_write();
+-- drop function if exists public.contract_addon_billing_groups_touch();
+select 1;

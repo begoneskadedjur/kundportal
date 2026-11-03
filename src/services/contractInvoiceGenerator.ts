@@ -53,12 +53,15 @@ import {
   existingByMarkingGroup,
   isAddonRulesV2,
   planGapGroups,
+  planIndexSlots,
+  bucketKeyColumn,
   type AddonPlanV2,
   type CoverageRange,
   type GapCandidate,
 } from '../shared/addonPlanV2'
 import { markingKey, markingKeyColumn } from '../shared/addonMarking'
 import { loadAddonV2Inputs } from '../shared/addonV2Loader'
+import { blockedGroupSlots, blockedSlotKey, GROUP_BLOCKED_REASON, type AddonBillingGroup, type IndexSlot } from '../shared/addonBillingGroups'
 import {
   buildContractDiff,
   consolidationGroupKey,
@@ -199,6 +202,13 @@ export interface BillingPlanEntry {
   markingKey?: string | null
   /** Posten hör till nya tilläggsregler: apply raderar sådana utkast först */
   addonRulesV2?: boolean
+  /**
+   * Faktureringsgrupp (2026-11-03): värdet som skrivs i
+   * invoices.addon_billing_group_id. undefined = kolumnen rörs inte.
+   */
+  billingGroupId?: string | null
+  /** Gruppens namn, för förhandsvisningen */
+  billingGroupName?: string
 }
 
 export interface BillingPlan {
@@ -294,6 +304,7 @@ type ExistingInvoice = {
   invoice_type?: string | null
   contract_invoice_kind?: string | null
   marking_key?: string | null
+  addon_billing_group_id?: string | null
   invoice_items?: Array<{ article_name: string | null; line_kind?: string | null; contract_id?: string | null; total_price?: number | null }> | null
   fortnox_document_number?: string | null
   has_generic_items?: boolean
@@ -322,6 +333,10 @@ type AddonV2Context = {
   fallbackMarking: string | null
   plan: AddonPlanV2
   gaps: GapCandidate[]
+  /** Avtalets faktureringsgrupper */
+  billingGroups: AddonBillingGroup[]
+  /** Gamla unika indexet borta (invoice_group_split_ready) */
+  groupSplit: boolean
 }
 
 const EMPTY_SUMMARY = (): BillingPlan['summary'] => ({
@@ -642,8 +657,18 @@ export class ContractInvoiceGenerator {
       split: inputs.split,
       fallbackMarking,
       coverage: inputs.coverage,
+      billingGroups: inputs.billingGroups,
     })
-    return { split: inputs.split, lines: inputs.lines, coverage: inputs.coverage, fallbackMarking, plan, gaps: inputs.gaps }
+    return {
+      split: inputs.split,
+      lines: inputs.lines,
+      coverage: inputs.coverage,
+      fallbackMarking,
+      plan,
+      gaps: inputs.gaps,
+      billingGroups: inputs.billingGroups,
+      groupSplit: inputs.groupSplit,
+    }
   }
 
   /**
@@ -694,8 +719,11 @@ export class ContractInvoiceGenerator {
     }
 
     // Egna tilläggsfakturor per märkning
+    // Faktureringsgrupper: fakturor med grupp diffas i gruppens hinkar nedan
+    const loadedEq = await this.loadExisting(customerId, contract.id, { kind: 'equipment' })
+    const loadedMonthly = await this.loadExisting(customerId, contract.id, { kind: 'equipment_monthly' })
     if (v2.plan.cadence !== 'with_premium' || v2.plan.groups.length > 0) {
-      const existing = await this.loadExisting(customerId, contract.id, { kind: 'equipment' })
+      const existing = loadedEq.filter((e) => !e.addon_billing_group_id)
       const existingById = new Map(existing.map((e) => [e.id, e]))
       const byKey = existingByMarkingGroup(
         v2.plan.groups.map((g) => g.markingKey),
@@ -717,7 +745,7 @@ export class ContractInvoiceGenerator {
 
     // Månadsfakturor för tillägg per månad (steg 0). Utan sådana rader blir
     // planen tom och gamla utkast raderas som förut.
-    const existingMonthly = await this.loadExisting(customerId, contract.id, { kind: 'equipment_monthly' })
+    const existingMonthly = loadedMonthly.filter((e) => !e.addon_billing_group_id)
     if (v2.plan.monthly.length > 0 || existingMonthly.length > 0) {
       const byId = new Map(existingMonthly.map((e) => [e.id, e]))
       out.push(
@@ -727,10 +755,54 @@ export class ContractInvoiceGenerator {
       )
     }
 
+    // Faktureringsgrupper: en diff per grupp, fakturatyp och märkning
+    const groupedExisting = [...loadedEq, ...loadedMonthly].filter((e) => !!e.addon_billing_group_id)
+    if (v2.plan.groupBuckets.length > 0 || groupedExisting.length > 0) {
+      const existingSlots: IndexSlot[] = [...loadedEq, ...loadedMonthly]
+        .filter((e) => !!e.billing_period_start && e.invoice_type === 'contract' && !(e.invoice_number ?? '').startsWith('F-'))
+        .map((e) => ({
+          kind: e.contract_invoice_kind ?? 'equipment',
+          start: e.billing_period_start as string,
+          key: e.marking_key ?? '',
+          groupId: e.addon_billing_group_id ?? null,
+        }))
+      const blocked = blockedGroupSlots(planIndexSlots(v2.plan, v2.split), existingSlots, v2.groupSplit)
+      const groupIds = [...new Set([...v2.plan.groupBuckets.map((b) => b.billingGroupId), ...groupedExisting.map((e) => e.addon_billing_group_id as string)])].sort()
+      for (const gid of groupIds) {
+        const name = v2.billingGroups.find((g) => g.id === gid)?.name ?? 'Borttagen grupp'
+        for (const kind of ['equipment', 'equipment_monthly'] as const) {
+          const buckets = v2.plan.groupBuckets.filter((b) => b.billingGroupId === gid && b.kind === kind)
+          const ex = groupedExisting.filter((e) => e.addon_billing_group_id === gid && (e.contract_invoice_kind ?? 'equipment') === kind)
+          if (buckets.length === 0 && ex.length === 0) continue
+          const byId = new Map(ex.map((e) => [e.id, e]))
+          const byKey = existingByMarkingGroup(
+            buckets.map((b) => b.markingKey),
+            v2.split ? ex : ex.map((e) => ({ ...e, marking_key: null }))
+          )
+          const entries: BillingPlanEntry[] = []
+          for (const [key, list] of byKey) {
+            const b = buckets.find((x) => x.markingKey === key)
+            const bMarking = b ? b.marking : (list.find((x) => x.marking_key)?.marking_key ?? marking)
+            const keyColumn = b ? bucketKeyColumn(b, v2.split) : v2.split ? markingKeyColumn(bMarking ?? key) : null
+            for (const e of this.buildDiff(b?.periods ?? [], list as ExistingInvoice[], { real: true, mode })) {
+              const entry: BillingPlanEntry = { ...decorate(e, kind, bMarking, keyColumn, byId), billingGroupId: gid, billingGroupName: name }
+              if (entry.action === 'create' && entry.planned && blocked.has(blockedSlotKey(gid, kind, entry.planned.periodStart, keyColumn))) {
+                entry.action = 'later'
+                entry.reason = GROUP_BLOCKED_REASON
+              }
+              entries.push(entry)
+            }
+          }
+          out.push(...dedupeLockedWithoutPlan(entries))
+        }
+      }
+    }
+
     // Glappfakturor
     if (v2.gaps.length > 0) {
       const markingByKey = new Map<string, string | null>()
       for (const l of v2.lines) markingByKey.set(markingKey(l.marking ?? null), l.marking ?? null)
+      for (const g of v2.billingGroups) if (g.marking?.trim()) markingByKey.set(markingKey(g.marking), g.marking.trim())
       const codeFor = (unitId: string, typeId: string | null) =>
         v2.lines.find((l) => l.site_customer_id === unitId && (l.station_type_id ?? null) === typeId)?.code ?? null
       const groups = planGapGroups(
@@ -762,6 +834,10 @@ export class ContractInvoiceGenerator {
         for (const e of buildGapDiff(groups, existingGap)) {
           const groupMarking = e.gap ? e.gap.marking : marking
           const entry = decorate(e, 'equipment_gap', groupMarking, e.gap ? markingKeyColumn(e.gap.markingKey) : null, byId)
+          if (e.gap?.billingGroupId) {
+            entry.billingGroupId = e.gap.billingGroupId
+            entry.billingGroupName = v2.billingGroups.find((g) => g.id === e.gap!.billingGroupId)?.name
+          }
           if (e.gap?.missingPrice.length) entry.reason = `${e.gap.missingPrice.length} stationer saknar årspris och är inte med`
           out.push(entry)
         }
@@ -1033,7 +1109,7 @@ export class ContractInvoiceGenerator {
     let q = supabase
       .from('invoices')
       .select(
-        'id, invoice_number, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, is_consolidated, contract_id, invoice_type, contract_invoice_kind, marking_key, fortnox_document_number, invoice_items(article_name, line_kind, contract_id, total_price)'
+        'id, invoice_number, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, is_consolidated, contract_id, invoice_type, contract_invoice_kind, marking_key, addon_billing_group_id, fortnox_document_number, invoice_items(article_name, line_kind, contract_id, total_price)'
       )
       .eq('customer_id', customerId)
       .in('invoice_type', ['contract', 'adhoc'])
@@ -1698,6 +1774,8 @@ export class ContractInvoiceGenerator {
         created_at: createdAt,
         // Nya tilläggsregler: märkningsnyckeln (en tilläggsfaktura per referenskod)
         ...(entry?.markingKey !== undefined ? { marking_key: entry.markingKey } : {}),
+        // Faktureringsgrupp (undefined = kolumnen skrivs inte)
+        ...(entry?.billingGroupId !== undefined ? { addon_billing_group_id: entry.billingGroupId } : {}),
       })
       .select('id')
       .single()
@@ -2004,6 +2082,7 @@ export class ContractInvoiceGenerator {
     if (contractId) updatePayload.contract_id = contractId
     if (entry?.marking !== undefined) updatePayload.invoice_marking = entry.marking
     if (entry?.markingKey !== undefined) updatePayload.marking_key = entry.markingKey
+    if (entry?.billingGroupId !== undefined) updatePayload.addon_billing_group_id = entry.billingGroupId
     if (entry?.consolidated) updatePayload.is_consolidated = true
     if (planned.kind) updatePayload.contract_invoice_kind = planned.kind
     // En redan godkänd faktura vars rader ändras ska granskas igen

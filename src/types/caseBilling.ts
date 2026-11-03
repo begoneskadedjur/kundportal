@@ -73,6 +73,8 @@ export interface CaseBillingItem {
   addon_model?: 'per_year' | 'per_month' | null
   /** Stationstypen raden avser (§ 6 och pro rata per typ) */
   station_type_id?: string | null
+  /** Faktureringsgrupp för § 6-raden (contract_addon_billing_groups), null = vanliga regler */
+  addon_billing_group_id?: string | null
   /** Raden täcks av kundens avtal (§ 4) och faktureras inte som merförsäljning */
   covered_by_contract?: boolean | null
   /** § 4: bärande rad (avtalstypens tjänst). Beloppet är härlett ur § 6, aldrig lagrat. */

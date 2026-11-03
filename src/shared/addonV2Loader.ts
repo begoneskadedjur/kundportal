@@ -8,6 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { EquipmentLine } from './contractPlanner'
 import type { CoverageRange, GapCandidate } from './addonPlanV2'
 import { addonMarkingFor, unitDisplayName } from './addonMarking'
+import type { AddonBillingGroup } from './addonBillingGroups'
 
 export interface AddonV2Inputs {
   /** Databasen tar en tilläggsfaktura per märkning och typen equipment_gap */
@@ -18,6 +19,10 @@ export interface AddonV2Inputs {
   gaps: GapCandidate[]
   /** Fel vid läsning av glappen (planen fortsätter utan glappfakturor) */
   gapError: string | null
+  /** Avtalets faktureringsgrupper (tom utan grupper) */
+  billingGroups: AddonBillingGroup[]
+  /** Gamla unika indexet borta: två grupper kan ha samma typ, periodstart och märkning */
+  groupSplit: boolean
 }
 
 type Cust = { id: string; company_name: string | null; site_name: string | null; billing_reference: string | null; parent_customer_id: string | null }
@@ -43,12 +48,44 @@ export async function loadAddonV2Inputs(
     for (const p of (parents ?? []) as Cust[]) custs.set(p.id, p)
   }
   const owner = custs.get(args.contractCustomerId) ?? null
+  // Faktureringsgrupper (2026-11-03): läses bara när avtalet har några
+  const { data: groupRows } = await sb
+    .from('contract_addon_billing_groups')
+    .select('id, contract_id, name, cadence, anchor_date, marking, created_at')
+    .eq('contract_id', args.contractId)
+  const billingGroups = ((groupRows ?? []) as AddonBillingGroup[]).slice().sort((a, b) => a.id.localeCompare(b.id))
+  const groupIds = new Set(billingGroups.map((g) => g.id))
+  // Stationernas grupp (bara giltiga grupper på avtalet)
+  const stationGroup = new Map<string, string>()
+  let groupSplit = false
+  if (billingGroups.length > 0) {
+    const [{ data: outRows }, { data: inRows }, { data: ready }] = await Promise.all([
+      sb.from('equipment_placements').select('id, addon_billing_group_id').eq('addon_contract_id', args.contractId).not('addon_billing_group_id', 'is', null),
+      sb.from('indoor_stations').select('id, addon_billing_group_id').eq('addon_contract_id', args.contractId).not('addon_billing_group_id', 'is', null),
+      sb.rpc('invoice_group_split_ready'),
+    ])
+    for (const r of [...((outRows ?? []) as Array<{ id: string; addon_billing_group_id: string }>), ...((inRows ?? []) as Array<{ id: string; addon_billing_group_id: string }>)]) {
+      if (groupIds.has(r.addon_billing_group_id)) stationGroup.set(r.id, r.addon_billing_group_id)
+    }
+    groupSplit = ready === true
+  }
+
   const lines: EquipmentLine[] = args.lines.map((l) => {
     const unit = l.site_customer_id ? (custs.get(l.site_customer_id) ?? null) : null
     // Huvudkontoret: enhetens förälder, annars avtalskundens förälder, annars avtalskunden
     const root = custs.get(unit?.parent_customer_id ?? owner?.parent_customer_id ?? args.contractCustomerId) ?? null
+    // Grupp på raden bara om den hör till avtalet. En station utan egen grupp
+    // ärver radens (SQL: addon_station_billing_group); en station med egen
+    // grupp hör bara till rader i den gruppen.
+    const gid = l.billing_group_id && groupIds.has(l.billing_group_id) ? l.billing_group_id : null
+    const { billing_group_id: _drop, ...rest } = l
+    void _drop
+    const stationIds =
+      billingGroups.length > 0 && l.station_ids ? l.station_ids.filter((sid) => !stationGroup.has(sid) || stationGroup.get(sid) === gid) : l.station_ids
     return {
-      ...l,
+      ...rest,
+      ...(gid ? { billing_group_id: gid } : {}),
+      ...(stationIds !== l.station_ids ? { station_ids: stationIds } : {}),
       unit_name: unitDisplayName(unit),
       marking: addonMarkingFor(unit, { invoice_reference: args.invoiceReference }, root),
     }
@@ -70,5 +107,6 @@ export async function loadAddonV2Inputs(
   }
 
   const { data: gaps, error: gapErr } = await sb.rpc('addon_gap_candidates', { p_contract_id: args.contractId })
-  return { split, lines, coverage, gaps: (gaps ?? []) as GapCandidate[], gapError: gapErr ? gapErr.message : null }
+  const gapRows = ((gaps ?? []) as GapCandidate[]).map((g) => (stationGroup.has(g.station_id) ? { ...g, billing_group_id: stationGroup.get(g.station_id) } : g))
+  return { split, lines, coverage, gaps: gapRows, gapError: gapErr ? gapErr.message : null, billingGroups, groupSplit }
 }

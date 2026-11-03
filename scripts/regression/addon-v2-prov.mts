@@ -13,7 +13,13 @@
 // (läget efter drop-raderna). --refs=beslut lägger dessutom referenserna enligt
 // beslut 8 i datadokumentet i minnet (FEV-enheternas koder, WBAB-avtalens).
 //
-//   npx tsx --env-file=.env scripts/regression/addon-v2-prov.mts --today=2026-10-30 [--refs=beslut]
+// Faktureringsgrupper (2026-11-03): --grupper=prov ger Maserfrakt 4c40f714 i
+// MINNET en månadsgrupp (Månadsvis, märkning MÅN-1, skapad --today) med
+// de mekaniska fällornas rad och en kvartalsgrupp (Kvartalsvis, startdag
+// 2027-01-01) med ljusfällan på Gjutargatan, och visar gruppernas fakturor
+// (plan.groupBuckets) och vilka som väntar på gamla unika indexet.
+//
+//   npx tsx --env-file=.env scripts/regression/addon-v2-prov.mts --today=2026-10-30 [--refs=beslut] [--grupper=prov]
 //
 // Skriver out/steg11/addon-v2-prov-<today>[-beslut].json och en läsbar
 // sammanfattning på skärmen.
@@ -22,7 +28,8 @@ import { createClient } from '@supabase/supabase-js'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { computeAddonPlanV2, dedupeLockedWithoutPlan, existingByMarkingGroup, type MarkedInvoice } from '../../src/shared/addonPlanV2'
+import { bucketKeyColumn, computeAddonPlanV2, dedupeLockedWithoutPlan, existingByMarkingGroup, planIndexSlots, type MarkedInvoice } from '../../src/shared/addonPlanV2'
+import { blockedGroupSlots, blockedSlotKey, type AddonBillingGroup } from '../../src/shared/addonBillingGroups'
 import { loadAddonV2Inputs } from '../../src/shared/addonV2Loader'
 import { markingKey } from '../../src/shared/addonMarking'
 import { buildContractDiff, matchModeFor } from '../../src/shared/contractInvoiceMatch'
@@ -33,6 +40,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const arg = (n: string) => process.argv.find((a) => a.startsWith(`--${n}=`))?.slice(n.length + 3)
 const TODAY = arg('today') ?? '2026-10-30'
 const REFS = arg('refs') ?? 'nu'
+const GRUPPER = arg('grupper') === 'prov'
 const sb = createClient(
   (process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL)!,
   (process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY)!,
@@ -111,6 +119,16 @@ for (const c0 of contracts.sort((a, b) => a.id.localeCompare(b.id))) {
     }))
 
   const inputs = await loadAddonV2Inputs(sb, { contractId: c.id, contractCustomerId: c.customer_id, invoiceReference: c.invoice_reference, lines })
+  if (GRUPPER && c.id.startsWith('4c40f714')) {
+    // Provgrupperna i minnet (inget skrivs)
+    const gm: AddonBillingGroup = { id: 'prov-manad', contract_id: c.id, name: 'Månadsvis', cadence: 'monthly', anchor_date: null, marking: 'MÅN-1', created_at: TODAY }
+    const gk: AddonBillingGroup = { id: 'prov-kvartal', contract_id: c.id, name: 'Kvartalsvis', cadence: 'quarterly', anchor_date: '2027-01-01', marking: null, created_at: TODAY }
+    inputs.billingGroups = [gm, gk]
+    for (const l of inputs.lines) {
+      if (l.station_type_id === 'bd223f3e-09c7-451c-b4d6-942c2f5b9e8f') l.billing_group_id = gm.id
+      if (l.station_type_id === 'e2458214-eafb-4631-a565-0fef918e9015' && l.site_customer_id === '8ab3f2d1-ba59-43db-883c-e591d3eddf69') l.billing_group_id = gk.id
+    }
+  }
   if (REFS === 'beslut' && isFev) {
     // Enhetens kod enligt beslut 8, i minnet; enheter utan kod får huvudkontorets (tom)
     for (const l of inputs.lines) l.marking = fevUnitCode(l.unit_name ?? '') ?? l.marking ?? null
@@ -152,6 +170,7 @@ for (const c0 of contracts.sort((a, b) => a.id.localeCompare(b.id))) {
       split: m.split,
       fallbackMarking,
       coverage: inputs.coverage,
+      billingGroups: inputs.billingGroups,
     })
     const byKey = existingByMarkingGroup(plan.groups.map((g) => g.markingKey), m.split ? existing : existing.map((e) => ({ ...e, marking_key: null })))
     const invoices: unknown[] = []
@@ -204,6 +223,32 @@ for (const c0 of contracts.sort((a, b) => a.id.localeCompare(b.id))) {
         snapped: [],
       })
     }
+    // Faktureringsgrupper: gruppernas fakturor (bara när avtalet har grupper)
+    if (plan.groupBuckets.length > 0) {
+      const blocked = blockedGroupSlots(planIndexSlots(plan, m.split), [], inputs.groupSplit)
+      for (const b of plan.groupBuckets) {
+        const keyColumn = bucketKeyColumn(b, m.split)
+        for (const e of buildContractDiff(b.periods, [], { real: true, mode: matchModeFor(c) })) {
+          const isBlocked = !!e.planned && blocked.has(blockedSlotKey(b.billingGroupId, b.kind, e.planned.periodStart, keyColumn))
+          invoices.push({
+            group: b.groupName,
+            marking: b.marking,
+            marking_key_column: keyColumn,
+            kind: b.kind,
+            action: isBlocked && e.action === 'create' ? 'later' : e.action,
+            existing: null,
+            period: e.planned ? `${e.planned.periodStart} t.o.m. ${e.planned.periodEnd}` : null,
+            subtotal: e.planned?.subtotal ?? null,
+            rows: e.planned
+              ? buildContractInvoiceRows(c.id, { premiumItems: [], equipment: inputs.lines, additionNotes: [], label, diaryNumber: c.diary_number }, e.planned).map(
+                  (r) => `${r.quantity} x ${r.unit_price} = ${r.total_price} | ${r.article_name}${r.station_ids ? ` | ${r.station_ids.length} stationer` : ''}`
+                )
+              : [],
+            snapped: [],
+          })
+        }
+      }
+    }
     ;(result.modes as unknown[]).push({ mode: m.name, cadence: plan.cadence, invoices })
   }
   out.push(result)
@@ -211,14 +256,14 @@ for (const c0 of contracts.sort((a, b) => a.id.localeCompare(b.id))) {
 
 const dir = join(here, 'out', 'steg11')
 mkdirSync(dir, { recursive: true })
-const file = join(dir, `addon-v2-prov-${TODAY}${REFS === 'beslut' ? '-beslut' : ''}.json`)
+const file = join(dir, `addon-v2-prov-${TODAY}${REFS === 'beslut' ? '-beslut' : ''}${GRUPPER ? '-grupper' : ''}.json`)
 writeFileSync(file, JSON.stringify(out, null, 1) + '\n')
 for (const r of out as Array<Record<string, unknown>>) {
   console.log(`\n${r.contract} ${r.customer} · ${r.label} · premie ${r.annual_value} ${r.frequency ?? 'utan intervall'} · ${r.start}..${r.end} · avtalsref ${r.contract_ref ?? '-'}`)
   for (const m of r.modes as Array<{ mode: string; cadence: string; invoices: Array<Record<string, unknown>> }>) {
     console.log(`  [${m.mode}] takt ${m.cadence}`)
     for (const i of m.invoices) {
-      console.log(`    ${String(i.action).padEnd(7)}${i.kind ? ` ${i.kind}` : ""} märkning ${i.marking || '(ingen)'} ${i.period ?? ''} ${i.subtotal ?? ''}${i.existing ? ` · befintlig ${i.existing}` : ''}${(i.snapped as string[]).length ? ` · snäppt ${(i.snapped as string[]).join(',')}` : ''}`)
+      console.log(`    ${String(i.action).padEnd(7)}${i.kind ? ` ${i.kind}` : ""}${i.group ? ` grupp ${i.group}` : ''} märkning ${i.marking || '(ingen)'} ${i.period ?? ''} ${i.subtotal ?? ''}${i.existing ? ` · befintlig ${i.existing}` : ''}${(i.snapped as string[]).length ? ` · snäppt ${(i.snapped as string[]).join(',')}` : ''}`)
       for (const row of i.rows as string[]) console.log(`        ${row}`)
     }
   }

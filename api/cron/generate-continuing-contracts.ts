@@ -79,11 +79,14 @@ import {
   computeAddonPlanV2,
   decorateV2Period,
   isAddonRulesV2,
+  planIndexSlots,
+  bucketKeyColumn,
   planGapGroups,
   type AddonPlanV2,
 } from '../../src/shared/addonPlanV2'
 import { markingKey, markingKeyColumn } from '../../src/shared/addonMarking'
 import { loadAddonV2Inputs, type AddonV2Inputs } from '../../src/shared/addonV2Loader'
+import { blockedGroupSlots, blockedSlotKey } from '../../src/shared/addonBillingGroups'
 import {
   buildConsolidatedInvoiceNotes,
   buildContractInvoiceNotes,
@@ -258,7 +261,7 @@ function buildRows(contract: ContractRow, sources: Sources, p: PlannedPeriod): R
 }
 
 /** En befintlig faktura som intervall: ägare = avtalets id, '__none__' (utan avtal) eller '__consolidated__'. */
-type CoveredRange = ExistingRange & { owner: string; kind: string; marking_key?: string | null }
+type CoveredRange = ExistingRange & { owner: string; kind: string; marking_key?: string | null; billing_group_id?: string | null }
 
 type Covered = {
   perContract: Map<string, Set<string>>
@@ -277,7 +280,7 @@ function rangesFor(covered: Covered, owners: string[], kind: string): CoveredRan
 async function loadCoveredPeriods(customerId: string): Promise<Covered> {
   const { data } = await supabase
     .from('invoices')
-    .select('id, invoice_number, invoice_type, is_historical, is_consolidated, contract_id, contract_invoice_kind, marking_key, billing_period_start, billing_period_end, status, invoice_items(contract_id)')
+    .select('id, invoice_number, invoice_type, is_historical, is_consolidated, contract_id, contract_invoice_kind, marking_key, addon_billing_group_id, billing_period_start, billing_period_end, status, invoice_items(contract_id)')
     .eq('customer_id', customerId)
     .in('invoice_type', ['contract', 'adhoc'])
     // Makulerade fakturor täcker ingen period (samma regel som planeraren)
@@ -292,6 +295,7 @@ async function loadCoveredPeriods(customerId: string): Promise<Covered> {
     contract_id: string | null
     contract_invoice_kind: string | null
     marking_key?: string | null
+    addon_billing_group_id?: string | null
     billing_period_start: string | null
     billing_period_end: string | null
     invoice_items: Array<{ contract_id: string | null }> | null
@@ -317,6 +321,13 @@ async function loadCoveredPeriods(customerId: string): Promise<Covered> {
       end: inv.billing_period_end ?? inv.billing_period_start,
       kind,
       marking_key: inv.marking_key ?? null,
+      billing_group_id: inv.addon_billing_group_id ?? null,
+    }
+    // Faktureringsgrupp: bara som intervall med grupp, aldrig i månadsnycklarna
+    // (de gäller fakturorna utan grupp)
+    if (inv.addon_billing_group_id && !inv.is_consolidated) {
+      ranges.push({ ...range, owner: inv.contract_id ?? '__none__' })
+      continue
     }
     if (inv.is_consolidated) {
       consolidated.add(key)
@@ -362,7 +373,7 @@ async function insertInvoice(
   orgNr: string | null,
   p: PlannedPeriod,
   rows: RowSpec[],
-  opts: { contractId: string | null; consolidated: boolean; marking: string | null; notes: string; markingKey?: string | null }
+  opts: { contractId: string | null; consolidated: boolean; marking: string | null; notes: string; markingKey?: string | null; billingGroupId?: string | null }
 ): Promise<boolean> {
   if (rows.length === 0) return false
   const { subtotal } = invoiceTotals(rows)
@@ -387,7 +398,7 @@ async function insertInvoiceNow(
   orgNr: string | null,
   p: PlannedPeriod,
   rows: RowSpec[],
-  opts: { contractId: string | null; consolidated: boolean; marking: string | null; notes: string; markingKey?: string | null },
+  opts: { contractId: string | null; consolidated: boolean; marking: string | null; notes: string; markingKey?: string | null; billingGroupId?: string | null },
   subtotal: number
 ): Promise<boolean> {
   const { vat } = invoiceTotals(rows)
@@ -422,6 +433,8 @@ async function insertInvoiceNow(
       created_at: parseLocalDate(p.invoiceDate).toISOString(),
       // Nya tilläggsregler: märkningsnyckeln (undefined = gamla regler, kolumnen skrivs inte)
       ...(opts.markingKey !== undefined ? { marking_key: opts.markingKey } : {}),
+      // Faktureringsgrupp (undefined = kolumnen skrivs inte)
+      ...(opts.billingGroupId !== undefined ? { addon_billing_group_id: opts.billingGroupId } : {}),
     })
     .select('id')
     .single()
@@ -438,7 +451,7 @@ type CronV2 = {
   inputs: AddonV2Inputs
   plan: AddonPlanV2
   /** Märkning per tilläggsperiod: fakturans märkning, gruppnyckel och kolumnvärdet för marking_key */
-  meta: Map<PlannedPeriod, { marking: string | null; key: string; keyColumn: string | null }>
+  meta: Map<PlannedPeriod, { marking: string | null; key: string; keyColumn: string | null; groupId?: string; blocked?: boolean }>
   marking: string | null
 }
 
@@ -467,7 +480,13 @@ async function planContractV2(
     lines: sources.equipment,
   })
   if (inputs.gapError) console.warn('Glappen kunde inte läsas:', inputs.gapError)
-  const plan = computeAddonPlanV2(contract, inputs.lines, { ...planOpts, split: inputs.split, fallbackMarking: marking, coverage: inputs.coverage })
+  const plan = computeAddonPlanV2(contract, inputs.lines, {
+    ...planOpts,
+    split: inputs.split,
+    fallbackMarking: marking,
+    coverage: inputs.coverage,
+    billingGroups: inputs.billingGroups,
+  })
   const withPremium = plan.cadence === 'with_premium'
   const periods = computePlannedPeriods(contract, {
     ...planOpts,
@@ -491,6 +510,28 @@ async function planContractV2(
     if (p.isHistorical || cronFortnoxCovers(p, covered.fortnoxRanges, fortnoxOpts)) continue
     equipmentPeriods.push(p)
   }
+  // Faktureringsgrupper: egna fakturor per grupp, typ och märkning (samma
+  // hinkar och samma spärr mot gamla unika indexet som Planera fakturor)
+  if (plan.groupBuckets.length > 0) {
+    const existingSlots = covered.ranges
+      .filter((r) => r.owner === contract.id && (r.kind === 'equipment' || r.kind === 'equipment_monthly') && !(r.invoice_number ?? '').startsWith('F-'))
+      .map((r) => ({ kind: r.kind, start: r.start, key: r.marking_key ?? '', groupId: r.billing_group_id ?? null }))
+    const blocked = blockedGroupSlots(planIndexSlots(plan, inputs.split), existingSlots, inputs.groupSplit)
+    for (const b of plan.groupBuckets) {
+      const keyColumn = bucketKeyColumn(b, inputs.split)
+      for (const p of b.periods) {
+        if (p.isHistorical || cronFortnoxCovers(p, covered.fortnoxRanges, fortnoxOpts)) continue
+        meta.set(p, {
+          marking: b.marking,
+          key: b.markingKey,
+          keyColumn,
+          groupId: b.billingGroupId,
+          blocked: blocked.has(blockedSlotKey(b.billingGroupId, b.kind, p.periodStart, keyColumn)),
+        })
+        equipmentPeriods.push(p)
+      }
+    }
+  }
   return { contract, sources, periods, equipmentPeriods, v2: { inputs, plan, meta, marking } }
 }
 
@@ -504,6 +545,7 @@ async function createGapInvoices(ctx: RunCtx, customer: CustomerRow, orgNr: stri
   if (!v2.inputs.split || v2.inputs.gaps.length === 0) return 0
   const markingByKey = new Map<string, string | null>()
   for (const l of v2.inputs.lines) markingByKey.set(markingKey(l.marking ?? null), l.marking ?? null)
+  for (const g of v2.inputs.billingGroups) if (g.marking?.trim()) markingByKey.set(markingKey(g.marking), g.marking.trim())
   const groups = planGapGroups(v2.inputs.gaps, {
     today,
     markingFor: (k) => markingByKey.get(k) ?? (k || null),
@@ -514,7 +556,11 @@ async function createGapInvoices(ctx: RunCtx, customer: CustomerRow, orgNr: stri
   for (const g of groups) {
     if (g.period.equipmentRows.length === 0) continue
     const dup = existing.some(
-      (r) => r.start === g.period.periodStart && r.end === g.period.periodEnd && markingKey(r.marking_key ?? '') === g.markingKey
+      (r) =>
+        r.start === g.period.periodStart &&
+        r.end === g.period.periodEnd &&
+        markingKey(r.marking_key ?? '') === g.markingKey &&
+        (r.billing_group_id ?? null) === (g.billingGroupId ?? null)
     )
     if (dup) continue
     const ok = await insertInvoice(ctx, customer, orgNr, g.period, buildRows(pl.contract, pl.sources, g.period), {
@@ -522,6 +568,7 @@ async function createGapInvoices(ctx: RunCtx, customer: CustomerRow, orgNr: stri
       consolidated: false,
       marking: g.marking,
       markingKey: markingKeyColumn(g.markingKey),
+      ...(g.billingGroupId ? { billingGroupId: g.billingGroupId } : {}),
       notes: buildContractInvoiceNotes(g.period, pl.sources.label, pl.sources.diaryNumber),
     })
     if (ok) created++
@@ -657,24 +704,28 @@ async function createPerContract(
     const meta = pl.v2?.meta.get(p)
     if (meta) {
       // Fakturor utan märkningsnyckel (en per avtal) täcker alla märkningar
+      // Faktureringsgrupp: bara gruppens egna fakturor (utan grupp: bara fakturor utan grupp)
       const existing = rangesFor(covered, [pl.contract.id, '__none__'], p.kind ?? 'premium').filter(
-        (r) => !r.marking_key || markingKey(r.marking_key) === meta.key
+        (r) => (!r.marking_key || markingKey(r.marking_key) === meta.key) && (r.billing_group_id ?? null) === (meta.groupId ?? null)
       )
       if (isCovered({ start: p.periodStart, end: p.periodEnd }, existing, mode)) continue
       if (!dueToday(p, today)) continue
+      // Krock med gamla unika indexet: väntar som i Planera fakturor
+      if (meta.blocked) continue
       const rows = buildRows(pl.contract, pl.sources, p)
       const ok = await insertInvoice(ctx, customer, orgNr, p, rows, {
         contractId: pl.contract.id,
         consolidated: false,
         marking: meta.marking,
         markingKey: meta.keyColumn,
+        ...(meta.groupId ? { billingGroupId: meta.groupId } : {}),
         notes: buildContractInvoiceNotes(p, pl.sources.label, pl.sources.diaryNumber),
       })
       if (ok) created++
       continue
     }
     if (mode === 'overlap') {
-      const existing = rangesFor(covered, [pl.contract.id, '__none__'], p.kind ?? 'premium')
+      const existing = rangesFor(covered, [pl.contract.id, '__none__'], p.kind ?? 'premium').filter((r) => !r.billing_group_id)
       if (isCovered({ start: p.periodStart, end: p.periodEnd }, existing, 'overlap')) continue
     } else {
       const key = periodKey(p.kind, p.periodStart)
@@ -709,7 +760,7 @@ async function refreshEditableEquipmentInvoices(
   void orgNr
   const { data: invoices } = await supabase
     .from('invoices')
-    .select('id, status, contract_invoice_kind, marking_key, billing_period_start, billing_period_end, is_consolidated, invoice_items(id, line_kind, contract_id, total_price, quantity)')
+    .select('id, status, contract_invoice_kind, marking_key, addon_billing_group_id, billing_period_start, billing_period_end, is_consolidated, invoice_items(id, line_kind, contract_id, total_price, quantity)')
     .eq('contract_id', pl.contract.id)
     .eq('invoice_type', 'contract')
     .in('status', ['draft', 'pending_approval', 'ready'])
@@ -718,6 +769,7 @@ async function refreshEditableEquipmentInvoices(
     status: string | null
     contract_invoice_kind: string | null
     marking_key?: string | null
+    addon_billing_group_id?: string | null
     billing_period_start: string | null
     billing_period_end: string | null
     is_consolidated: boolean | null
@@ -735,11 +787,15 @@ async function refreshEditableEquipmentInvoices(
     // Nya tilläggsregler: bara perioder med fakturans märkning. Ett gammalt
     // utkast utan märkningsnyckel delas av Planera fakturor, inte här.
     if (pl.v2 && kind === 'equipment' && pl.v2.inputs.split && !inv.marking_key) continue
-    const candidates = [...pl.periods, ...pl.equipmentPeriods].filter(
-      (p) =>
-        (p.kind ?? 'premium') === kind &&
-        (!pl.v2 || kind !== 'equipment' || (pl.v2.meta.get(p)?.key ?? '') === markingKey(inv.marking_key ?? ''))
-    )
+    const invGroup = inv.addon_billing_group_id ?? null
+    const candidates = [...pl.periods, ...pl.equipmentPeriods].filter((p) => {
+      if ((p.kind ?? 'premium') !== kind) return false
+      const meta = pl.v2?.meta.get(p)
+      // Faktureringsgrupp: fakturan och perioden i samma grupp (och märkning)
+      if ((meta?.groupId ?? null) !== invGroup) return false
+      if (meta?.groupId) return meta.key === markingKey(inv.marking_key ?? '')
+      return !pl.v2 || kind !== 'equipment' || (meta?.key ?? '') === markingKey(inv.marking_key ?? '')
+    })
     const plannedPeriod = findPlannedFor(candidates, { start: inv.billing_period_start, end: inv.billing_period_end }, mode)
     if (!plannedPeriod) continue
     const rows = buildRows(pl.contract, pl.sources, plannedPeriod)

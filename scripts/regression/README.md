@@ -86,6 +86,8 @@ npx tsx --env-file=.env scripts/regression/addon-v2-prov.mts --today=2026-10-30 
 
 Sedan steg 0 (2026-11-03, 3.116.0) är också Maserfrakts två avtal med i provet, och tilläggens egna månadsfakturor (§ 6-rader per månad, `plan.monthly`) visas som `equipment_monthly`. `tillaggsregler-v2.test.sql` T5 och `prorata-v2.test.sql` T14 provar månadstakten i SQL (nästa månadsstart för stationer per månad).
 
+Faktureringsgrupper (2026-11-03, 3.117.0): `faktureringsgrupper.test.sql` provar grupperna på Maserfrakt i ett block som alltid rullas tillbaka (fyrpartsvarianten av `contract_addon_next_period_start`, gruppbyte på rader och stationer, pro rata till gruppens nästa periodstart, vakten och gamla unika indexet). `addon-v2-prov.mts --grupper=prov` ger Maserfrakt en månadsgrupp och en kvartalsgrupp i minnet och visar gruppernas fakturor (`out/steg11/addon-v2-prov-<today>-grupper.json`). `prorata-compare.sql` räknar inte med kolumnen `addon_billing_group_id` (annars ändras md5 bara av att kolumnen finns).
+
 `plan-dump.mts` speglar inte version 2 (inget avtal har `addon_rules` satt); provet ovan använder samma delade kod som Planera fakturor.
 
 ## Löpande avtal i exakt läge (datasteg 18, STRUL 1)

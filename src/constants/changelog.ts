@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.117.0',
+    date: '2026-11-03',
+    title: 'Faktureringsgrupper för tilläggsstationer',
+    items: [
+      { kind: 'nyhet', text: 'Avtal med tilläggsreglerna Följer premien kan ha faktureringsgrupper. En grupp har ett eget intervall (varje månad, kvartal, halvår eller år, eller samma som premien), en startdag och en egen märkning. Tilläggsraderna i gruppen faktureras på egna fakturor med gruppens intervall, till exempel varje månad fast premien är årlig. Grupperna skapas i avtalskartan under Innehåll och utrustning › Faktureringsgrupper, där du också väljer grupp för varje tilläggsrad.' },
+      { kind: 'nyhet', text: 'I Besluta tillägg kan du välja faktureringsgrupp för stationerna när de läggs som tillägg utöver avtalet. Pro rata och fakturan Tillägg från utsättning räknas då till gruppens nästa periodstart.' },
+      { kind: 'andring', text: 'Planera fakturor visar gruppens namn på tilläggsfakturorna, och fakturan i Fakturering visar vilken faktureringsgrupp den hör till.' },
+    ],
+  },
+  {
     version: '3.116.1',
     date: '2026-11-03',
     title: 'Betald till och med för delvis betalda stationer',

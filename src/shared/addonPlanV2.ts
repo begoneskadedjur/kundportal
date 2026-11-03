@@ -43,7 +43,9 @@ import {
   type PlanOptions,
   type PremiumStep,
 } from './contractPlanner'
-import { addonMarkingFor, markingKey } from './addonMarking'
+import { addonMarkingFor, markingKey, markingKeyColumn } from './addonMarking'
+import { billingGroupAnchor, groupMarking, groupStepMonths, stockholmDate, type AddonBillingGroup, type IndexSlot } from './addonBillingGroups'
+import { addMonthsClampedIso, exactPeriodIndexContaining } from './contractPeriods'
 import { EDITABLE_STATUSES, isAutoDeletable, LOCKED_STATUSES, type MatchableInvoice, type ContractDiffEntry } from './contractInvoiceMatch'
 
 export const ADDON_RULES_V2 = 'v2'
@@ -219,6 +221,20 @@ export interface AddonMarkingGroup {
   periods: PlannedPeriod[]
 }
 
+/**
+ * Fakturor för en faktureringsgrupp (addonBillingGroups.ts): en hink per
+ * grupp, fakturatyp och märkning.
+ */
+export interface AddonGroupBucket {
+  billingGroupId: string
+  groupName: string
+  kind: 'equipment' | 'equipment_monthly'
+  marking: string | null
+  markingKey: string
+  lines: EquipmentLine[]
+  periods: PlannedPeriod[]
+}
+
 export interface AddonPlanV2 {
   cadence: AddonCadence
   /** Månadspremie: raderna som ska på premiefakturan (normaliserade till årspris) */
@@ -229,6 +245,8 @@ export interface AddonPlanV2 {
   monthlyLines: EquipmentLine[]
   /** Egna månadsfakturor (kind equipment_monthly), en per månad och avtal */
   monthly: PlannedPeriod[]
+  /** Faktureringsgruppernas fakturor (tom utan grupper) */
+  groupBuckets: AddonGroupBucket[]
 }
 
 export interface AddonPlanV2Options extends Omit<PlanOptions, 'equipment' | 'equipmentMode'> {
@@ -237,15 +255,22 @@ export interface AddonPlanV2Options extends Omit<PlanOptions, 'equipment' | 'equ
   /** Fakturans märkning när allt ligger på en faktura (dagens regel) */
   fallbackMarking: string | null
   coverage?: CoverageRange[]
+  /** Avtalets faktureringsgrupper; § 6-rader med billing_group_id i listan planeras i sin grupp */
+  billingGroups?: AddonBillingGroup[]
 }
 
 /**
  * Lines ska bära site_customer_id, unit_name och marking (addonMarkingFor)
  * när de finns. Perioder utan rader tas bort.
  */
-export function computeAddonPlanV2(contract: PlanningContract, lines: EquipmentLine[], opts: AddonPlanV2Options): AddonPlanV2 {
+export function computeAddonPlanV2(contract: PlanningContract, allLines: EquipmentLine[], opts: AddonPlanV2Options): AddonPlanV2 {
   const cadence = addonCadence(contract, opts.steps)
   const coverage = opts.coverage ?? []
+  // Faktureringsgrupper: raderna i en grupp planeras för sig, övriga som förut
+  const groupsById = new Map((opts.billingGroups ?? []).map((g) => [g.id, g]))
+  const inGroup = (l: EquipmentLine) => !!l.billing_group_id && groupsById.has(l.billing_group_id)
+  const lines = allLines.filter((l) => !inGroup(l))
+  const { buckets: groupBuckets, premiumExtra } = computeGroupBuckets(contract, allLines.filter(inGroup), groupsById, opts)
   const monthlyLines = lines.filter((l) => addonCadenceFor(l, contract, opts.steps) === 'monthly')
   const normalized = lines.filter((l) => !monthlyLines.includes(l)).map(normalizeV2Line)
   // Egna månadsfakturor: kalendermånader (exakt avtalsdag: månader från
@@ -261,7 +286,7 @@ export function computeAddonPlanV2(contract: PlanningContract, lines: EquipmentL
         .map((p) => decorateV2Period(p, monthlyLines, coverage, opts.fallbackMarking))
         .filter((p) => p.equipmentRows.length > 0)
     : []
-  if (cadence === 'with_premium') return { cadence, premiumEquipment: normalized, groups: [], monthlyLines, monthly }
+  if (cadence === 'with_premium') return { cadence, premiumEquipment: [...normalized, ...premiumExtra], groups: [], monthlyLines, monthly, groupBuckets }
 
   const variant: PlanningContract =
     cadence === 'anniversary'
@@ -294,7 +319,120 @@ export function computeAddonPlanV2(contract: PlanningContract, lines: EquipmentL
       .map((p) => ({ ...p, amount: 0, subtotal: p.subtotal, kind: 'equipment' as const }))
     groups.push({ marking: g.marking, markingKey: key, lines: g.lines, periods })
   }
-  return { cadence, premiumEquipment: [], groups, monthlyLines, monthly }
+  return { cadence, premiumEquipment: [], groups, monthlyLines, monthly, groupBuckets }
+}
+
+/** Raden som månadsrad: månadspris = årspris / 12 (per månad-rader behåller sitt pris). */
+function toMonthlyLine(l: EquipmentLine): EquipmentLine {
+  if (l.billing_model === 'per_month') return l
+  const annual = normalizeV2Line(l).unit_price_annual
+  return { ...l, billing_model: 'per_month', unit_price_month: annual / 12 }
+}
+
+/**
+ * Faktureringsgruppernas hinkar. Följer premien: radens vanliga takt
+ * (addonCadenceFor) men egna fakturor för gruppen; vid månadspremie ligger
+ * raderna kvar på premiefakturan (premiumExtra). Månad, kvartal, halvår, år:
+ * perioder från gruppens startdag (billingGroupAnchor) med exakt dag.
+ * Märkning: gruppens märkning, annars dagens regel per rad. Perioder som
+ * börjar före den dag gruppen skapades tas inte med (aldrig bakåt).
+ */
+function computeGroupBuckets(
+  contract: PlanningContract,
+  grouped: EquipmentLine[],
+  groupsById: Map<string, AddonBillingGroup>,
+  opts: AddonPlanV2Options
+): { buckets: AddonGroupBucket[]; premiumExtra: EquipmentLine[] } {
+  const buckets: AddonGroupBucket[] = []
+  const premiumExtra: EquipmentLine[] = []
+  if (grouped.length === 0) return { buckets, premiumExtra }
+  const coverage = opts.coverage ?? []
+  const base = addonCadence(contract, opts.steps)
+  const groups = [...groupsById.values()].sort((a, b) => a.name.localeCompare(b.name, 'sv') || a.id.localeCompare(b.id))
+  for (const g of groups) {
+    const gl = grouped.filter((l) => l.billing_group_id === g.id)
+    if (gl.length === 0) continue
+    const floor = stockholmDate(g.created_at)
+    const gm = groupMarking(g)
+    const anchor = g.cadence === 'follows_premium' ? null : billingGroupAnchor(g, contract)
+    let monthlyL: EquipmentLine[] = []
+    let periodicL: EquipmentLine[] = []
+    let periodicContract: PlanningContract = contract
+    let periodicSteps = opts.steps
+    let monthlyContract: PlanningContract = contract
+    if (!anchor) {
+      // Följer premien (eller startdag saknas): radens vanliga takt
+      for (const l of gl) {
+        const c = addonCadenceFor(l, contract, opts.steps)
+        if (c === 'with_premium') premiumExtra.push(normalizeV2Line(l))
+        else if (c === 'monthly') monthlyL.push(l)
+        else periodicL.push(normalizeV2Line(l))
+      }
+      if (base === 'anniversary') {
+        periodicContract = { ...contract, billing_frequency: 'annual', billing_anchor_mode: 'start_day', annual_value: 0 }
+        periodicSteps = []
+      }
+    } else if (g.cadence === 'monthly') {
+      monthlyL = gl.map(toMonthlyLine)
+      monthlyContract = { ...contract, contract_start_date: anchor, billing_anchor_mode: 'start_day' }
+    } else {
+      periodicL = gl.map(normalizeV2Line)
+      periodicContract = { ...contract, contract_start_date: anchor, billing_anchor_mode: 'start_day', billing_frequency: g.cadence, annual_value: 0 }
+      periodicSteps = []
+    }
+    // Radens startdag snäpps bakåt till gruppens period som innehåller den:
+    // dagarna före startdagen är redan betalda (täckning) och dras av per station
+    if (anchor) {
+      const step = groupStepMonths(g.cadence) ?? 12
+      const snap = (l: EquipmentLine): EquipmentLine => {
+        const bsd = l.billing_start_date
+        if (!bsd || bsd <= anchor) return l
+        const k = exactPeriodIndexContaining(anchor, step, bsd)
+        return { ...l, billing_start_date: addMonthsClampedIso(anchor, k * step) }
+      }
+      monthlyL = monthlyL.map(snap)
+      periodicL = periodicL.map(snap)
+    }
+    const split = (ls: EquipmentLine[]) => {
+      const byKey = new Map<string, { marking: string | null; lines: EquipmentLine[] }>()
+      for (const l of ls) {
+        const key = gm ? markingKey(gm) : opts.split ? markingKey(l.marking ?? null) : ''
+        const slot = byKey.get(key) ?? { marking: gm ?? (opts.split ? (l.marking ?? null) : opts.fallbackMarking), lines: [] }
+        slot.lines.push(l)
+        byKey.set(key, slot)
+      }
+      return [...byKey.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+    }
+    const keep = (p: PlannedPeriod) => p.equipmentRows.length > 0 && (!floor || p.periodStart >= floor)
+    for (const [key, s] of split(periodicL)) {
+      const periods = computePlannedEquipmentPeriods(periodicContract, {
+        paymentTermsDays: opts.paymentTermsDays,
+        leadDays: opts.leadDays,
+        today: opts.today,
+        window: opts.window,
+        horizonEnd: opts.horizonEnd,
+        steps: periodicSteps,
+        equipment: s.lines,
+      })
+        .map((p) => decorateV2Period(p, s.lines, coverage, s.marking))
+        .filter(keep)
+        .map((p) => ({ ...p, amount: 0, kind: 'equipment' as const }))
+      buckets.push({ billingGroupId: g.id, groupName: g.name, kind: 'equipment', marking: s.marking, markingKey: key, lines: s.lines, periods })
+    }
+    for (const [key, s] of split(monthlyL)) {
+      const periods = computePlannedMonthlyEquipmentPeriods(monthlyContract, {
+        paymentTermsDays: opts.paymentTermsDays,
+        today: opts.today,
+        window: opts.window,
+        horizonEnd: opts.horizonEnd,
+        equipment: s.lines,
+      })
+        .map((p) => decorateV2Period(p, s.lines, coverage, s.marking))
+        .filter(keep)
+      buckets.push({ billingGroupId: g.id, groupName: g.name, kind: 'equipment_monthly', marking: s.marking, markingKey: key, lines: s.lines, periods })
+    }
+  }
+  return { buckets, premiumExtra }
 }
 
 /** Med v2-rader (enhetens namn finns) ska fakturaraderna få v2-text. */
@@ -317,7 +455,7 @@ export function v2AddonRowName(
 
 // ─── Fördelning av befintliga fakturor på märkningsgrupper ─────────────────
 
-export type MarkedInvoice = MatchableInvoice & { marking_key?: string | null }
+export type MarkedInvoice = MatchableInvoice & { marking_key?: string | null; addon_billing_group_id?: string | null }
 
 /**
  * Befintliga tilläggsfakturor per märkningsnyckel. En faktura med
@@ -382,6 +520,8 @@ export interface GapCandidate {
   end_day: string
   marking_key: string
   on_open_gap_invoice: string | null
+  /** Stationens faktureringsgrupp (läggs på av laddaren, inte SQL) */
+  billing_group_id?: string | null
 }
 
 export interface GapGroup {
@@ -390,6 +530,8 @@ export interface GapGroup {
   period: PlannedPeriod
   /** Stationer utan årspris (kan inte prissättas) */
   missingPrice: string[]
+  /** Faktureringsgruppen glappet hör till (undefined = ingen) */
+  billingGroupId?: string
 }
 
 export const GAP_YEAR_DAYS = 365
@@ -411,13 +553,13 @@ export function planGapGroups(
 ): GapGroup[] {
   const groups = new Map<string, GapCandidate[]>()
   for (const c of candidates) {
-    const k = `${c.marking_key}|${c.gap_from}|${c.gap_to}`
+    const k = c.billing_group_id ? `${c.marking_key}|${c.gap_from}|${c.gap_to}|${c.billing_group_id}` : `${c.marking_key}|${c.gap_from}|${c.gap_to}`
     groups.set(k, [...(groups.get(k) ?? []), c])
   }
   const out: GapGroup[] = []
   const due = toLocalIsoDate(new Date(parseLocalDate(opts.today).getTime() + (opts.paymentTermsDays ?? 30) * DAY + 12 * 3_600_000))
   for (const [k, list] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    const [key, from, to] = k.split('|')
+    const [key, from, to, groupId] = k.split('|')
     const missingPrice = list.filter((c) => !(Number(c.annual) > 0)).map((c) => c.station_id)
     const rowsBy = new Map<string, GapCandidate[]>()
     for (const c of list) {
@@ -461,7 +603,7 @@ export function planGapGroups(
       sequenceNumber: 1,
       totalSequenceCount: 1,
     }
-    out.push({ marking: opts.markingFor(key), markingKey: key, period: totals(base, rows), missingPrice })
+    out.push({ marking: opts.markingFor(key), markingKey: key, period: totals(base, rows), missingPrice, ...(groupId ? { billingGroupId: groupId } : {}) })
   }
   return out
 }
@@ -488,6 +630,7 @@ export function buildGapDiff(planned: GapGroup[], existing: MarkedInvoice[]): Ar
       (e) =>
         !used.has(e.id) &&
         markingKey(e.marking_key ?? '') === g.markingKey &&
+        (e.addon_billing_group_id ?? null) === (g.billingGroupId ?? null) &&
         e.billing_period_start === g.period.periodStart &&
         (e.billing_period_end ?? e.billing_period_start) === g.period.periodEnd
     )
@@ -518,4 +661,30 @@ export function markingForUnit(
   root: { billing_reference?: string | null } | null | undefined
 ): string | null {
   return addonMarkingFor(unit, contract, root)
+}
+
+// ─── Faktureringsgrupper och gamla unika indexet ───────────────────────────
+
+/** Värdet i invoices.marking_key för en hink (samma regel som tilläggsfakturorna utan grupp). */
+export function bucketKeyColumn(b: Pick<AddonGroupBucket, 'marking' | 'markingKey'>, split: boolean): string | null {
+  return split ? markingKeyColumn(b.marking ?? b.markingKey) : null
+}
+
+/**
+ * Planens tilläggsfakturor som platser i unika indexet (typ, periodstart,
+ * marking_key, grupp). Används av blockedGroupSlots i generatorn och cronen,
+ * så att båda håller tillbaka samma gruppfakturor.
+ */
+export function planIndexSlots(plan: AddonPlanV2, split: boolean): IndexSlot[] {
+  const out: IndexSlot[] = []
+  for (const g of plan.groups) {
+    const key = split ? (markingKeyColumn(g.marking ?? g.markingKey) ?? '') : ''
+    for (const p of g.periods) out.push({ kind: 'equipment', start: p.periodStart, key, groupId: null })
+  }
+  for (const p of plan.monthly) out.push({ kind: 'equipment_monthly', start: p.periodStart, key: '', groupId: null })
+  for (const b of plan.groupBuckets) {
+    const key = bucketKeyColumn(b, split) ?? ''
+    for (const p of b.periods) out.push({ kind: b.kind, start: p.periodStart, key, groupId: b.billingGroupId })
+  }
+  return out
 }

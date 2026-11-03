@@ -89,6 +89,8 @@ export interface EquipmentLine {
   station_type_id?: string | null
   unit_name?: string | null
   marking?: string | null
+  /** Faktureringsgrupp (case_billing_items.addon_billing_group_id), bara satt när raden har en */
+  billing_group_id?: string | null
 }
 
 /** En utrustningsrad skalad till fakturaperioden. */

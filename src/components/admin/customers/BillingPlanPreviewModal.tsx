@@ -392,9 +392,13 @@ export default function BillingPlanPreviewModal({ isOpen, plan: basePlan, loadin
                               ? 'tillägg per månad'
                               : entry.kind === 'equipment_gap'
                                 ? 'tillägg från utsättning'
-                                : 'tillägg per år'}
+                                : entry.billingGroupName
+                                  ? 'tillägg'
+                                  : 'tillägg per år'}
                             {/* Nya tilläggsregler: en tilläggsfaktura per referenskod */}
                             {entry.addonRulesV2 && entry.marking ? ` · ${entry.marking}` : ''}
+                            {/* Faktureringsgrupp: gruppens namn */}
+                            {entry.billingGroupName ? ` · grupp ${entry.billingGroupName}` : ''}
                           </span>
                         )}
                         {/* Exkl. moms, samma tal som § 6 på pappret och kundens avtal */}

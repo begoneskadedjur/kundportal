@@ -2126,6 +2126,8 @@ export interface EquipmentPlacement {
   station_type_id?: string | null
   /** Ärendet där stationen sattes ut (steg 5, läses inte ännu) */
   placed_case_id?: string | null
+  /** Faktureringsgrupp (contract_addon_billing_groups), null = tilläggens vanliga regler */
+  addon_billing_group_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -2162,6 +2164,29 @@ export interface AddonStationCoverage {
   released_at: string | null
   released_by: string | null
   release_reason: string | null
+}
+
+/**
+ * Faktureringsgrupp för tilläggsstationer (tabellen contract_addon_billing_groups,
+ * 2026-11-03). Bara avtal med addon_rules = 'v2'. § 6-rader (case_billing_items),
+ * stationer (equipment_placements, indoor_stations) och fakturor (invoices) har
+ * kolumnen addon_billing_group_id; null = tilläggens vanliga regler.
+ * Logiken: src/shared/addonBillingGroups.ts och addonPlanV2.ts.
+ */
+export type AddonBillingGroupCadence = 'follows_premium' | 'monthly' | 'quarterly' | 'semi_annual' | 'annual'
+
+export interface ContractAddonBillingGroup {
+  id: string
+  contract_id: string
+  name: string
+  cadence: AddonBillingGroupCadence
+  /** ÅÅÅÅ-MM-DD, null = avtalsdagen (gamla läget: premiens månadsankare) */
+  anchor_date: string | null
+  /** Fakturamärkning, null = dagens märkningsregel */
+  marking: string | null
+  created_at: string
+  updated_at: string
+  created_by: string | null
 }
 
 // Extended type with relations

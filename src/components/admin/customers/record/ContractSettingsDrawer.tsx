@@ -42,6 +42,7 @@ import { billingModelOf, isAddonLabourLine, MODEL_LABEL, siteOf, type BillingMod
 import { useContractContent } from './ContractContentSection'
 import ContractBillingModePanel from './ContractBillingModePanel'
 import AddonCoveragePanel from './AddonCoveragePanel'
+import AddonBillingGroupsPanel from './AddonBillingGroupsPanel'
 import type { AdhocInvoiceGrouping } from '../../../../services/customerBillingService'
 import { useAvropCatalog } from './ContractPriceListSection'
 import type { HistoryTab } from './ContractHistoryModal'
@@ -835,6 +836,16 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                   : 'Egen faktura i samband med avtalets årsfaktura. Tilläggen löper med avtalet och slutar när avtalet slutar.'}
               </p>
             </div>
+            {/* Faktureringsgrupper: bara nya tilläggsregler */}
+            {contract.addon_rules === 'v2' && (
+              <AddonBillingGroupsPanel
+                contract={contract}
+                archived={archived}
+                unitNameOf={p.unitNameOf}
+                reloadKey={p.contentReloadKey}
+                onChanged={p.onBillingModeChanged}
+              />
+            )}
           </div>
         )
       case 'fakturering':

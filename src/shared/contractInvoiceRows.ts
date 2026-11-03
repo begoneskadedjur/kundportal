@@ -64,7 +64,7 @@ export interface ContractRowSources {
 
 /** Kolumnerna på case_billing_items som källorna läser (§ 4, § 6) */
 export const CONTRACT_SOURCE_ITEM_COLUMNS =
-  'id, article_id, article_code, article_name, service_id, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, rot_rut_type, fastighetsbeteckning, billing_model, billing_start_date, site_customer_id, station_type_id, status, is_premium_carrier, premium_share'
+  'id, article_id, article_code, article_name, service_id, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, rot_rut_type, fastighetsbeteckning, billing_model, billing_start_date, site_customer_id, station_type_id, status, is_premium_carrier, premium_share, addon_billing_group_id'
 
 export interface ContractSourceItemRow {
   id: string
@@ -86,6 +86,8 @@ export interface ContractSourceItemRow {
   station_type_id?: string | null
   is_premium_carrier?: boolean | null
   premium_share?: number | string | null
+  /** Faktureringsgrupp för § 6-raden (nya tilläggsregler) */
+  addon_billing_group_id?: string | null
 }
 
 export interface ContractSourceStepRow {
@@ -168,6 +170,8 @@ export function contractSourcesFromRows(
       station_ids: s.site_customer_id ? (stationIdsByRow.get(`${s.site_customer_id}|${s.station_type_id ?? ''}`) ?? null) : null,
       site_customer_id: s.site_customer_id ?? null,
       station_type_id: s.station_type_id ?? null,
+      // Bara när raden har en grupp: dumparna för rader utan grupp är oförändrade
+      ...(s.addon_billing_group_id ? { billing_group_id: s.addon_billing_group_id } : {}),
     }))
   return {
     steps: steps.map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value), event_type: s.event_type ?? null })),

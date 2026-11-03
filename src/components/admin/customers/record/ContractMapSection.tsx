@@ -90,6 +90,7 @@ import { PAPER_GEAR_CLASS } from './paperInk'
 import { adhocGroupingOf } from '../../../../services/customerBillingService'
 import { FOLD_THRESHOLD, FoldLink, FoldSummary, foldBodyClass, usePaperFold } from './paperFold'
 import LinkFortnoxInvoiceModal, { type LinkFortnoxTarget } from './LinkFortnoxInvoiceModal'
+import { AddonBillingGroupService } from '../../../../services/addonBillingGroupService'
 import AddonDropPrompt, { type AddonDecisionMode, type AddonDropPromptState, type AddonPromptBrick } from './AddonDropPrompt'
 import { useAddonPending } from '../../../../hooks/useAddonPending'
 import { refreshContractWorkItems } from '../../../../hooks/useContractWorkItems'
@@ -1552,7 +1553,10 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   }
 
   /** Ett beslut per bricka: lägg till i avtalet (premien) eller tillägg utöver avtalet. Kastar vid fel. */
-  const confirmAddonBrick = async (item: AddonPromptBrick, input: { effectiveFrom: string; unitPriceAnnual: number; mode: AddonDecisionMode }) => {
+  const confirmAddonBrick = async (
+    item: AddonPromptBrick,
+    input: { effectiveFrom: string; unitPriceAnnual: number; mode: AddonDecisionMode; billingGroupId: string | null }
+  ) => {
     if (!addonPrompt) return
     const { contract } = addonPrompt
     const b = item.brick
@@ -1580,6 +1584,10 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         indoorIds: b.indoorIds,
         unitPriceAnnual: input.unitPriceAnnual,
       })
+      // Faktureringsgrupp vald: stationerna till gruppen, § 6-raderna synkas
+      if (input.billingGroupId) {
+        await AddonBillingGroupService.setStationGroup(b.outdoorIds, b.indoorIds, input.billingGroupId)
+      }
     }
     setDecidedByContract((prev) => ({
       ...prev,

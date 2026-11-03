@@ -42,7 +42,7 @@ begin
       v_n := v_n + 1;
       begin
         execute format('select public.%I($1, null, null, null, $2)', fn) into v_res using c.customer_id, c.case_id;
-        select coalesce(jsonb_agg(to_jsonb(b) - 'id' - 'created_at' - 'updated_at' - 'mapped_service_id'
+        select coalesce(jsonb_agg(to_jsonb(b) - 'id' - 'created_at' - 'updated_at' - 'mapped_service_id' - 'addon_billing_group_id'
                                   order by b.case_id, b.station_type_id, b.addon_model, b.status, b.quantity, b.total_price), '[]'::jsonb)
           into v_rows
         from case_billing_items b

@@ -74,6 +74,8 @@ export interface Invoice {
   delivery_address?: string | null
   /** Märkningen en tilläggsfaktura avser, en faktura per avtal, period, typ och märkning (steg 5, läses inte ännu) */
   marking_key?: string | null
+  /** Faktureringsgruppen tilläggsfakturan hör till (contract_addon_billing_groups), null = ingen */
+  addon_billing_group_id?: string | null
 }
 
 /**

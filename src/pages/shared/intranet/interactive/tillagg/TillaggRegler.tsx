@@ -6,7 +6,9 @@
 // täckta stationer 2026-11-03): ContractBillingModePanel,
 // sync_addon_prorata_line (legacy och v2), addonPlanV2 (addonCadence, addonCadenceFor),
 // contract_work_items_internal (gap_invoice) och ContractSettingsDrawer
-// (Tilläggen faktureras). Platt text med statuspunkt, inga piller.
+// (Tilläggen faktureras). Faktureringsgrupper 2026-11-03: addonPlanV2
+// (computeGroupBuckets), contract_addon_next_period_start med grupp och
+// AddonBillingGroupsPanel. Platt text med statuspunkt, inga piller.
 
 import { useState } from 'react'
 
@@ -33,8 +35,10 @@ export default function TillaggRegler() {
   const [regler, setRegler] = useState<Regler>('v2')
   const [takt, setTakt] = useState<Takt>('period')
   const [stangt, setStangt] = useState(false)
+  const [grupp, setGrupp] = useState(false)
 
   const v2 = regler === 'v2'
+  const iGrupp = v2 && grupp
   const fore = v2
     ? 'Ingen pro rata. Raden Tillägg att besluta står i arbetslistan tills någon beslutar.'
     : 'Pro rata läggs på enhetens öppna ärende redan när stationen sätts ut, även innan någon har beslutat.'
@@ -43,7 +47,10 @@ export default function TillaggRegler() {
     : stangt
       ? 'Arbetslistan visar Faktura att skapa. Planera fakturor, eller nattkörningen, skapar en faktura av typen Tillägg från utsättning för dagarna fram till nästa periodstart.'
       : 'Pro rata läggs på ärendet där stationen sattes ut, för dagarna fram till nästa periodstart. Den faktureras när ärendet stängs.'
-  const sedan = !v2
+  const forstaText = iGrupp ? forsta.replace('nästa periodstart', 'gruppens nästa periodstart') : forsta
+  const sedan = iGrupp
+    ? 'Egen tilläggsfaktura med gruppens intervall, varje månad, kvartal, halvår eller år från gruppens startdag (tom startdag är avtalsdagen). Gruppens märkning står som Er referens om gruppen har en, annars enhetens kod. Följer premien ger samma takt som utan grupp men på gruppens egna fakturor. En station som redan är betald för en del av perioden faktureras bara för resten.'
+    : !v2
     ? 'Per år: egen tilläggsfaktura i samband med årsfakturan. Per månad: egen faktura varje månad. Teknikerns val per år eller per månad styr, inte premien.'
     : takt === 'manad'
       ? 'På premiens månadsfaktura, årspriset delat med tolv. Ingen egen tilläggsfaktura. Enhetens namn står på raden.'
@@ -58,7 +65,7 @@ export default function TillaggRegler() {
         Välj som på avtalet. Tilläggsregler står i avtalskartans panel under Fakturering.
       </p>
 
-      <div className="mt-3 grid gap-4 sm:grid-cols-3">
+      <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <fieldset>
           <legend className="mb-1 text-xs font-medium text-slate-400">Tilläggsregler</legend>
           <label className={VAL}><input type="radio" className={RADIO} checked={v2} onChange={() => setRegler('v2')} />Följer premien</label>
@@ -75,11 +82,16 @@ export default function TillaggRegler() {
           <label className={VAL}><input type="radio" className={RADIO} checked={!stangt} onChange={() => setStangt(false)} />Fortfarande öppet</label>
           <label className={VAL}><input type="radio" className={RADIO} checked={stangt} onChange={() => setStangt(true)} />Redan stängt</label>
         </fieldset>
+        <fieldset disabled={!v2} className={v2 ? '' : 'opacity-50'}>
+          <legend className="mb-1 text-xs font-medium text-slate-400">Faktureringsgrupp</legend>
+          <label className={VAL}><input type="radio" className={RADIO} checked={!grupp} onChange={() => setGrupp(false)} />Ingen grupp</label>
+          <label className={VAL}><input type="radio" className={RADIO} checked={grupp} onChange={() => setGrupp(true)} />Eget intervall</label>
+        </fieldset>
       </div>
 
       <div className="mt-3 divide-y divide-slate-700/60 border-y border-slate-700/60">
         <Steg rubrik="När teknikern har satt ut stationen" text={fore} ton={v2 ? 'warn' : 'muted'} />
-        <Steg rubrik="Första perioden" text={forsta} ton="ok" />
+        <Steg rubrik="Första perioden" text={forstaText} ton="ok" />
         <Steg rubrik="Sedan, så länge avtalet gäller" text={sedan} ton="ok" />
       </div>
 

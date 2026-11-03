@@ -85,6 +85,7 @@ import CommentSection from '../../communication/CommentSection'
 import EmbeddedMapPreview from '../../communication/EmbeddedMapPreview'
 import { createSystemComment } from '../../../services/communicationService'
 import { useAuth } from '../../../contexts/AuthContext'
+import { AddonBillingGroupService } from '../../../services/addonBillingGroupService'
 import type { CaseType } from '../../../types/communication'
 import type { CasePreparationWithDetails } from '../../../types/casePreparations'
 
@@ -191,6 +192,24 @@ export default function InvoiceDetailModal({
   const [staleInfo, setStaleInfo] = useState<{ stale: boolean; reason?: string } | null>(null)
   const [regenerating, setRegenerating] = useState(false)
   const [caseBillingItems, setCaseBillingItems] = useState<CaseBillingItem[]>([])
+  // Tilläggsfakturans faktureringsgrupp (contract_addon_billing_groups), namnet visas
+  const [billingGroupName, setBillingGroupName] = useState<string | null>(null)
+  const billingGroupId = (invoice as { addon_billing_group_id?: string | null } | null)?.addon_billing_group_id ?? null
+  useEffect(() => {
+    let cancelled = false
+    if (!billingGroupId) {
+      setBillingGroupName(null)
+      return
+    }
+    AddonBillingGroupService.namesByIds([billingGroupId])
+      .then((m) => {
+        if (!cancelled) setBillingGroupName(m.get(billingGroupId) ?? null)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [billingGroupId])
   // Provisionsposter för fakturans ärende — visas som underlag i
   // godkännandepanelen (read-only, ingen provisionslogik ändras här).
   // Posterna skapas redan vid ärendeavslut med status pending_invoice
@@ -2032,6 +2051,14 @@ export default function InvoiceDetailModal({
                       periodEnd={invoice.billing_period_end}
                     />
                   )}
+
+                {/* Faktureringsgrupp för tilläggsfakturan */}
+                {billingGroupName && (
+                  <div className="bg-slate-800/50 rounded-lg p-3">
+                    <h3 className="text-xs font-medium text-slate-400 mb-1.5">Faktureringsgrupp</h3>
+                    <p className="text-sm text-slate-300">{billingGroupName}</p>
+                  </div>
+                )}
 
                 {/* Märkning faktura */}
                 {invoice.invoice_marking && (
