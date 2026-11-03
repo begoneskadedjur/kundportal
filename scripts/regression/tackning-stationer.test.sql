@@ -203,3 +203,33 @@ begin
 
   raise exception 'RESULTAT (rullas tillbaka):%', v_out;
 end $$;
+
+-- Steg 0 (2026-11-03), 20261103_tackning_delvis_rad.sql: täckningen när en
+-- faktura med en delvis täckt station låses. Maserfrakt INV-202611-0062
+-- (ljusfällorna 2027-03-01 t.o.m. 2028-02-29, täckta av Fortnox 746 och 747
+-- t.o.m. 2027-08-09, fakturerade 2027-08-10 t.o.m. 2028-02-29): täckning från
+-- 2027-08-10, ingen konflikt, ingen dubblett vid nästa låsning. 0055
+-- (december 980) som förut. 0088 med en station redan täckt hela perioden:
+-- konflikt som förut. Rullas alltid tillbaka.
+do $$
+declare v_out text; v_out2 text; v_inv uuid; v_inv2 uuid; v_inv3 uuid;
+begin
+  select id into v_inv from invoices where invoice_number = 'INV-202611-0062';
+  select id into v_inv2 from invoices where invoice_number = 'INV-202611-0055';
+  select id into v_inv3 from invoices where invoice_number = 'INV-202611-0088';
+  update invoices set status = 'sent' where id in (v_inv, v_inv2);
+  update invoices set status = 'paid' where id = v_inv;
+  select string_agg(format('%s %s..%s %s', left(station_id::text,8), covered_from, covered_to, source), '; ' order by station_id) into v_out
+  from addon_station_coverage where invoice_id = v_inv;
+  select string_agg(format('%s %s..%s', left(station_id::text,8), covered_from, covered_to), '; ' order by station_id) into v_out2
+  from addon_station_coverage where invoice_id = v_inv2;
+  insert into addon_station_coverage (station_id, station_kind, unit_customer_id, contract_id, covered_from, covered_to, source, note, created_by_name)
+  select station_id, station_kind, unit_customer_id, contract_id, '2028-03-01', '2029-02-28', 'waived', 'prov', 'prov'
+  from addon_station_coverage where invoice_id = v_inv limit 1;
+  update invoices set status = 'sent' where id = v_inv3;
+  raise exception E'0062: % (konflikter %, väntat två rader 2027-08-10..2028-02-29 och 0)\n0055: % (konflikter %)\n0088 med hel täckning: konflikter % (väntat 1), täckning % (väntat 1)', coalesce(v_out,'-'),
+    (select count(*) from addon_coverage_conflicts where invoice_id = v_inv), coalesce(v_out2,'-'),
+    (select count(*) from addon_coverage_conflicts where invoice_id = v_inv2),
+    (select count(*) from addon_coverage_conflicts where invoice_id = v_inv3),
+    (select count(*) from addon_station_coverage where invoice_id = v_inv3);
+end $$;

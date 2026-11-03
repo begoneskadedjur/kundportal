@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.116.1',
+    date: '2026-11-03',
+    title: 'Betald till och med för delvis betalda stationer',
+    items: [
+      { kind: 'buggfix', text: 'När en tilläggsfaktura med en station som redan var betald för en del av perioden skickas, räknas stationen som betald från dagen efter den tidigare betalningen. Förut blev det en krock i stället, och stationens betald till och med stod kvar på det gamla datumet.' },
+    ],
+  },
+  {
     version: '3.116.0',
     date: '2026-11-03',
     title: 'Tillägg per månad faktureras månadsvis',
