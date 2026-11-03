@@ -90,6 +90,8 @@ Faktureringsgrupper (2026-11-03, 3.117.0): `faktureringsgrupper.test.sql` provar
 
 Efter drop av de gamla unika indexen (2026-11-03, 3.117.1) provar det andra blocket i `faktureringsgrupper.test.sql` en delad § 6-rad (T8), två grupper med samma märkning och period (T9) och att förhandsvisningen i Besluta tillägg (`addon_group_prorata_preview`) ger samma första faktura och belopp som pro rata-raden som sparas (T10).
 
+Steg 0c (2026-11-03, 3.117.2): det tredje blocket i `faktureringsgrupper.test.sql` (T11 till T14) provar startdagen när en rad byter grupp, makuleringen av tomma rader utan historik och att pro rata och förhandsvisningen räknar till första periodstart planeraren fakturerar (`addon_first_billable_start`). Glappen för alla v2-avtal och `addon_prorata_v2_end` för alla v2-stationer jämförs med md5 före och efter (avsnittet Steg 0c i strul-dokumentet).
+
 `plan-dump.mts` speglar inte version 2 (inget avtal har `addon_rules` satt); provet ovan använder samma delade kod som Planera fakturor.
 
 ## Löpande avtal i exakt läge (datasteg 18, STRUL 1)

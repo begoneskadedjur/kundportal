@@ -3,6 +3,7 @@ import {
   billingGroupAnchor,
   blockedGroupSlots,
   blockedSlotKey,
+  addonFirstBillableStart,
   addonInvoiceCadenceText,
   describeBillingGroup,
   groupNextPeriodStart,
@@ -253,5 +254,67 @@ describe('addonInvoiceCadenceText (Besluta tillägg)', () => {
   })
   it('okänt intervall faller tillbaka', () => {
     expect(addonInvoiceCadenceText('okand')).toBe('Egen faktura i samband med avtalets årsfaktura')
+  })
+})
+
+describe('steg 0c: pro rata räknar till första periodstart planeraren fakturerar', () => {
+  const c = { contract_start_date: '2026-03-01', billing_frequency: 'annual', billing_anchor_mode: 'start_day', billing_anchor_month: 3 }
+  const today = '2026-11-03'
+  const bete = line({ id: 'BETE', name: 'Betesstation', quantity: 2, billing_model: 'per_month', unit_price_month: 325, unit_price_annual: 3900, station_ids: ['b1', 'b2'] })
+  const firstPlanned = (g: AddonBillingGroup, bsd: string, model: 'per_month' | 'per_year' = 'per_month') => {
+    const l = model === 'per_month' ? { ...bete, billing_start_date: bsd, billing_group_id: g.id } : { ...line({ station_ids: ['b1'] }), billing_start_date: bsd, billing_group_id: g.id }
+    const p = computeAddonPlanV2(maser, [l], { ...opts, billingGroups: [g] })
+    // Planeraren skapar inga passerade perioder (isHistorical, före innevarande månad)
+    return p.groupBuckets[0].periods.find((x) => !x.isHistorical)?.periodStart ?? null
+  }
+  const scenario = async (g: AddonBillingGroup, bsd: string, startDay: string, model: 'per_month' | 'per_year' = 'per_month') => {
+    const { prorataEnd } = await import('./addonProrata')
+    const minStart = addonFirstBillableStart({ group: g, contract: maser, model, premiumFrequency: 'annual', today, lineStart: bsd })
+    return { minStart, end: prorataEnd('b1', startDay, c, [], g, { minStart })?.endDay, planned: firstPlanned(g, bsd, model) }
+  }
+
+  it('månadsgrupp skapad i dag (T10): 2026-12-01 i stället för 2026-10-01', async () => {
+    const g = group({ id: 'GM', cadence: 'monthly' })
+    // Ny rad i gruppen: gruppens nästa periodstart (addon_line_start_for_group)
+    const bsd = groupNextPeriodStart(g, maser, today)!
+    expect(bsd).toBe('2026-12-01')
+    const { prorataEnd } = await import('./addonProrata')
+    expect(prorataEnd('b1', '2026-09-23', c, [], g)?.endDay).toBe('2026-10-01')
+    expect(await scenario(g, bsd, '2026-09-23')).toEqual({ minStart: '2026-12-01', end: '2026-12-01', planned: '2026-12-01' })
+  })
+
+  it('månadsgrupp skapad 2026-10-15 med raden från 2026-11-01: november faktureras av planeraren', async () => {
+    const g = group({ id: 'GM', cadence: 'monthly', created_at: '2026-10-15T08:00:00Z' })
+    expect(await scenario(g, '2026-11-01', '2026-09-23')).toEqual({ minStart: '2026-11-01', end: '2026-11-01', planned: '2026-11-01' })
+  })
+
+  it('kvartalsgrupp från 2027-01-01: oförändrat 2027-01-01', async () => {
+    const g = group({ id: 'GK', cadence: 'quarterly', anchor_date: '2027-01-01' })
+    expect(await scenario(g, '2027-01-01', '2026-09-23', 'per_year')).toEqual({ minStart: '2027-01-01', end: '2027-01-01', planned: '2027-01-01' })
+  })
+
+  it('kvartalsgrupp från avtalsdagen: passerad period och perioden före gruppen hoppas över', async () => {
+    const g = group({ id: 'GK', cadence: 'quarterly', created_at: '2026-10-15T08:00:00Z' })
+    // Utsatt 2026-07-10: nästa periodstart 2026-09-01 är passerad, planeraren börjar 2026-12-01
+    expect(await scenario(g, '2026-12-01', '2026-07-10', 'per_year')).toEqual({ minStart: '2026-12-01', end: '2026-12-01', planned: '2026-12-01' })
+  })
+
+  it('utan grupp: per månad till radens start, per år ingen gräns (oförändrat)', () => {
+    const base = { group: null, contract: maser, premiumFrequency: 'annual', today }
+    expect(addonFirstBillableStart({ ...base, model: 'per_month', lineStart: '2026-12-01' })).toBe('2026-12-01')
+    expect(addonFirstBillableStart({ ...base, model: 'per_month', lineStart: '2026-10-01' })).toBe('2026-11-01')
+    expect(addonFirstBillableStart({ ...base, model: 'per_year', lineStart: '2027-03-01' })).toBeNull()
+    // Månadspremie: per månad ligger på premiefakturan, ingen gräns
+    expect(addonFirstBillableStart({ ...base, premiumFrequency: 'monthly', model: 'per_month', lineStart: '2026-12-01' })).toBeNull()
+  })
+
+  it('utkast före första planerade periodstart: med stationen stoppar, utan stationen hoppas över', async () => {
+    const { prorataEnd } = await import('./addonProrata')
+    const g = group({ id: 'GM', cadence: 'monthly' })
+    const oct = { periodStart: '2026-10-01', periodEnd: '2026-10-31' }
+    expect(prorataEnd('b1', '2026-09-23', c, [], g, { minStart: '2026-12-01', openInvoices: [{ ...oct, stationIds: ['b1'] }] })?.endDay).toBe('2026-10-01')
+    expect(prorataEnd('b1', '2026-09-23', c, [], g, { minStart: '2026-12-01', openInvoices: [{ ...oct, stationIds: ['x'] }] })?.endDay).toBe('2026-12-01')
+    // Låst faktura med stationen stoppar som förut
+    expect(prorataEnd('b1', '2026-09-23', c, [{ ...oct, stationIds: ['b1'] }], g, { minStart: '2026-12-01' })?.endDay).toBe('2026-10-01')
   })
 })

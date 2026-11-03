@@ -100,18 +100,33 @@ export function prorataEnd(
   lockedInvoices: ProrataLockedInvoice[],
   /** Stationens faktureringsgrupp: ordinarie = gruppens nästa periodstart (SQL: contract_addon_next_period_start med grupp) */
   group?: Pick<AddonBillingGroup, 'cadence' | 'anchor_date'> | null,
+  /**
+   * Steg 0c (SQL: addon_first_billable_start): första dag planeraren
+   * fakturerar (addonFirstBillableStart). Slutet går vidare period för period
+   * tills dit; före den dagen räknas också utkast (`openInvoices`) som fakturor.
+   */
+  opts?: { minStart?: string | null; openInvoices?: ProrataLockedInvoice[] },
 ): ProrataEnd | null {
-  const ordinary =
-    (group ? groupNextPeriodStart(group, { contract_start_date: contract.contract_start_date ?? null, billing_anchor_mode: contract.billing_anchor_mode ?? null, billing_anchor_month: contract.billing_anchor_month ?? null }, startDay) : null) ??
-    nextPeriodStart(contract, startDay)
+  const groupContract = { contract_start_date: contract.contract_start_date ?? null, billing_anchor_mode: contract.billing_anchor_mode ?? null, billing_anchor_month: contract.billing_anchor_month ?? null }
+  const nextFrom = (d: string) => (group ? groupNextPeriodStart(group, groupContract, d) : null) ?? nextPeriodStart(contract, d)
+  const ordinary = nextFrom(startDay)
   if (!ordinary) return null
+  const minStart = opts?.minStart ?? null
   let end = ordinary
   let unknownInvoice: string | null = null
   for (let guard = 0; guard < 60; guard++) {
-    const containing = lockedInvoices
+    const candidates = minStart && end < minStart ? [...lockedInvoices, ...(opts?.openInvoices ?? [])] : lockedInvoices
+    const containing = candidates
       .filter((i) => i.periodStart <= end && i.periodEnd >= end)
       .sort((a, b) => (a.periodStart < b.periodStart ? 1 : a.periodStart > b.periodStart ? -1 : 0))[0]
-    if (!containing) break
+    if (!containing) {
+      // Ingen faktura: vidare till nästa periodstart tills planeraren fakturerar
+      if (!minStart || end >= minStart) break
+      const next = nextFrom(end)
+      if (!next || next <= end) break
+      end = next
+      continue
+    }
     const ids = containing.stationIds ?? []
     if (ids.includes(stationId)) break
     if (ids.length === 0) {

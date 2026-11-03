@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.117.2',
+    date: '2026-11-03',
+    title: 'Faktureringsgrupperna tappar inga dagar',
+    items: [
+      { kind: 'buggfix', text: 'När en station sätts ut i en faktureringsgrupp räknas pro rata på etableringsärendet nu fram till den första faktura som gruppen faktiskt skapar. Förut kunde pro rata sluta vid en period som redan passerat, till exempel oktober för en månadsgrupp som skapades i november, och dagarna däremellan blev aldrig fakturerade. Samma sak gäller tillägg per månad utan grupp. Besluta tillägg visar samma datum och belopp som sparas.' },
+      { kind: 'buggfix', text: 'En tilläggsrad som byter faktureringsgrupp får gruppens startdatum i stället för sitt gamla, så att Planera fakturor börjar på rätt period.' },
+      { kind: 'buggfix', text: 'Tomma tilläggsrader utan stationer makuleras när avtalskartan synkas, så länge de aldrig legat på en faktura. Rader som har fakturahistorik ligger kvar men räknas inte.' },
+    ],
+  },
+  {
     version: '3.117.1',
     date: '2026-11-03',
     title: 'Besluta tillägg följer faktureringsgruppen',

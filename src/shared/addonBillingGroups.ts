@@ -96,6 +96,68 @@ export function groupNextPeriodStart(
   return addMonthsClampedIso(anchor, (k + 1) * step)
 }
 
+/** Periodstarten för perioden som innehåller dagen (startdag och steg i månader). */
+function periodStartContaining(anchor: string, step: number, day: string): string {
+  return addMonthsClampedIso(anchor, exactPeriodIndexContaining(anchor, step, day) * step)
+}
+
+const maxIso = (...xs: Array<string | null | undefined>): string | null =>
+  xs.filter((x): x is string => !!x).sort().pop() ?? null
+
+const addDays = (iso: string, days: number): string => {
+  const [y, m, d] = iso.split('-').map(Number)
+  const t = new Date(y, m - 1, d + days)
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Första dag planeraren kan fakturera en station från (steg 0c, SQL:
+ * addon_first_billable_start). Pro rata räknas fram till första
+ * periodstart som är minst den här dagen, så att inga dagar faller bort
+ * mellan pro rata och första planerade fakturan:
+ *   - gruppens skapad-dag (computeGroupBuckets tar inte perioder före den),
+ *   - första period planeraren tar: månadsfakturor från perioden som
+ *     innehåller dagen, övriga från innevarande kalendermånad (isHistorical),
+ *   - § 6-radens startdag (i en grupp snäppt bakåt till gruppens period; följer
+ *     premien i exakt läge högst 31 dagar för halvår och år).
+ * null = ingen gräns (utan grupp per år, eller per månad vid månadspremie).
+ * `lineStart` är radens billing_start_date, eller den startdag synken ger en
+ * ny rad (addon_line_start_for_group) när raden saknas.
+ */
+export function addonFirstBillableStart(args: {
+  group: Pick<AddonBillingGroup, 'cadence' | 'anchor_date' | 'created_at'> | null
+  contract: Pick<PlanningContract, 'contract_start_date' | 'billing_anchor_mode' | 'billing_anchor_month'>
+  model: 'per_year' | 'per_month'
+  /** Premiens intervall när avtalet har premie, annars null */
+  premiumFrequency: string | null
+  today: string
+  lineStart: string | null
+}): string | null {
+  const { group: g, contract, model, premiumFrequency, today } = args
+  let line = args.lineStart
+  const monthlyPremium = premiumFrequency === 'monthly'
+  if (!g && !(model === 'per_month' && !monthlyPremium)) return null
+  const floor = g ? stockholmDate(g.created_at) : null
+  const firstOfMonth = `${today.slice(0, 7)}-01`
+  const step = g ? groupStepMonths(g.cadence) : null
+  const anchor = g && step != null ? billingGroupAnchor(g, contract) : null
+  if (g && step != null && anchor) {
+    const current = g.cadence === 'monthly' ? (today < anchor ? anchor : periodStartContaining(anchor, 1, today)) : firstOfMonth
+    if (line && line > anchor) line = periodStartContaining(anchor, step, line)
+    return maxIso(floor, current, line)
+  }
+  if (model === 'per_month' && !monthlyPremium) {
+    const start = contract.contract_start_date
+    const current =
+      contract.billing_anchor_mode === 'start_day' && start ? (today < start ? start : periodStartContaining(start, 1, today)) : firstOfMonth
+    return maxIso(floor, current, line)
+  }
+  const freq = premiumFrequency && ['monthly', 'quarterly', 'semi_annual', 'annual'].includes(premiumFrequency) ? premiumFrequency : 'annual'
+  const exact = premiumFrequency && freq === premiumFrequency ? contract.billing_anchor_mode === 'start_day' : true
+  if (line && exact && (freq === 'semi_annual' || freq === 'annual')) line = addDays(line, -31)
+  return maxIso(monthlyPremium ? null : floor, firstOfMonth, line)
+}
+
 /** Datumet (Europe/Stockholm) en tidpunkt avser, ÅÅÅÅ-MM-DD. */
 export function stockholmDate(ts: string | null | undefined): string | null {
   if (!ts) return null
