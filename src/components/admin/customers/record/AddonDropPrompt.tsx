@@ -3,7 +3,9 @@
 // Öppnas av drag till § 5/§ 6 och av panelens brickflöde. Dragzonen är bara
 // förval; radiovalet avgör:
 //   - Tillägg utöver avtalet (förvalt): egen faktura i samband med avtalets
-//     årsfaktura, rör aldrig premie, § 4 eller avtalets marginal.
+//     årsfaktura, rör aldrig premie, § 4 eller avtalets marginal. Med en
+//     faktureringsgrupp vald räknar databasen första fakturan och pro rata
+//     med gruppens takt (addon_group_prorata_preview, samma steg som synken).
 //   - Lägg till i avtalet: premien höjs i trappan och kostnaden läggs i § 4.
 // Per enhet: "Arbetstid för att hantera tilläggen" (timmar per år × kundens
 // timpris), förifylld med teknikerns förslag. Besluten körs ett i taget:
@@ -16,8 +18,8 @@ import { Loader2 } from 'lucide-react'
 import DateField from '../../../ui/DateField'
 import Button from '../../../ui/Button'
 import { AddonStationBillingService } from '../../../../services/addonStationBillingService'
-import { AddonBillingGroupService } from '../../../../services/addonBillingGroupService'
-import { describeBillingGroup } from '../../../../shared/addonBillingGroups'
+import { AddonBillingGroupService, type GroupProrataPreview } from '../../../../services/addonBillingGroupService'
+import { addonInvoiceCadenceText, describeBillingGroup } from '../../../../shared/addonBillingGroups'
 import type { ContractAddonBillingGroup } from '../../../../types/database'
 import { todayKey } from '../../../../utils/contractLifecycle'
 import {
@@ -215,17 +217,80 @@ export default function AddonDropPrompt({ prompt, onClose, onConfirmBrick, onCon
     if (nextStart && !dateTouched) setDate(nextStart)
   }, [nextStart, dateTouched])
 
-  // Det som faktureras nu, pro rata till nästa periodstart (samma formel som RPC:n)
+  // Vald faktureringsgrupp (bara för tillägg utöver avtalet)
+  const selectedGroup = !included && billingGroupId ? (billingGroups.find((g) => g.id === billingGroupId) ?? null) : null
+  const selectedGroupId = selectedGroup?.id ?? null
+
+  // Gruppens första faktura och pro rata per bricka, räknat i databasen med
+  // samma steg som synken efter beslutet. Väntar en stund efter prisändring.
+  const [groupPreviewByKey, setGroupPreviewByKey] = useState<Record<string, GroupProrataPreview | null>>({})
+  const [groupPreviewLoading, setGroupPreviewLoading] = useState(false)
+  const groupPriceSig = items.map(({ brick }) => `${brickKey(brick)}=${priceByKey[brickKey(brick)] ?? ''}`).join(',')
+  useEffect(() => {
+    if (!selectedGroupId || loading) {
+      setGroupPreviewByKey({})
+      setGroupPreviewLoading(false)
+      return
+    }
+    let cancelled = false
+    setGroupPreviewLoading(true)
+    const timer = window.setTimeout(() => {
+      Promise.all(
+        items.map(async ({ brick }) => {
+          const key = brickKey(brick)
+          const p = parseNum(priceByKey[key])
+          if (!(p > 0)) return [key, null] as const
+          const r = await AddonBillingGroupService.prorataPreview(prompt.contractId, selectedGroupId, brick.outdoorIds, brick.indoorIds, p).catch(() => null)
+          return [key, r] as const
+        })
+      )
+        .then((rows) => {
+          if (!cancelled) setGroupPreviewByKey(Object.fromEntries(rows))
+        })
+        .finally(() => {
+          if (!cancelled) setGroupPreviewLoading(false)
+        })
+    }, 300)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroupId, loading, groupPriceSig, prompt.contractId])
+
+  // Gruppens del: tidigaste första faktura och stationernas pro rata.
+  // null utan vald grupp (då gäller avtalets vanliga takt, som förut).
+  const groupView = useMemo(() => {
+    if (!selectedGroup) return null
+    let first: string | null = null
+    let total = 0
+    let complete = !groupPreviewLoading
+    for (const { brick } of items) {
+      const r = groupPreviewByKey[brickKey(brick)]
+      if (!r) {
+        complete = false
+        continue
+      }
+      total += r.total
+      if (r.firstInvoice && (!first || r.firstInvoice < first)) first = r.firstInvoice
+    }
+    return { cadence: selectedGroup.cadence, first, stationsTotal: total, complete }
+  }, [selectedGroup, groupPreviewByKey, groupPreviewLoading, items])
+
+  // Det som faktureras nu, pro rata till nästa periodstart (samma formel som
+  // RPC:n). Med en grupp kommer stationernas del från databasen (groupView);
+  // arbetstiden följer alltid avtalets nästa periodstart.
   const firstPeriod = useMemo(() => {
     if (!nextStart) return null
-    let total = 0
+    let stationsTotal = 0
+    let labourTotal = 0
     let fraction = 0
     let months = 0
     for (const { brick } of items) {
       const p = price(brickKey(brick))
       if (!(p > 0)) continue
       const t = timelineForProposal({ fromDate: today, startDate: nextStart, perUnitAnnual: p, quantityNow: brick.count, unit: 'station', model: brick.model })
-      total += t.totalNow
+      stationsTotal += t.totalNow
       fraction = t.fraction
       months = t.months
     }
@@ -233,13 +298,21 @@ export default function AddonDropPrompt({ prompt, onClose, onConfirmBrick, onCon
       if (l.rate == null || !Number.isFinite(l.hours)) continue
       const delta = Math.max(l.hours - l.now, 0)
       const t = timelineForProposal({ fromDate: today, startDate: nextStart, perUnitAnnual: l.rate, quantityNow: delta, quantityAnnual: l.hours, unit: 'timme' })
-      total += t.totalNow
+      labourTotal += t.totalNow
       fraction = t.fraction
       months = t.months
     }
-    return { total, fraction, months }
+    if (groupView) {
+      // Grupp vald: inget belopp förrän databasens svar finns för alla brickor
+      if (!groupView.complete) return null
+      return { total: groupView.stationsTotal + labourTotal, fraction, months: null as number | null }
+    }
+    return { total: stationsTotal + labourTotal, fraction, months: months as number | null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nextStart, today, items, priceByKey, hoursByUnit, infoByUnit])
+  }, [nextStart, today, items, priceByKey, hoursByUnit, infoByUnit, groupView])
+
+  // Första fakturan för tillägget: gruppens när en grupp är vald
+  const firstInvoice = groupView ? (groupView.complete ? groupView.first : null) : nextStart
 
   const raise = premiumRaise(prompt.annualInForce, stationsAnnual + labourIncrease)
 
@@ -492,13 +565,19 @@ export default function AddonDropPrompt({ prompt, onClose, onConfirmBrick, onCon
             <span className="text-xs">
               <span className="block font-medium text-slate-100">Tillägg utöver avtalet</span>
               <span className="block text-slate-300 mt-0.5">
-                Egen faktura i samband med avtalets årsfaktura
-                {nextStart ? `, första ${formatDateShortSv(nextStart)}` : ''}.
+                {addonInvoiceCadenceText(groupView?.cadence)}
+                {firstInvoice ? `, första ${formatDateShortSv(firstInvoice)}` : ''}.
                 {firstPeriod && firstPeriod.total > 0 && (
                   <>
                     {' '}
-                    Nu faktureras <span className="tabular-nums">{formatKr(firstPeriod.total)}</span> för {monthsLabel(firstPeriod.months)} på etableringsärendet.
+                    Nu faktureras <span className="tabular-nums">{formatKr(firstPeriod.total)}</span>
+                    {firstPeriod.months != null ? ` för ${monthsLabel(firstPeriod.months)}` : ''} på etableringsärendet.
                   </>
+                )}
+                {groupView && groupPreviewLoading && (
+                  <span className="ml-1 inline-flex items-center gap-1 text-slate-500">
+                    <Loader2 className="w-3 h-3 animate-spin" /> räknar med gruppens takt
+                  </span>
                 )}
               </span>
               <span className="block text-slate-500 mt-0.5">

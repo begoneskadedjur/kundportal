@@ -3,6 +3,7 @@ import {
   billingGroupAnchor,
   blockedGroupSlots,
   blockedSlotKey,
+  addonInvoiceCadenceText,
   describeBillingGroup,
   groupNextPeriodStart,
   stockholmDate,
@@ -235,5 +236,22 @@ describe('pro rata-spegeln räknar till gruppens nästa periodstart', () => {
     expect(prorataEnd('s1', '2026-11-10', c, [], { cadence: 'monthly', anchor_date: null })?.endDay).toBe('2026-12-01')
     expect(prorataEnd('s1', '2026-11-10', c, [], { cadence: 'follows_premium', anchor_date: null })?.endDay).toBe('2027-03-01')
     expect(prorataEnd('s1', '2026-11-10', c, [])?.endDay).toBe('2027-03-01')
+  })
+})
+
+describe('addonInvoiceCadenceText (Besluta tillägg)', () => {
+  it('utan grupp och med följer premien: samma text som förut', () => {
+    expect(addonInvoiceCadenceText(null)).toBe('Egen faktura i samband med avtalets årsfaktura')
+    expect(addonInvoiceCadenceText(undefined)).toBe('Egen faktura i samband med avtalets årsfaktura')
+    expect(addonInvoiceCadenceText('follows_premium')).toBe('Egen faktura i samband med avtalets årsfaktura')
+  })
+  it('gruppens takt', () => {
+    expect(addonInvoiceCadenceText('monthly')).toBe('Egen faktura varje månad')
+    expect(addonInvoiceCadenceText('quarterly')).toBe('Egen faktura varje kvartal')
+    expect(addonInvoiceCadenceText('semi_annual')).toBe('Egen faktura varje halvår')
+    expect(addonInvoiceCadenceText('annual')).toBe('Egen faktura varje år')
+  })
+  it('okänt intervall faller tillbaka', () => {
+    expect(addonInvoiceCadenceText('okand')).toBe('Egen faktura i samband med avtalets årsfaktura')
   })
 })

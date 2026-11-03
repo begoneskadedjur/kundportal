@@ -1590,6 +1590,8 @@ export class ContractScopeService {
       outdoorIds: string[]
       indoorIds: string[]
       unitPriceAnnual: number
+      /** Faktureringsgrupp (nya tilläggsregler). Sätts före pro rata så att den räknas med gruppens takt. */
+      billingGroupId?: string | null
     }
   ): Promise<void> {
     if (input.outdoorIds.length > 0) {
@@ -1597,6 +1599,16 @@ export class ContractScopeService {
     }
     if (input.indoorIds.length > 0) {
       await supabase.from('indoor_stations').update({ addon_contract_mode: 'separate', addon_contract_id: contractId, addon_unit_price_annual: input.unitPriceAnnual }).in('id', input.indoorIds)
+    }
+    // Gruppen före § 6-synken och pro rata: raden och pro rata följer
+    // gruppens takt, samma som förhandsvisningen i Besluta tillägg
+    if (input.billingGroupId) {
+      const { error: groupError } = await supabase.rpc('set_addon_station_billing_group', {
+        p_outdoor_ids: input.outdoorIds,
+        p_indoor_ids: input.indoorIds,
+        p_group_id: input.billingGroupId,
+      })
+      if (groupError) throw new Error(`Kunde inte sätta faktureringsgruppen: ${groupError.message}`)
     }
     const { error } = await supabase.rpc('sync_addon_period_lines', {
       p_customer_id: input.unitId,

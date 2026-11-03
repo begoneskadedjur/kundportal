@@ -90,7 +90,6 @@ import { PAPER_GEAR_CLASS } from './paperInk'
 import { adhocGroupingOf } from '../../../../services/customerBillingService'
 import { FOLD_THRESHOLD, FoldLink, FoldSummary, foldBodyClass, usePaperFold } from './paperFold'
 import LinkFortnoxInvoiceModal, { type LinkFortnoxTarget } from './LinkFortnoxInvoiceModal'
-import { AddonBillingGroupService } from '../../../../services/addonBillingGroupService'
 import AddonDropPrompt, { type AddonDecisionMode, type AddonDropPromptState, type AddonPromptBrick } from './AddonDropPrompt'
 import { useAddonPending } from '../../../../hooks/useAddonPending'
 import { refreshContractWorkItems } from '../../../../hooks/useContractWorkItems'
@@ -1583,11 +1582,9 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         outdoorIds: b.outdoorIds,
         indoorIds: b.indoorIds,
         unitPriceAnnual: input.unitPriceAnnual,
+        // Faktureringsgrupp vald: stationerna till gruppen före § 6-synken och pro rata
+        billingGroupId: input.billingGroupId,
       })
-      // Faktureringsgrupp vald: stationerna till gruppen, § 6-raderna synkas
-      if (input.billingGroupId) {
-        await AddonBillingGroupService.setStationGroup(b.outdoorIds, b.indoorIds, input.billingGroupId)
-      }
     }
     setDecidedByContract((prev) => ({
       ...prev,

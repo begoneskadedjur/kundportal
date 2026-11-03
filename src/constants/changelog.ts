@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.117.1',
+    date: '2026-11-03',
+    title: 'Besluta tillägg följer faktureringsgruppen',
+    items: [
+      { kind: 'buggfix', text: 'När du väljer en faktureringsgrupp i Besluta tillägg visar rutan nu gruppens takt, till exempel Egen faktura varje månad, och datumet för första fakturan och beloppet som faktureras nu räknas med gruppens takt, precis som när beslutet sparas. Förut visades avtalets vanliga datum och belopp, och pro rata på etableringsärendet räknades till avtalets nästa periodstart i stället för gruppens.' },
+      { kind: 'andring', text: 'En tilläggsrad kan nu delas mellan faktureringsgrupper, och två grupper med samma märkning kan faktureras för samma period.' },
+    ],
+  },
+  {
     version: '3.117.0',
     date: '2026-11-03',
     title: 'Faktureringsgrupper för tilläggsstationer',

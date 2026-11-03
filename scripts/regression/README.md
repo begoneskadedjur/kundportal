@@ -88,6 +88,8 @@ Sedan steg 0 (2026-11-03, 3.116.0) är också Maserfrakts två avtal med i prove
 
 Faktureringsgrupper (2026-11-03, 3.117.0): `faktureringsgrupper.test.sql` provar grupperna på Maserfrakt i ett block som alltid rullas tillbaka (fyrpartsvarianten av `contract_addon_next_period_start`, gruppbyte på rader och stationer, pro rata till gruppens nästa periodstart, vakten och gamla unika indexet). `addon-v2-prov.mts --grupper=prov` ger Maserfrakt en månadsgrupp och en kvartalsgrupp i minnet och visar gruppernas fakturor (`out/steg11/addon-v2-prov-<today>-grupper.json`). `prorata-compare.sql` räknar inte med kolumnen `addon_billing_group_id` (annars ändras md5 bara av att kolumnen finns).
 
+Efter drop av de gamla unika indexen (2026-11-03, 3.117.1) provar det andra blocket i `faktureringsgrupper.test.sql` en delad § 6-rad (T8), två grupper med samma märkning och period (T9) och att förhandsvisningen i Besluta tillägg (`addon_group_prorata_preview`) ger samma första faktura och belopp som pro rata-raden som sparas (T10).
+
 `plan-dump.mts` speglar inte version 2 (inget avtal har `addon_rules` satt); provet ovan använder samma delade kod som Planera fakturor.
 
 ## Löpande avtal i exakt läge (datasteg 18, STRUL 1)

@@ -122,3 +122,114 @@ begin
 
   raise exception 'RESULTAT %', r;
 end $$;
+
+-- ─── Efter drop-raderna (3.117.1) ──────────────────────────────────────────
+-- Christian körde 2026-11-03 drop av cbi_addon_period_line_key och
+-- invoices_contract_period_marking_key. Spärrarna läser indexen
+-- (addon_line_split_ready, invoice_group_split_ready) och släpper själva.
+-- Blocket ovan (T3 och T6) visar därför numera att halva raden och samma
+-- märkning går igenom.
+--
+-- T8: en av två mekaniska fällor på samma rad flyttas till månadsgruppen:
+--     går igenom, enheten får en rad utan grupp och en rad i gruppen.
+-- T9: två grupper med samma typ, periodstart och märkning går igenom; vakten
+--     stoppar fortfarande överlapp i samma grupp.
+-- T10: förhandsvisningen i Besluta tillägg (addon_group_prorata_preview) mot
+--     det som sparas: ärendet cfb29f95 öppnas, täckningen släpps och
+--     stationerna blir obeslutade i transaktionen; sedan samma steg som
+--     addAddonStationsSeparate med grupp (stationerna, gruppen, § 6-synken,
+--     pro rata). Första fakturan och beloppet ska vara lika.
+--
+-- Körd 2026-11-03 efter drop och 20261103_faktureringsgrupper_forhandsvisning.sql
+-- (i transaktion, rullad tillbaka): split_ready [true, true]; T8 gick igenom,
+-- en rad utan grupp och en i Månadsvis (1 st var); T9 samma märkning i två
+-- grupper gick igenom, vakten stoppar samma grupp (23P01); T10 betet
+-- (månad) förhand 2026-10-01 / 170,96 kr = sparat, mekaniska fällorna
+-- (kvartal från 2027-01-01) förhand 2027-01-01 / 1 084,94 kr = sparat.
+do $$
+declare
+  c uuid := '4c40f714-6174-45c1-8907-bf9fab7fdd99';
+  unit uuid := '8ab3f2d1-ba59-43db-883c-e591d3eddf69';
+  kase uuid := 'cfb29f95-3168-4bba-8b48-54e0397214ef';
+  bete uuid[] := array['9e525a7e-a35a-4621-b95d-63b876179a8d', 'c3f09a93-88a8-4d8c-912c-831ba31662c0']::uuid[];
+  mek uuid[] := array['173ff1b2-ae31-48a9-ba9e-8e1a3688e390', '564bae07-4473-4684-818c-f16d60bdde1c']::uuid[];
+  gm uuid;
+  gk uuid;
+  r jsonb := '{}'::jsonb;
+  pv jsonb;
+  pk jsonb;
+  v_err text;
+  cust uuid;
+begin
+  perform set_config('request.jwt.claims', '{"sub":"4ef86aa9-8f9f-4602-a4fd-967d0424697a","role":"authenticated"}', true);
+  r := r || jsonb_build_object('split_ready', jsonb_build_array(addon_line_split_ready(), invoice_group_split_ready()));
+  insert into contract_addon_billing_groups (contract_id, name, cadence, marking) values (c, 'Månadsvis', 'monthly', 'MÅN-1') returning id into gm;
+  insert into contract_addon_billing_groups (contract_id, name, cadence, anchor_date) values (c, 'Kvartalsvis', 'quarterly', '2027-01-01') returning id into gk;
+
+  -- T8
+  begin
+    perform set_addon_station_billing_group(array[mek[1]], '{}'::uuid[], gm);
+    v_err := 'gick igenom';
+  exception when others then v_err := sqlerrm; end;
+  r := r || jsonb_build_object('T8_halva_raden', v_err, 'T8_rader', (
+    select jsonb_agg(jsonb_build_object('antal', b.quantity, 'start', b.billing_start_date, 'grupp', g.name) order by g.name nulls first)
+    from case_billing_items b left join contract_addon_billing_groups g on g.id = b.addon_billing_group_id
+    where b.case_id = c and b.site_customer_id = unit and b.station_type_id = 'af638f8f-3e18-43ee-abe2-b099d6d6bc51'
+      and b.billing_model = 'per_month' and b.status <> 'cancelled' and not coalesce(b.is_addon_labour_line, false)));
+  perform set_addon_station_billing_group(array[mek[1]], '{}'::uuid[], null);
+
+  -- T9
+  select customer_id into cust from contracts where id = c;
+  begin
+    insert into invoices (invoice_number, invoice_type, customer_id, customer_name, contract_id, contract_invoice_kind, status, billing_period_start, billing_period_end,
+                          subtotal, vat_amount, total_amount, marking_key, addon_billing_group_id)
+    values ('TEST-GRP-1', 'contract', cust, 'Test', c, 'equipment', 'draft', '2027-04-01', '2027-06-30', 1, 0, 1, 'X', gk);
+    insert into invoices (invoice_number, invoice_type, customer_id, customer_name, contract_id, contract_invoice_kind, status, billing_period_start, billing_period_end,
+                          subtotal, vat_amount, total_amount, marking_key, addon_billing_group_id)
+    values ('TEST-GRP-2', 'contract', cust, 'Test', c, 'equipment', 'draft', '2027-04-01', '2027-06-30', 1, 0, 1, 'X', gm);
+    v_err := 'gick igenom';
+  exception when others then v_err := sqlstate || ' ' || sqlerrm; end;
+  r := r || jsonb_build_object('T9_samma_marking_tva_grupper', v_err);
+  begin
+    insert into invoices (invoice_number, invoice_type, customer_id, customer_name, contract_id, contract_invoice_kind, status, billing_period_start, billing_period_end,
+                          subtotal, vat_amount, total_amount, marking_key, addon_billing_group_id)
+    values ('TEST-GRP-4', 'contract', cust, 'Test', c, 'equipment', 'draft', '2027-05-01', '2027-07-31', 1, 0, 1, 'X', gk);
+    v_err := 'gick igenom';
+  exception when others then v_err := sqlstate || ' ' || sqlerrm; end;
+  r := r || jsonb_build_object('T9_vakten_samma_grupp', v_err);
+  update invoices set status = 'cancelled' where invoice_number in ('TEST-GRP-1', 'TEST-GRP-2') and contract_id = c;
+
+  -- T10: läget före beslutet (bara i transaktionen)
+  update cases set status = 'Pågående' where id = kase;
+  update addon_station_coverage set released_at = now() where station_id = any(bete || mek) and released_at is null;
+  update equipment_placements set addon_contract_mode = null, addon_contract_id = null, addon_billing_group_id = null where id = any(bete || mek);
+  perform sync_addon_period_lines(null, c, null);
+
+  pv := addon_group_prorata_preview(c, gm, bete, '{}'::uuid[], 3900);
+  pk := addon_group_prorata_preview(c, gk, mek, '{}'::uuid[], 1980);
+
+  -- Samma steg som addAddonStationsSeparate med grupp
+  update equipment_placements set addon_contract_mode = 'separate', addon_contract_id = c, addon_unit_price_annual = 3900 where id = any(bete);
+  perform set_addon_station_billing_group(bete, '{}'::uuid[], gm);
+  perform sync_addon_period_lines(unit, c, 3900);
+  perform sync_addon_prorata_line(unit, null, null, null, kase);
+  update equipment_placements set addon_contract_mode = 'separate', addon_contract_id = c, addon_unit_price_annual = 1980 where id = any(mek);
+  perform set_addon_station_billing_group(mek, '{}'::uuid[], gk);
+  perform sync_addon_period_lines(unit, c, 1980);
+  perform sync_addon_prorata_line(unit, null, null, null, kase);
+
+  r := r || jsonb_build_object(
+    'T10_bete_forhand', jsonb_build_object('forsta', pv->'first_invoice', 'belopp', pv->'total'),
+    'T10_bete_sparat', (select jsonb_agg(jsonb_build_object('forsta', b.billing_start_date, 'belopp', b.total_price)) from case_billing_items b
+                        where b.case_id = kase and b.is_addon_prorata_line and not b.is_addon_labour_line and b.status = 'pending' and b.station_ids && bete),
+    'T10_mek_forhand', jsonb_build_object('forsta', pk->'first_invoice', 'belopp', pk->'total'),
+    'T10_mek_sparat', (select jsonb_agg(jsonb_build_object('forsta', b.billing_start_date, 'belopp', b.total_price)) from case_billing_items b
+                       where b.case_id = kase and b.is_addon_prorata_line and not b.is_addon_labour_line and b.status = 'pending' and b.station_ids && mek),
+    'T10_rader_6', (select jsonb_agg(jsonb_build_object('typ', left(b.station_type_id::text, 8), 'antal', b.quantity, 'start', b.billing_start_date, 'grupp', g.name)
+                                     order by b.station_type_id, g.name nulls first)
+                    from case_billing_items b left join contract_addon_billing_groups g on g.id = b.addon_billing_group_id
+                    where b.case_id = c and b.site_customer_id = unit and b.billing_model in ('per_year', 'per_month')
+                      and b.status <> 'cancelled' and not coalesce(b.is_addon_labour_line, false)));
+
+  raise exception 'RESULTAT %', r;
+end $$;

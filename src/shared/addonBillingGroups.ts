@@ -114,6 +114,23 @@ export function describeBillingGroup(g: Pick<AddonBillingGroup, 'cadence' | 'anc
   return parts.join(', ')
 }
 
+const GROUP_INVOICE_CADENCE_TEXT: Record<BillingGroupCadence, string> = {
+  follows_premium: 'Egen faktura i samband med avtalets årsfaktura',
+  monthly: 'Egen faktura varje månad',
+  quarterly: 'Egen faktura varje kvartal',
+  semi_annual: 'Egen faktura varje halvår',
+  annual: 'Egen faktura varje år',
+}
+
+/**
+ * Texten i Besluta tillägg för tillägg utöver avtalet: hur ofta tillägget
+ * faktureras. Utan grupp (null) eller med "följer premien" samma text som
+ * före grupperna; okänt intervall faller tillbaka på den.
+ */
+export function addonInvoiceCadenceText(cadence: string | null | undefined): string {
+  return GROUP_INVOICE_CADENCE_TEXT[(cadence ?? 'follows_premium') as BillingGroupCadence] ?? GROUP_INVOICE_CADENCE_TEXT.follows_premium
+}
+
 // ─── Gamla unika indexet ────────────────────────────────────────────────────
 
 /** En faktura eller planerad faktura sedd av unika indexet. */

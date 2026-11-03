@@ -15,6 +15,15 @@ export interface BillingGroupInput {
   marking: string | null
 }
 
+/** Gruppens första faktura och pro rata nu för en bricka (addon_group_prorata_preview). */
+export interface GroupProrataPreview {
+  cadence: string | null
+  /** ÅÅÅÅ-MM-DD */
+  firstInvoice: string | null
+  /** Kronor exkl. moms som faktureras på etableringsärendet nu */
+  total: number
+}
+
 /** En § 6-rad för tillägg med sin grupp. */
 export interface AddonLineWithGroup {
   id: string
@@ -123,6 +132,35 @@ export class AddonBillingGroupService {
   static async setLineGroup(lineId: string, groupId: string | null): Promise<void> {
     const { error } = await supabase.rpc('set_addon_line_billing_group', { p_line_id: lineId, p_group_id: groupId })
     if (error) throw new Error(error.message)
+  }
+
+  /**
+   * Förhandsvisning i Besluta tillägg: brickans stationer i gruppen med
+   * årspriset per station. Databasen räknar som pro rata-synken gör efter
+   * beslutet (addon_group_prorata_preview): gruppens första faktura och det
+   * som faktureras på etableringsärendet nu. Null utan giltig grupp eller vid fel.
+   */
+  static async prorataPreview(
+    contractId: string,
+    groupId: string,
+    outdoorIds: string[],
+    indoorIds: string[],
+    annualPerStation: number
+  ): Promise<GroupProrataPreview | null> {
+    const { data, error } = await supabase.rpc('addon_group_prorata_preview', {
+      p_contract_id: contractId,
+      p_group_id: groupId,
+      p_outdoor_ids: outdoorIds,
+      p_indoor_ids: indoorIds,
+      p_annual: annualPerStation,
+    })
+    if (error) {
+      console.warn('[AddonBillingGroup] addon_group_prorata_preview fel:', error)
+      return null
+    }
+    const d = data as { cadence?: string | null; first_invoice?: string | null; total?: number | string | null } | null
+    if (!d) return null
+    return { cadence: d.cadence ?? null, firstInvoice: d.first_invoice ?? null, total: Number(d.total ?? 0) }
   }
 
   /** Stationer byter grupp (utsättningen i Besluta tillägg); § 6-raderna synkas. */
