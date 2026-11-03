@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../_lib/auth'
+import { isSignedContractRow } from '../../src/shared/contractStatusGuard'
 
 interface DeleteOfferRequestBody {
   contractId: string // Supabase UUID (contracts.id)
@@ -47,6 +48,15 @@ export default async function handler(
     if (fetchError || !contract) {
       console.error('Kunde inte hitta kontraktet:', fetchError)
       return res.status(404).json({ message: 'Kontraktet hittades inte' })
+    }
+
+    // Ett signerat avtal raderas aldrig härifrån: det sägs upp på avtalskartan
+    // (beslut Christian 2026-11-03). Databasen stoppar det också
+    // (contracts_status_guard). Offerter raderas som förut.
+    if (isSignedContractRow(contract)) {
+      return res.status(409).json({
+        message: 'Avtalet är signerat och kan inte raderas. Säg upp det på avtalskartan i stället.',
+      })
     }
 
     // 2. Radera från Oneflow API

@@ -87,6 +87,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         updated_at: new Date().toISOString(),
       })
       .in('id', ids)
+      // Källan syns i avtalsloggen (contracts_status_log). Spärren
+      // contracts_status_guard släpper igenom raderna för att terminated_at är satt.
+      .setHeader('x-status-source', 'expire')
 
     if (updateErr) throw updateErr
 

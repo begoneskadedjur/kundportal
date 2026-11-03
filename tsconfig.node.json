@@ -62,6 +62,8 @@
     // Signeringsbehandlingen av avtal (api/_lib/contractSigning.ts): ärende-
     // statusar, premie/org.nr-regler, fakturarader och andelar av premien
     "src/shared/documentStatus.ts",
+    // Vem får ändra avtalsstatus (sync-oneflow, webhook, delete-offer)
+    "src/shared/contractStatusGuard.ts",
     "src/shared/contractSigning.ts",
     "src/shared/contractInvoiceRows.ts",
     "src/shared/premiumShares.ts",

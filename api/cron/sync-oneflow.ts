@@ -1,7 +1,13 @@
 // api/cron/sync-oneflow.ts
 // Nattlig synkronisering av Oneflow-kontrakt med vår databas
-// Hanterar: saknade kontrakt, borttagna/papperskorg, statusdrift
-// Körs automatiskt varje natt kl 03:00 via Vercel Cron
+// Hanterar: saknade kontrakt (import), statusdrift FÖRE signering och
+// signeringsdeadline. Körs automatiskt varje natt kl 03:00 UTC via Vercel Cron.
+//
+// Oneflow används bara fram till signering. Efter signering styr portalen
+// statusen: synken ändrar aldrig status på ett signerat eller aktivt avtal,
+// inte heller när dokumentet saknas, raderats eller avböjts i Oneflow. Sådana
+// avvikelser loggas i cron_runs.summary (signedDeviations, signedMissing).
+// Regler i src/shared/contractStatusGuard.ts. Beslut Christian 2026-11-03.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireCronSecret } from '../_lib/cronAuth'
@@ -9,6 +15,14 @@ import { withCronLog } from '../_lib/cronLogger'
 import { fetchTemplatesStrict, getKnownTemplateIds, getOfferTemplateIds } from '../_lib/oneflowTemplates'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
+import {
+  ONEFLOW_STATE_TO_STATUS,
+  PRE_SIGNING_STATUSES,
+  isSignedContractRow,
+  oneflowNextPageUrl,
+  signedContractDeviation,
+  syncStatusDecision,
+} from '../../src/shared/contractStatusGuard'
 
 export const config = { maxDuration: 300 }
 
@@ -52,27 +66,15 @@ const CONTRACT_FIELD_MAPPING: Record<string, string> = {
   'org-nr': 'organization_number',
 }
 
-const STATUS_MAP: Record<string, string> = {
-  pending: 'pending',
-  signed: 'signed',
-  declined: 'declined',
-  overdue: 'overdue',
-  canceled: 'declined',
-  cancelled: 'declined',
-  published: 'pending',
-  completed: 'signed',
-  expired: 'overdue',
-}
+// Oneflows state → portalens status (import av nya dokument och drift före signering)
+const STATUS_MAP = ONEFLOW_STATE_TO_STATUS
 
-// Status-prioritet: aldrig nedgradera från högre till lägre
-const STATUS_PRIORITY: Record<string, number> = {
-  pending: 1,
-  overdue: 2,
-  signed: 3,
-  active: 3,
-  declined: 3,
-  ended: 3,
-}
+// Högst så här många sidor (100 per sida) ur Oneflows lista
+const MAX_PAGES = 200
+// PostgREST klipper tyst vid 1 000 rader: contracts läses i sidor
+const DB_PAGE = 1000
+// Så många id:n per lista i cron_runs.summary (antalen räknas alltid fullt)
+const SUMMARY_LIST_MAX = 100
 
 interface OneFlowContract {
   id: number
@@ -144,50 +146,72 @@ function parseDate(value: string | undefined | null): string | null {
   return null
 }
 
-/** Lista alla kontrakt från Oneflow med godkända mallar */
-async function listAllContractIds(): Promise<OneFlowContract[]> {
+/**
+ * Lista alla dokument i Oneflow utom utkast, alla mallar. Följer
+ * `_links.next.href` tills den är null (objektet finns alltid). Vid felsvar
+ * kastas ett fel så att körningen avbryts som 'failed' utan en enda skrivning:
+ * en avkortad lista används aldrig.
+ */
+async function listAllOneflowContracts(): Promise<OneFlowContract[]> {
   const contracts: OneFlowContract[] = []
-  let offset = 0
-  const limit = 100
+  let url: string | null = 'https://api.oneflow.com/v1/contracts?limit=100&offset=0'
+  let pages = 0
 
-  while (true) {
-    const response = await fetch(
-      `https://api.oneflow.com/v1/contracts?limit=${limit}&offset=${offset}`,
-      {
-        headers: {
-          'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-          'x-oneflow-user-email': ONEFLOW_USER_EMAIL,
-          'Accept': 'application/json',
-        },
-      }
-    )
-
+  while (url) {
+    pages++
+    if (pages > MAX_PAGES) {
+      throw new Error(`Oneflows lista tog inte slut efter ${MAX_PAGES} sidor, avbryter utan ändringar`)
+    }
+    const response = await fetch(url, {
+      headers: {
+        'x-oneflow-api-token': ONEFLOW_API_TOKEN,
+        'x-oneflow-user-email': ONEFLOW_USER_EMAIL,
+        'Accept': 'application/json',
+      },
+    })
     if (!response.ok) {
-      console.error(`[sync-oneflow] Oneflow API error: ${response.status}`)
-      break
+      throw new Error(`Oneflow svarade ${response.status} på sida ${pages}, avbryter utan ändringar`)
     }
 
     const data = await response.json() as any
     const page: OneFlowContract[] = Array.isArray(data) ? data : data.data || []
-
     for (const c of page) {
-      if (c.state === 'draft') continue
-
-      const templateId =
-        c._private_ownerside?.template_id?.toString() ||
-        c.template?.id?.toString()
-
-      if (templateId && getKnownTemplateIds().has(templateId)) {
-        contracts.push(c)
-      }
+      if (c.state !== 'draft') contracts.push(c)
     }
-
-    const hasMore = !Array.isArray(data) && !!data._links?.next
-    offset += limit
-    if (!hasMore || offset > 10000) break
+    url = Array.isArray(data) ? null : oneflowNextPageUrl(data)
   }
 
   return contracts
+}
+
+function templateIdOf(c: OneFlowContract): string | undefined {
+  return c._private_ownerside?.template_id?.toString() || c.template?.id?.toString()
+}
+
+interface DbContractRow {
+  oneflow_contract_id: string
+  type: string | null
+  status: string
+  signing_deadline: string | null
+  terminated_at: string | null
+}
+
+/** Alla contracts-rader med Oneflow-id, i sidor om 1 000. Kastar vid läsfel. */
+async function readAllDbContracts(): Promise<DbContractRow[]> {
+  const rows: DbContractRow[] = []
+  for (let from = 0; ; from += DB_PAGE) {
+    const { data, error } = await supabase
+      .from('contracts')
+      .select('id, oneflow_contract_id, type, status, signing_deadline, terminated_at')
+      .not('oneflow_contract_id', 'is', null)
+      .order('id', { ascending: true })
+      .range(from, from + DB_PAGE - 1)
+    if (error) throw new Error(`Kunde inte läsa contracts: ${error.message}`)
+    const page = (data ?? []) as DbContractRow[]
+    rows.push(...page)
+    if (page.length < DB_PAGE) break
+  }
+  return rows
 }
 
 /** Hämta detaljer + parties för ett kontrakt */
@@ -294,20 +318,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const result = await withCronLog('sync-oneflow', async () => {
-    // 'missingInOneflow' räknas men åtgärdas aldrig — se punkt 3 nedan.
-    const stats = { missingInOneflow: 0, imported: 0, driftFixed: 0, errors: 0 }
+    // Avvikelser räknas och loggas men åtgärdas aldrig (se punkt 3 nedan)
+    const stats = {
+      missingInOneflow: 0,
+      signedMissing: 0,
+      imported: 0,
+      driftFixed: 0,
+      errors: 0,
+    }
 
-    // TRASHING-SKYDD: mallistan MÅSTE läsas färskt från oneflow_templates.
-    // fetchTemplatesStrict kastar vid fel/tom tabell => hela körningen loggas
-    // som 'failed' i cron_runs och INGENTING trashas.
+    // Mallistan läses färskt från oneflow_templates. fetchTemplatesStrict
+    // kastar vid fel/tom tabell => hela körningen loggas som 'failed' i
+    // cron_runs och ingenting skrivs.
     await fetchTemplatesStrict()
     console.log(`[sync-oneflow] ${getKnownTemplateIds().size} godkända mallar lästa från DB`)
 
     console.log('[sync-oneflow] Startar nattlig synkronisering...')
 
-    // 1. Lista alla kontrakt med godkända mallar från Oneflow
-    const oneflowContracts = await listAllContractIds()
-    console.log(`[sync-oneflow] ${oneflowContracts.length} kontrakt i Oneflow`)
+    // 1. Alla dokument i Oneflow (utom utkast). Kastar vid API-fel: inget skrivs.
+    const allOneflow = await listAllOneflowContracts()
+    // Import och drift gäller bara godkända mallar, som förut
+    const oneflowContracts = allOneflow.filter(c => {
+      const t = templateIdOf(c)
+      return !!t && getKnownTemplateIds().has(t)
+    })
+    console.log(`[sync-oneflow] ${allOneflow.length} dokument i Oneflow, ${oneflowContracts.length} på godkända mallar`)
 
     // Säkerhetsspärr: om Oneflow returnerar 0 kontrakt → troligt API-fel
     if (oneflowContracts.length === 0) {
@@ -319,72 +354,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    const oneflowIdSet = new Set(oneflowContracts.map(c => c.id.toString()))
+    const allOneflowById = new Map(allOneflow.map(c => [c.id.toString(), c]))
 
-    // 2. Hämta alla kontrakt från DB
-    const { data: dbContracts } = await supabase
-      .from('contracts')
-      .select('oneflow_contract_id, status, signing_deadline, terminated_at')
-
-    const dbMap = new Map<string, {
-      oneflow_contract_id: string
-      status: string
-      signing_deadline: string | null
-      terminated_at?: string | null
-    }>()
-    for (const c of dbContracts || []) {
-      if (c.oneflow_contract_id) {
-        dbMap.set(c.oneflow_contract_id, c)
-      }
+    // 2. Alla kontrakt i DB, i sidor (1 000-taket). Kastar vid läsfel: inget skrivs,
+    //    annars skulle en avklippt läsning få importen att skriva över befintliga rader.
+    const dbContracts = await readAllDbContracts()
+    const dbMap = new Map<string, DbContractRow>()
+    for (const c of dbContracts) {
+      if (c.oneflow_contract_id) dbMap.set(c.oneflow_contract_id, c)
     }
 
-    // 3. Avtal som finns i DB men inte i Oneflow.
+    // 3. Avtal som finns i DB men inte i Oneflow, och signerade avtal som
+    //    Oneflow visar som något annat än signerat.
     //
-    // Dessa RÖRS INTE. Ett avtal får aldrig försvinna automatiskt: det sägs
-    // upp av oss, avslutas när uppsägningstiden löpt ut, och ligger sedan kvar
-    // tills någon aktivt raderar det. Att någon tar bort dokumentet i Oneflow
-    // ändrar ingenting i portalen.
-    //
-    // Den gamla logiken slog dessutom mot fel population: PORTALSKAPADE avtal
-    // (oneflow_contract_id 'local-<uuid>') finns per definition aldrig i
-    // Oneflow, så varje avtal skapat på Avtalskartan trashades nästa natt.
-    // Tre riktiga avtal förlorades så — Kiab, Vånga Vinteknik och RBFG,
-    // alla inom samma sekund 2026-08-21 03:01.
+    // Dessa RÖRS INTE. Ett avtal avslutas bara i portalen: det sägs upp,
+    // avslutas av expire-contracts när uppsägningstiden löpt ut, eller ersätts
+    // av ett nytt avtal i avtalskartan. Vad som händer med dokumentet i
+    // Oneflow ändrar ingenting. (Den gamla trashningen här avslutade bland
+    // annat Kiab, Vånga Vinteknik och RBFG 2026-08-21 03:01.)
     const TERMINAL_STATUSES = new Set(['declined', 'ended', 'trashed'])
     const missingInOneflow: string[] = []
+    const signedMissing: string[] = []
+    const signedDeviations: Array<{ id: string; portal: string; oneflow: string }> = []
     for (const [id, record] of dbMap) {
-      if (!oneflowIdSet.has(id) && !TERMINAL_STATUSES.has(record.status)) {
-        missingInOneflow.push(id)
+      const doc = allOneflowById.get(id)
+      if (!doc) {
+        if (!TERMINAL_STATUSES.has(record.status)) missingInOneflow.push(id)
+        if (isSignedContractRow(record)) signedMissing.push(id)
+        continue
       }
+      const avvikelse = signedContractDeviation(record, doc.state)
+      if (avvikelse) signedDeviations.push({ id, portal: record.status, oneflow: avvikelse })
     }
 
     // 4. Hitta saknade kontrakt (i Oneflow men inte i DB)
     const missingContracts = oneflowContracts.filter(c => !dbMap.has(c.id.toString()))
 
-    // 5. Hitta statusdrift (båda har, men status skiljer sig)
-    const driftedContracts = oneflowContracts.filter(c => {
+    // 5. Statusdrift: bara rader FÖRE signering (draft/pending/overdue) och bara
+    //    uppåt. Signerade, aktiva, uppsagda och avslutade rader rörs aldrig, så
+    //    'active' i portalen mot 'signed' i Oneflow ger ingen skrivning.
+    const drifted: Array<{ c: OneFlowContract; from: string; to: string }> = []
+    for (const c of oneflowContracts) {
       const dbRecord = dbMap.get(c.id.toString())
-      if (!dbRecord || TERMINAL_STATUSES.has(dbRecord.status)) return false
-      // Lokalt uppsagda avtal rörs aldrig. Statusen ligger kvar på 'signed'
-      // fram till effective_end_date (avtalet löper ut), så TERMINAL_STATUSES
-      // fångar dem inte — men en statusdrift från Oneflow får ändå inte skriva
-      // över uppsägningen.
-      if (dbRecord.terminated_at) return false
-      const expectedStatus = STATUS_MAP[c.state] || 'pending'
-      return dbRecord.status !== expectedStatus
-    })
+      if (!dbRecord) continue
+      const decision = syncStatusDecision(dbRecord, c.state)
+      if (decision.change) drifted.push({ c, from: dbRecord.status, to: decision.to })
+    }
 
-    console.log(`[sync-oneflow] Saknas i Oneflow: ${missingInOneflow.length} (rörs ej), Saknade i DB: ${missingContracts.length}, Statusdrift: ${driftedContracts.length}`)
+    console.log(`[sync-oneflow] Saknas i Oneflow: ${missingInOneflow.length} (rörs ej, varav ${signedMissing.length} signerade), Avvikande signerade: ${signedDeviations.length} (rörs ej), Saknade i DB: ${missingContracts.length}, Statusdrift före signering: ${drifted.length}`)
 
-    // === Avtal som saknas i Oneflow: LOGGAS, ändras aldrig ===
-    // Loggen finns kvar som spårbarhet — man ska kunna se att ett dokument
-    // försvunnit i Oneflow — men portalen är sanningskällan för avtalets
-    // livscykel och rör inte raden.
+    // === Avvikelser: LOGGAS, ändras aldrig ===
     stats.missingInOneflow = missingInOneflow.length
+    stats.signedMissing = signedMissing.length
     if (missingInOneflow.length > 0) {
       console.log(
         `[sync-oneflow] Följande finns i portalen men inte i Oneflow (oförändrade): ${missingInOneflow.join(', ')}`
       )
+    }
+    for (const d of signedDeviations) {
+      console.log(`[sync-oneflow] Avvikelse (oförändrad): ${d.id} är ${d.portal} i portalen men ${d.oneflow} i Oneflow`)
     }
 
     // === Importera saknade kontrakt ===
@@ -398,9 +426,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const insertData = mapToInsertData(detail, c)
 
+        // Bara nya rader: ignoreDuplicates gör att en rad som ändå finns (t.ex.
+        // skapad av webhooken under körningen) aldrig skrivs över, inte heller
+        // dess status.
         const { error } = await supabase
           .from('contracts')
-          .upsert(insertData, { onConflict: 'oneflow_contract_id' })
+          .upsert(insertData, { onConflict: 'oneflow_contract_id', ignoreDuplicates: true })
 
         if (error) {
           console.error(`[sync-oneflow] Fel vid import av ${c.id}:`, error.message)
@@ -416,31 +447,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // === Korrigera statusdrift (med prioritetsskydd) ===
-    for (const c of driftedContracts) {
-      const dbRecord = dbMap.get(c.id.toString())!
-      const newStatus = STATUS_MAP[c.state] || 'pending'
-
-      const incomingPriority = STATUS_PRIORITY[newStatus] ?? 1
-      const existingPriority = STATUS_PRIORITY[dbRecord.status] ?? 1
-
-      // Aldrig nedgradera från en terminal/högre status
-      if (incomingPriority < existingPriority) {
-        console.log(`[sync-oneflow] Hoppar över nedgradering för ${c.id}: ${dbRecord.status} → ${newStatus}`)
-        continue
-      }
-
-      const { error } = await supabase
+    // === Statusdrift före signering ===
+    // Villkoret på status upprepas i uppdateringen: hinner raden signeras
+    // (webhooken) under körningen rörs den inte.
+    for (const { c, from, to } of drifted) {
+      const { data: updated, error } = await supabase
         .from('contracts')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update({ status: to, updated_at: new Date().toISOString() })
         .eq('oneflow_contract_id', c.id.toString())
+        .in('status', [...PRE_SIGNING_STATUSES])
+        .is('terminated_at', null)
+        .setHeader('x-status-source', 'sync-oneflow')
+        .select('id')
 
       if (error) {
         console.error(`[sync-oneflow] Fel vid statusuppdatering av ${c.id}:`, error.message)
         stats.errors++
-      } else {
+      } else if ((updated ?? []).length > 0) {
         stats.driftFixed++
-        console.log(`[sync-oneflow] Statusdrift fixad ${c.id}: ${dbRecord.status} → ${newStatus}`)
+        console.log(`[sync-oneflow] Statusdrift fixad ${c.id}: ${from} → ${to}`)
       }
       await delay(30)
     }
@@ -467,6 +492,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .from('contracts')
             .update({ signing_deadline: deadline })
             .eq('oneflow_contract_id', c.id.toString())
+            .in('status', ['pending', 'overdue'])
           if (error) {
             console.error(`[sync-oneflow] Fel vid deadline-uppdatering av ${c.id}:`, error.message)
             stats.errors++
@@ -482,8 +508,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const summary = {
       oneflow_total: oneflowContracts.length,
+      oneflow_all_templates: allOneflow.length,
       db_total: dbMap.size,
       ...stats,
+      signedDeviations: signedDeviations.length,
+      // Oneflow-id:n för uppföljning (signerade avtal rörs aldrig av synken)
+      signedDeviationList: signedDeviations.slice(0, SUMMARY_LIST_MAX),
+      signedMissingList: signedMissing.slice(0, SUMMARY_LIST_MAX),
     }
 
     console.log('[sync-oneflow] Klar:', JSON.stringify(summary))

@@ -14,6 +14,7 @@ import {
   documentKindOf,
   type DocumentKind,
 } from '../../src/shared/documentStatus'
+import { isSignedContractRow, webhookMayChangeStatus } from '../../src/shared/contractStatusGuard'
 
 // Miljövariabler
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -651,7 +652,7 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
     // Kontrollera om kontraktet redan finns
     const { data: existingContract, error: checkError } = await supabase
       .from('contracts')
-      .select('id, status, source_id, source_type, created_by_email')
+      .select('id, type, status, source_id, source_type, created_by_email')
       .eq('oneflow_contract_id', contractData.oneflow_contract_id)
       .single()
 
@@ -689,6 +690,15 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
       const LIFECYCLE_STATUSES = ['overdue', 'signed', 'declined', 'ended', 'active', 'trashed']
       if (options?.preserveStatus && LIFECYCLE_STATUSES.includes(existingContract.status)) {
         console.log(`🔒 Bevarar status '${existingContract.status}' — ignorerar inkommande '${webhookData.status}'`)
+        delete webhookData.status
+      }
+      // Efter signering styr portalen statusen: ett signerat eller aktivt avtal
+      // behåller sin status oavsett vad Oneflow skickar (även en ny
+      // contract:sign på ett aktivt avtal, som annars skrev active → signed)
+      if (webhookData.status !== undefined && isSignedContractRow(existingContract)) {
+        if (webhookData.status !== existingContract.status) {
+          console.log(`🔒 Signerat avtal: behåller '${existingContract.status}', ignorerar inkommande '${webhookData.status}'`)
+        }
         delete webhookData.status
       }
 
@@ -773,6 +783,103 @@ const deactivateCustomersWithoutLiveContracts = async (oneflowContractId: string
   } catch (err) {
     console.error('⚠️ Kunde inte uppdatera kundstatus efter avslutat avtal:', err instanceof Error ? err.message : err)
   }
+}
+
+/**
+ * Oneflow används bara fram till signering. Efter signering styr portalen
+ * avtalets status: bara Säga upp, expire-contracts och "ersatt av nytt avtal"
+ * avslutar ett avtal (beslut Christian 2026-11-03, regler i
+ * src/shared/contractStatusGuard.ts).
+ *
+ * Returnerar true när raden är ett signerat eller aktivt avtal. Då ändras
+ * ingenting: händelsen skrivs i avtalsloggen (contract_events) och, för
+ * händelser som annars hade avslutat avtalet, får administratörerna en notis.
+ * Returnerar false när raden saknas eller är före signering (eller en
+ * offert), och då körs händelsen som förut.
+ */
+const keepSignedContractStatus = async (
+  oneflowContractId: string,
+  eventType: string,
+  title: string,
+  options?: { notify?: boolean }
+): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('contracts')
+    .select('id, type, status, terminated_at, customer_id, company_name, label')
+    .eq('oneflow_contract_id', oneflowContractId)
+    .maybeSingle()
+  if (error) {
+    // Kan vi inte läsa raden ändras ingenting: hellre en missad statusändring
+    // före signering än ett avslutat avtal
+    console.error(`⚠️ Kunde inte läsa avtalet ${oneflowContractId}, statusen lämnas orörd:`, error.message)
+    return true
+  }
+  const row = data as {
+    id: string
+    type: string | null
+    status: string | null
+    terminated_at: string | null
+    customer_id: string | null
+    company_name: string | null
+    label: string | null
+  } | null
+  if (webhookMayChangeStatus(row) || !row) return false
+
+  console.log(`🔒 ${eventType} på signerat avtal ${oneflowContractId} (${row.status}): statusen ändras inte, loggas`)
+  const detail = `Oneflow skickade ${eventType}. Avtalet är signerat och styrs i portalen, så statusen (${row.status}) ändrades inte. Ska avtalet avslutas görs det med Säg upp på avtalskartan.`
+  try {
+    const { error: logErr } = await supabase.from('contract_events').insert({
+      contract_id: row.id,
+      event_type: 'other',
+      title,
+      detail,
+      metadata: { kind: 'oneflow_event_ignored', oneflow_event: eventType, oneflow_contract_id: oneflowContractId, status: row.status },
+      created_by_name: 'Oneflow',
+    })
+    if (logErr) console.error('⚠️ Kunde inte logga i contract_events:', logErr.message)
+  } catch (err) {
+    console.error('⚠️ Kunde inte logga i contract_events:', err instanceof Error ? err.message : err)
+  }
+
+  if (options?.notify && row.customer_id) {
+    try {
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('id, parent_customer_id, company_name')
+        .eq('id', row.customer_id)
+        .maybeSingle()
+      const c = cust as { id: string; parent_customer_id: string | null; company_name: string | null } | null
+      const rootId = c?.parent_customer_id ?? row.customer_id
+      const companyName = c?.company_name ?? row.company_name ?? 'Avtalskund'
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .or('role.eq.admin,is_admin.eq.true')
+        .eq('is_active', true)
+      const recipients = ((admins ?? []) as Array<{ user_id: string | null }>)
+        .map(p => p.user_id)
+        .filter((v): v is string => !!v)
+      if (recipients.length > 0) {
+        const { error: notisErr } = await supabase.from('notifications').insert(
+          recipients.map(id => ({
+            recipient_id: id,
+            case_id: rootId,
+            case_type: 'customer',
+            title: `${title} · ${companyName}`,
+            preview: detail,
+            case_title: companyName,
+            sender_id: id,
+            sender_name: 'Systemet',
+            is_read: false,
+          }))
+        )
+        if (notisErr) console.error('⚠️ Kunde inte skapa notis:', notisErr.message)
+      }
+    } catch (err) {
+      console.error('⚠️ Kunde inte skapa notis:', err instanceof Error ? err.message : err)
+    }
+  }
+  return true
 }
 
 // Kundskapande, avtalsfält, premie, avtalskarta, fakturaplan och notis vid
@@ -1337,6 +1444,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
         case 'contract:decline':
           console.log('❌ Kontrakt avvisat - uppdaterar status')
+          if (await keepSignedContractStatus(contractId, event.type, 'Avvisat i Oneflow, avtalet gäller', { notify: true })) break
           await supabase
             .from('contracts')
             .update({
@@ -1367,6 +1475,9 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
         case 'contract:lifecycle_state:start':
           console.log('🚀 Kontrakt aktiverat - uppdaterar kontrakt och kund status')
+          // Signerat avtal blir aktivt på startdagen av portalen
+          // (contract_signed_becomes_active, activate_started_contracts)
+          if (await keepSignedContractStatus(contractId, event.type, 'Oneflow: livscykeln startad')) break
           await supabase
             .from('contracts')
             .update({ 
@@ -1389,6 +1500,9 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
         case 'contract:lifecycle_state:terminate':
         case 'contract:lifecycle_state:cancel':
           console.log('🔚 Kontrakt avslutat/uppsagt - uppdaterar kontrakt och kund status')
+          // Ett signerat avtal avslutas bara i portalen (Säg upp). Oneflows
+          // livscykel loggas och notifieras men ändrar ingenting.
+          if (await keepSignedContractStatus(contractId, event.type, 'Avslutat i Oneflow, avtalet gäller', { notify: true })) break
           await supabase
             .from('contracts')
             .update({ 
@@ -1406,6 +1520,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
         case 'contract:signing_period_expire':
           console.log('⏰ Signeringsperiod gått ut - uppdaterar status')
+          if (await keepSignedContractStatus(contractId, event.type, 'Oneflow: signeringstiden gick ut')) break
           await supabase
             .from('contracts')
             .update({
@@ -1436,6 +1551,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
         case 'contract:signing_period_revive':
           console.log('🔄 Signeringsperiod återaktiverad')
+          if (await keepSignedContractStatus(contractId, event.type, 'Oneflow: signeringstiden förlängd')) break
           await supabase
             .from('contracts')
             .update({ 
@@ -1466,6 +1582,9 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
         case 'contract:delete':
           console.log('🗑️ Kontrakt borttaget/papperskorgen')
+          // Ett signerat avtal lever vidare i portalen även om dokumentet
+          // raderas i Oneflow: loggas och notifieras, statusen rörs inte
+          if (await keepSignedContractStatus(contractId, event.type, 'Raderat i Oneflow, avtalet gäller', { notify: true })) break
           await supabase
             .from('contracts')
             .update({
@@ -1578,6 +1697,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
         case 'participant:signature_reset':
         case 'contract:signature_reset':
           console.log('🔄 Signatur återställd')
+          if (await keepSignedContractStatus(contractId, event.type, 'Oneflow: signaturen återställd', { notify: true })) break
           await supabase
             .from('contracts')
             .update({ 

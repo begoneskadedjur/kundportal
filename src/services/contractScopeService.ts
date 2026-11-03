@@ -625,14 +625,17 @@ export class ContractScopeService {
       .select('id')
     moved += items?.length ?? 0
 
-    // Markera den gamla raden som ersatt så den försvinner ur aktiva vyer
-    await supabase
-      .from('contracts')
-      .update({
-        status: 'ended',
-        termination_reason: 'Ersatt av nytt avtal i portalen',
-      })
-      .eq('id', fromContractId)
+    // Markera den gamla raden som ersatt så den försvinner ur aktiva vyer.
+    // RPC:n sätter källan 'replaced' (spärren contracts_status_guard släpper
+    // då igenom ett signerat/aktivt avtal), updated_at och en rad i
+    // avtalsloggen. Migration 20261103_avtalsstatus_vakt.sql.
+    const { error: replaceErr } = await supabase.rpc('contract_mark_replaced', {
+      p_from: fromContractId,
+      p_to: toContractId,
+    })
+    if (replaceErr) {
+      console.error('Kunde inte markera den gamla avtalsraden som ersatt:', replaceErr.message)
+    }
 
     return moved
   }

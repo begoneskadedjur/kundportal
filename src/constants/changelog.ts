@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.118.0',
+    date: '2026-11-03',
+    title: 'Bara Säg upp avslutar ett signerat avtal',
+    items: [
+      { kind: 'andring', text: 'När ett avtal är signerat styr portalen dess status. Nattsynken mot Oneflow och händelser från Oneflow (raderat, avvisat, avslutat, signaturen återställd) ändrar inte längre ett signerat eller aktivt avtal. Händelsen skrivs i avtalsloggen och administratörerna får en notis. Ett avtal avslutas med Säg upp på avtalskartan, när uppsägningstiden löpt ut eller när det ersätts av ett nytt avtal.' },
+      { kind: 'andring', text: 'Varje statusändring på ett avtal skrivs i avtalsloggen med tid, vem som gjorde den och varifrån. Databasen stoppar dessutom ett försök att avsluta ett signerat avtal utan uppsägning.' },
+      { kind: 'buggfix', text: 'Nattsynken skrev om status och ändringstid på alla aktiva avtal varje natt klockan 03.01, så att ändringstiden inte gick att lita på. Den rör nu bara dokument som ännu inte är signerade. Synken avbryts utan ändringar om Oneflow svarar med fel, och läser alla avtal även när de blir fler än 1 000.' },
+      { kind: 'buggfix', text: 'Ersatt av nytt avtal på avtalskartan sätter nu ändringstid och skriver en rad i avtalsloggen.' },
+    ],
+  },
+  {
     version: '3.117.2',
     date: '2026-11-03',
     title: 'Faktureringsgrupperna tappar inga dagar',
