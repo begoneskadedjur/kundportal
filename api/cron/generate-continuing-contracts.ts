@@ -95,6 +95,7 @@ import {
   contractSourcesFromRows,
   CONTRACT_SOURCE_ITEM_COLUMNS,
   invoiceTotals,
+  premiumLabel,
   toInvoiceItemRows,
   type ContractSourceItemRow,
   type ContractSourceLedgerRow,
@@ -866,7 +867,7 @@ async function generateForSynthCustomer(ctx: RunCtx, customer: CustomerRow, toda
           contract_id: null,
           line_kind: 'generic',
           article_code: null,
-          article_name: `Årspremie, ${p.periodStart} t.o.m. ${p.periodEnd}`,
+          article_name: `${premiumLabel(p)}, ${p.periodStart} t.o.m. ${p.periodEnd}`,
           quantity: 1,
           unit_price: p.amount,
           total_price: p.amount,
@@ -878,7 +879,7 @@ async function generateForSynthCustomer(ctx: RunCtx, customer: CustomerRow, toda
         contractId: null,
         consolidated: false,
         marking: customer.billing_reference,
-        notes: `Årspremie · Betalning ${p.sequenceNumber}/${p.totalSequenceCount} · Period ${p.periodStart} t.o.m. ${p.periodEnd}`,
+        notes: `${premiumLabel(p)} · Period ${p.periodStart} t.o.m. ${p.periodEnd}`,
       }
     )
     if (ok) created++

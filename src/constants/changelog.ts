@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.118.1',
+    date: '2026-11-04',
+    title: 'Avtalsfakturans text visar rätt premie och period',
+    items: [
+      { kind: 'buggfix', text: 'Avtalsfakturor skrev "Betalning 6/6" i kommentaren, vilket på kundens faktura såg ut som sista betalningen fast avtalet löper vidare. Kommentaren visar nu bara premien och perioden.' },
+      { kind: 'buggfix', text: 'Premien heter Månadspremie, Kvartalspremie, Halvårspremie eller Årspremie efter fakturans period, både i kommentaren och på fakturaraden. Tidigare stod det Årspremie även på månads- och kvartalsfakturor.' },
+    ],
+  },
+  {
     version: '3.118.0',
     date: '2026-11-03',
     title: 'Bara Säg upp avslutar ett signerat avtal',

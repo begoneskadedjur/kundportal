@@ -190,6 +190,23 @@ export function periodLabel(p: Pick<PlannedPeriod, 'periodStart' | 'periodEnd'>)
   return `${p.periodStart} t.o.m. ${p.periodEnd}`
 }
 
+/**
+ * Premiens namn efter periodens längd: Månadspremie, Kvartalspremie,
+ * Halvårspremie eller Årspremie. Andra längder (förkortad första period o.d.)
+ * heter bara Premie. Texten står på kundens faktura.
+ */
+export function premiumLabel(p: Pick<PlannedPeriod, 'periodStart' | 'periodEnd'>): string {
+  const [y1, m1, d1] = p.periodStart.split('-').map(Number)
+  const [ye, me, de] = p.periodEnd.split('-').map(Number)
+  const end = new Date(Date.UTC(ye, me - 1, de) + 86_400_000)
+  const [y2, m2, d2] = [end.getUTCFullYear(), end.getUTCMonth() + 1, end.getUTCDate()]
+  const months = (y2 - y1) * 12 + (m2 - m1)
+  // Hela månader: samma dag, eller start den sista och nästa period på kortare månad
+  const whole = d2 === d1 || (d1 > 28 && d2 < d1 && new Date(Date.UTC(y2, m2 - 1, d2 + 1)).getUTCDate() === 1)
+  if (!whole) return 'Premie'
+  return months === 1 ? 'Månadspremie' : months === 3 ? 'Kvartalspremie' : months === 6 ? 'Halvårspremie' : months === 12 ? 'Årspremie' : 'Premie'
+}
+
 export function buildContractInvoiceRows(contractId: string, sources: ContractRowSources, planned: PlannedPeriod): InvoiceRowSpec[] {
   const period = periodLabel(planned)
   const diary = sources.diaryNumber ? ` (${sources.diaryNumber})` : ''
@@ -292,8 +309,8 @@ export function buildContractInvoiceRows(contractId: string, sources: ContractRo
         article_id: null,
         article_code: it.display_code,
         article_name: isCarrier
-          ? `Årspremie ${sources.label ?? it.display_name}, ${period}${diary}`
-          : `${it.display_name}, andel av årspremien ${period}${diary}`,
+          ? `${premiumLabel(planned)} ${sources.label ?? it.display_name}, ${period}${diary}`
+          : `${it.display_name}, andel av ${premiumLabel(planned).toLowerCase()}n ${period}${diary}`,
         quantity,
         unit_price: unit,
         total_price: total,
@@ -312,7 +329,7 @@ export function buildContractInvoiceRows(contractId: string, sources: ContractRo
       contract_id: contractId,
       line_kind: 'premium',
       article_code: null,
-      article_name: `Årspremie ${sources.label ?? 'avtal'}, ${period}${diary}`,
+      article_name: `${premiumLabel(planned)} ${sources.label ?? 'avtal'}, ${period}${diary}`,
       quantity: 1,
       unit_price: planned.amount,
       total_price: planned.amount,
@@ -367,7 +384,7 @@ export function buildContractInvoiceNotes(planned: PlannedPeriod, label: string 
   if (planned.kind === 'equipment' || planned.kind === 'equipment_monthly') {
     return `Tilläggsstationer utöver avtal${label ? ` ${label}` : ''} · Period ${periodLabel(planned)}${diary ? ` · ${diary}` : ''}`
   }
-  return `Årspremie${label ? ` ${label}` : ''} · Betalning ${planned.sequenceNumber}/${planned.totalSequenceCount} · Period ${periodLabel(planned)}${
+  return `${premiumLabel(planned)}${label ? ` ${label}` : ''} · Period ${periodLabel(planned)}${
     diary ? ` · ${diary}` : ''
   }`
 }
@@ -377,7 +394,7 @@ export function buildContractInvoiceNotes(planned: PlannedPeriod, label: string 
  * (beslut 2026-09-02: huvudkundens referens i huvudet, avtalen som rader).
  */
 export function buildConsolidatedInvoiceNotes(planned: Pick<PlannedPeriod, 'periodStart' | 'periodEnd'>, labels: string[], diaries: string[]): string {
-  return `Årspremie · Period ${periodLabel(planned)} · Avtal: ${labels.join(', ')}${diaries.length ? ` · ${diaries.join(', ')}` : ''}`
+  return `${premiumLabel(planned)} · Period ${periodLabel(planned)} · Avtal: ${labels.join(', ')}${diaries.length ? ` · ${diaries.join(', ')}` : ''}`
 }
 
 /** Samlingsfakturans märkning: kundens referens, annars avtalens gemensamma referens */

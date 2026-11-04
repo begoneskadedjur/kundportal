@@ -36,6 +36,7 @@ import {
   contractSourcesFromRows,
   CONTRACT_SOURCE_ITEM_COLUMNS,
   periodLabel,
+  premiumLabel,
   toInvoiceItemRows,
   type ContractSourceItemRow,
   type ContractSourceLedgerRow,
@@ -1710,7 +1711,7 @@ export class ContractInvoiceGenerator {
         contract_id: null,
         line_kind: 'generic',
         article_code: null,
-        article_name: `Årspremie, ${periodLabel(planned)}`,
+        article_name: `${premiumLabel(planned)}, ${periodLabel(planned)}`,
         quantity: 1,
         unit_price: planned.amount,
         total_price: planned.amount,
@@ -1725,7 +1726,7 @@ export class ContractInvoiceGenerator {
   }
 
   private static buildLegacyNotes(planned: PlannedInvoice): string {
-    return `Årspremie · Betalning ${planned.sequenceNumber}/${planned.totalSequenceCount} · Period ${periodLabel(planned)}`
+    return `${premiumLabel(planned)} · Period ${periodLabel(planned)}`
   }
 
   // ------- Privata hjälpare för DB-skrivning -------
@@ -1915,7 +1916,7 @@ export class ContractInvoiceGenerator {
     const amount = Math.round(input.amount * 100) / 100
     const vat = Math.round(amount * 25) / 100
     const invoicedAt = parseLocalDate(input.invoicedAt).toISOString()
-    const notes = `Årspremie · Period ${periodLabel(planned)} · Fakturerad utanför portalen ${input.invoicedAt}, belopp ej verifierat mot Fortnox.${
+    const notes = `${premiumLabel(planned)} · Period ${periodLabel(planned)} · Fakturerad utanför portalen ${input.invoicedAt}, belopp ej verifierat mot Fortnox.${
       input.note ? ` ${input.note}` : ''
     }`
 
@@ -1961,7 +1962,7 @@ export class ContractInvoiceGenerator {
           contract_id: contractId,
           line_kind: 'premium',
           article_code: null,
-          article_name: `Årspremie ${label ?? 'avtal'}, ${periodLabel(planned)} (fakturerad utanför portalen)`,
+          article_name: `${premiumLabel(planned)} ${label ?? 'avtal'}, ${periodLabel(planned)} (fakturerad utanför portalen)`,
           quantity: 1,
           unit_price: amount,
           total_price: amount,

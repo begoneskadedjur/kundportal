@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildContractInvoiceNotes, buildContractInvoiceRows, invoiceTotals, nextInvoiceNumber } from './contractInvoiceRows'
+import { buildContractInvoiceNotes, buildContractInvoiceRows, invoiceTotals, nextInvoiceNumber, premiumLabel } from './contractInvoiceRows'
 import type { PlannedPeriod } from './contractPlanner'
 
 const period: PlannedPeriod = {
@@ -82,7 +82,7 @@ describe('fakturarader för en avtalsperiod', () => {
 
   it('anteckning och fakturanummer', () => {
     expect(buildContractInvoiceNotes(period, 'Mekaniska fällor', null)).toBe(
-      'Årspremie Mekaniska fällor · Betalning 1/2 · Period 2026-10-01 t.o.m. 2027-09-30'
+      'Årspremie Mekaniska fällor · Period 2026-10-01 t.o.m. 2027-09-30'
     )
     expect(nextInvoiceNumber('INV-202610', 'INV-202610-0041')).toBe('INV-202610-0042')
     expect(nextInvoiceNumber('INV-202610', null)).toBe('INV-202610-0001')
@@ -125,5 +125,18 @@ describe('A5: nya tilläggsregler, enhetens namn på raden', () => {
     expect(buildContractInvoiceNotes(gap, 'GNU 2026/60', null)).toBe(
       'Tilläggsstationer från utsättning till nästa periodstart · GNU 2026/60 · Period 2026-11-10 t.o.m. 2027-06-30'
     )
+  })
+})
+
+describe('premiumLabel', () => {
+  it('namnger premien efter periodens längd', () => {
+    expect(premiumLabel({ periodStart: '2026-12-01', periodEnd: '2026-12-31' })).toBe('Månadspremie')
+    expect(premiumLabel({ periodStart: '2027-01-15', periodEnd: '2027-02-14' })).toBe('Månadspremie')
+    expect(premiumLabel({ periodStart: '2027-01-01', periodEnd: '2027-03-31' })).toBe('Kvartalspremie')
+    expect(premiumLabel({ periodStart: '2027-03-01', periodEnd: '2027-08-31' })).toBe('Halvårspremie')
+    expect(premiumLabel({ periodStart: '2026-12-15', periodEnd: '2027-12-14' })).toBe('Årspremie')
+    expect(premiumLabel({ periodStart: '2027-03-01', periodEnd: '2028-02-29' })).toBe('Årspremie')
+    expect(premiumLabel({ periodStart: '2027-01-31', periodEnd: '2027-02-27' })).toBe('Månadspremie')
+    expect(premiumLabel({ periodStart: '2026-11-04', periodEnd: '2027-02-28' })).toBe('Premie')
   })
 })
