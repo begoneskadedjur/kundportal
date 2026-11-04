@@ -167,6 +167,8 @@ export type PlannedWrite = {
   /** Fakturans märkning och anteckning (bara i minnet, för jämförelsen med Planera fakturor) */
   marking?: string | null
   notes?: string
+  /** Glappfakturans ärende (invoices.case_id), bara när det finns */
+  caseId?: string
   /** Raderna (bara i minnet, loggas inte i cron_runs) */
   rows?: InvoiceRowSpec[]
 }
@@ -262,7 +264,7 @@ function buildRows(contract: ContractRow, sources: Sources, p: PlannedPeriod): R
 }
 
 /** En befintlig faktura som intervall: ägare = avtalets id, '__none__' (utan avtal) eller '__consolidated__'. */
-type CoveredRange = ExistingRange & { owner: string; kind: string; marking_key?: string | null; billing_group_id?: string | null }
+type CoveredRange = ExistingRange & { owner: string; kind: string; marking_key?: string | null; billing_group_id?: string | null; case_id?: string | null }
 
 type Covered = {
   perContract: Map<string, Set<string>>
@@ -281,7 +283,7 @@ function rangesFor(covered: Covered, owners: string[], kind: string): CoveredRan
 async function loadCoveredPeriods(customerId: string): Promise<Covered> {
   const { data } = await supabase
     .from('invoices')
-    .select('id, invoice_number, invoice_type, is_historical, is_consolidated, contract_id, contract_invoice_kind, marking_key, addon_billing_group_id, billing_period_start, billing_period_end, status, invoice_items(contract_id)')
+    .select('id, invoice_number, invoice_type, is_historical, is_consolidated, contract_id, contract_invoice_kind, marking_key, addon_billing_group_id, case_id, billing_period_start, billing_period_end, status, invoice_items(contract_id)')
     .eq('customer_id', customerId)
     .in('invoice_type', ['contract', 'adhoc'])
     // Makulerade fakturor täcker ingen period (samma regel som planeraren)
@@ -297,6 +299,7 @@ async function loadCoveredPeriods(customerId: string): Promise<Covered> {
     contract_invoice_kind: string | null
     marking_key?: string | null
     addon_billing_group_id?: string | null
+    case_id?: string | null
     billing_period_start: string | null
     billing_period_end: string | null
     invoice_items: Array<{ contract_id: string | null }> | null
@@ -323,6 +326,7 @@ async function loadCoveredPeriods(customerId: string): Promise<Covered> {
       kind,
       marking_key: inv.marking_key ?? null,
       billing_group_id: inv.addon_billing_group_id ?? null,
+      case_id: inv.case_id ?? null,
     }
     // Faktureringsgrupp: bara som intervall med grupp, aldrig i månadsnycklarna
     // (de gäller fakturorna utan grupp)
@@ -374,7 +378,7 @@ async function insertInvoice(
   orgNr: string | null,
   p: PlannedPeriod,
   rows: RowSpec[],
-  opts: { contractId: string | null; consolidated: boolean; marking: string | null; notes: string; markingKey?: string | null; billingGroupId?: string | null }
+  opts: { contractId: string | null; consolidated: boolean; marking: string | null; notes: string; markingKey?: string | null; billingGroupId?: string | null; caseId?: string }
 ): Promise<boolean> {
   if (rows.length === 0) return false
   const { subtotal } = invoiceTotals(rows)
@@ -389,6 +393,7 @@ async function insertInvoice(
     action: 'create',
     marking: opts.marking,
     notes: opts.notes,
+    ...(opts.caseId ? { caseId: opts.caseId } : {}),
     rows,
   }
   return write(ctx, entry, true, () => insertInvoiceNow(customer, orgNr, p, rows, opts, subtotal))
@@ -399,7 +404,7 @@ async function insertInvoiceNow(
   orgNr: string | null,
   p: PlannedPeriod,
   rows: RowSpec[],
-  opts: { contractId: string | null; consolidated: boolean; marking: string | null; notes: string; markingKey?: string | null; billingGroupId?: string | null },
+  opts: { contractId: string | null; consolidated: boolean; marking: string | null; notes: string; markingKey?: string | null; billingGroupId?: string | null; caseId?: string },
   subtotal: number
 ): Promise<boolean> {
   const { vat } = invoiceTotals(rows)
@@ -413,7 +418,8 @@ async function insertInvoiceNow(
       contract_id: opts.contractId,
       is_consolidated: opts.consolidated,
       contract_invoice_kind: p.kind ?? 'premium',
-      case_id: null,
+      // Glappfaktura per ärende: ärendet (cases.id), case_type null som förut
+      case_id: opts.caseId ?? null,
       case_type: null,
       customer_name: customer.company_name,
       customer_email: customer.billing_email ?? customer.contact_email,
@@ -553,6 +559,9 @@ async function createGapInvoices(ctx: RunCtx, customer: CustomerRow, orgNr: stri
     codeFor: (unitId, typeId) => v2.inputs.lines.find((l) => l.site_customer_id === unitId && (l.station_type_id ?? null) === typeId)?.code ?? null,
   })
   const existing = rangesFor(covered, [pl.contract.id], 'equipment_gap')
+  // Stationer som redan ligger på ett öppet glapputkast: Planera fakturor
+  // ändrar utkastet (t.ex. delar det per ärende), nattjobbet skapar ingen till
+  const onOpen = new Set(v2.inputs.gaps.filter((c) => c.on_open_gap_invoice).map((c) => c.station_id))
   let created = 0
   for (const g of groups) {
     if (g.period.equipmentRows.length === 0) continue
@@ -561,15 +570,18 @@ async function createGapInvoices(ctx: RunCtx, customer: CustomerRow, orgNr: stri
         r.start === g.period.periodStart &&
         r.end === g.period.periodEnd &&
         markingKey(r.marking_key ?? '') === g.markingKey &&
-        (r.billing_group_id ?? null) === (g.billingGroupId ?? null)
+        (r.billing_group_id ?? null) === (g.billingGroupId ?? null) &&
+        (r.case_id ?? null) === (g.caseId ?? null)
     )
     if (dup) continue
+    if (g.period.equipmentRows.some((row) => (row.station_ids ?? []).some((id) => onOpen.has(id)))) continue
     const ok = await insertInvoice(ctx, customer, orgNr, g.period, buildRows(pl.contract, pl.sources, g.period), {
       contractId: pl.contract.id,
       consolidated: false,
       marking: g.marking,
       markingKey: markingKeyColumn(g.markingKey),
       ...(g.billingGroupId ? { billingGroupId: g.billingGroupId } : {}),
+      ...(g.caseId ? { caseId: g.caseId } : {}),
       notes: buildContractInvoiceNotes(g.period, pl.sources.label, pl.sources.diaryNumber),
     })
     if (ok) created++

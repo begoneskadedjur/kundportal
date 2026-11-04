@@ -522,6 +522,10 @@ export interface GapCandidate {
   on_open_gap_invoice: string | null
   /** Stationens faktureringsgrupp (läggs på av laddaren, inte SQL) */
   billing_group_id?: string | null
+  /** Ärendet som satte ut stationen (läggs på av laddaren, cases.id) */
+  placed_case_id?: string | null
+  /** Ärendets fakturamärkning (cases.invoice_marking, läggs på av laddaren) */
+  case_marking?: string | null
 }
 
 export interface GapGroup {
@@ -532,15 +536,21 @@ export interface GapGroup {
   missingPrice: string[]
   /** Faktureringsgruppen glappet hör till (undefined = ingen) */
   billingGroupId?: string
+  /** Ärendet som satte ut stationerna (invoices.case_id), undefined = inget */
+  caseId?: string
 }
 
 export const GAP_YEAR_DAYS = 365
 
 /**
- * Glappfakturor: en per märkning och glapp (samma första dag och sista dag),
- * så att täckningen som skrivs vid sändning börjar där glappet börjar. En rad
- * per enhet och stationstyp, à-pris = årspris × medeldagar / 365 (samma
- * formel som pro rata i SQL). Fakturadatum idag.
+ * Glappfakturor: en per märkning, glapp (samma första dag och sista dag) och
+ * ärende, så att täckningen som skrivs vid sändning börjar där glappet börjar
+ * och fakturan bär ärendets märkning, arbetsorder och adress (invoices.case_id).
+ * Ett ärende med egen fakturamärkning ger märkningen och marking_key. Krockar
+ * två ärenden på samma plats i unika indexet (märkning, periodstart, grupp)
+ * delas de inte: de hamnar på en faktura utan ärende som förut. En rad per
+ * enhet och stationstyp, à-pris = årspris × medeldagar / 365 (samma formel
+ * som pro rata i SQL). Fakturadatum idag.
  */
 export function planGapGroups(
   candidates: GapCandidate[],
@@ -551,15 +561,43 @@ export function planGapGroups(
     codeFor?: (unitId: string, stationTypeId: string | null) => string | null
   }
 ): GapGroup[] {
-  const groups = new Map<string, GapCandidate[]>()
-  for (const c of candidates) {
-    const k = c.billing_group_id ? `${c.marking_key}|${c.gap_from}|${c.gap_to}|${c.billing_group_id}` : `${c.marking_key}|${c.gap_from}|${c.gap_to}`
-    groups.set(k, [...(groups.get(k) ?? []), c])
+  type Slot = { key: string; from: string; to: string; groupId?: string; caseId?: string; caseMarking?: string; list: GapCandidate[] }
+  const caseMarkingOf = (c: GapCandidate) => (c.placed_case_id ? c.case_marking?.trim() || undefined : undefined)
+  const place = (c: GapCandidate, byCase: boolean) => {
+    const caseId = byCase ? (c.placed_case_id ?? undefined) : undefined
+    const caseMarking = caseId ? caseMarkingOf(c) : undefined
+    return { key: caseMarking ? markingKey(caseMarking) : c.marking_key, caseId, caseMarking }
   }
+  const build = (noCase: Set<string>) => {
+    const groups = new Map<string, Slot>()
+    for (const c of candidates) {
+      const p = place(c, !noCase.has(c.station_id))
+      // Samma nyckel och ordning som före uppdelningen per ärende, ärendet sist
+      const base = c.billing_group_id ? `${p.key}|${c.gap_from}|${c.gap_to}|${c.billing_group_id}` : `${p.key}|${c.gap_from}|${c.gap_to}`
+      const k = p.caseId ? `${base}|case:${p.caseId}` : base
+      const slot = groups.get(k) ?? { key: p.key, from: c.gap_from, to: c.gap_to, groupId: c.billing_group_id ?? undefined, caseId: p.caseId, caseMarking: p.caseMarking, list: [] }
+      slot.list.push(c)
+      groups.set(k, slot)
+    }
+    return groups
+  }
+  let groups = build(new Set())
+  // Unika indexet: typ, periodstart, marking_key och grupp. Ärendegrupper som
+  // delar plats faktureras ihop utan ärende (som före uppdelningen).
+  const bySlot = new Map<string, Slot[]>()
+  for (const g of groups.values()) {
+    const s = [g.key, g.from, g.groupId ?? ''].join('|')
+    bySlot.set(s, [...(bySlot.get(s) ?? []), g])
+  }
+  const noCase = new Set<string>()
+  for (const list of bySlot.values()) {
+    if (list.length > 1 && list.some((g) => g.caseId)) for (const g of list) for (const c of g.list) noCase.add(c.station_id)
+  }
+  if (noCase.size > 0) groups = build(noCase)
   const out: GapGroup[] = []
   const due = toLocalIsoDate(new Date(parseLocalDate(opts.today).getTime() + (opts.paymentTermsDays ?? 30) * DAY + 12 * 3_600_000))
-  for (const [k, list] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    const [key, from, to, groupId] = k.split('|')
+  for (const [, slot] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const { key, from, to, groupId, caseId, caseMarking, list } = slot
     const missingPrice = list.filter((c) => !(Number(c.annual) > 0)).map((c) => c.station_id)
     const rowsBy = new Map<string, GapCandidate[]>()
     for (const c of list) {
@@ -603,7 +641,14 @@ export function planGapGroups(
       sequenceNumber: 1,
       totalSequenceCount: 1,
     }
-    out.push({ marking: opts.markingFor(key), markingKey: key, period: totals(base, rows), missingPrice, ...(groupId ? { billingGroupId: groupId } : {}) })
+    out.push({
+      marking: caseMarking ?? opts.markingFor(key),
+      markingKey: key,
+      period: totals(base, rows),
+      missingPrice,
+      ...(groupId ? { billingGroupId: groupId } : {}),
+      ...(caseId ? { caseId } : {}),
+    })
   }
   return out
 }
@@ -615,12 +660,13 @@ export function gapRowName(eq: Pick<PlannedEquipmentRow, 'name' | 'unit_name' | 
 export const GAP_INVOICE_NOTE = 'Tilläggsstationer från utsättning till nästa periodstart'
 
 /**
- * Diff för glappfakturor: exakt samma märkning, första och sista dag. Ett
- * matchat utkast behålls (eller uppdateras om beloppet ändrats), övriga
- * utkast raderas, låsta lämnas. Ingen överlappsregel: två glapp för olika
+ * Diff för glappfakturor: exakt samma märkning, ärende, första och sista dag.
+ * Ett matchat utkast behålls (eller uppdateras om beloppet ändrats), övriga
+ * utkast raderas (också ett ihopklumpat utkast utan ärende när glappen delats
+ * per ärende), låsta lämnas. Ingen överlappsregel: två glapp för olika
  * stationer kan överlappa helt.
  */
-export function buildGapDiff(planned: GapGroup[], existing: MarkedInvoice[]): Array<ContractDiffEntry & { gap?: GapGroup }> {
+export function buildGapDiff(planned: GapGroup[], existing: Array<MarkedInvoice & { case_id?: string | null }>): Array<ContractDiffEntry & { gap?: GapGroup }> {
   const used = new Set<string>()
   const out: Array<ContractDiffEntry & { gap?: GapGroup }> = []
   // Makulerade glappfakturor är historik: varken matchas, ändras eller raderas
@@ -631,6 +677,7 @@ export function buildGapDiff(planned: GapGroup[], existing: MarkedInvoice[]): Ar
         !used.has(e.id) &&
         markingKey(e.marking_key ?? '') === g.markingKey &&
         (e.addon_billing_group_id ?? null) === (g.billingGroupId ?? null) &&
+        (e.case_id ?? null) === (g.caseId ?? null) &&
         e.billing_period_start === g.period.periodStart &&
         (e.billing_period_end ?? e.billing_period_start) === g.period.periodEnd
     )

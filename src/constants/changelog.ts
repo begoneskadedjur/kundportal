@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.119.0',
+    date: '2026-11-04',
+    title: 'Glappfakturor delas per ärende',
+    items: [
+      { kind: 'buggfix', text: 'Tilläggsstationer från utsättning som satts ut i olika ärenden hamnade på samma glappfaktura utan ärende. Märkning, arbetsorder, objekt och leveransadress kom då inte med till Fortnox.' },
+      { kind: 'andring', text: 'Planera fakturor gör nu en glappfaktura per ärende. Fakturan får ärendets fakturamärkning som Er referens, arbetsorder och objekt som Ert ordernummer och textrad, och ärendets adress som leveransadress. Ett gammalt ihopslaget utkast tas bort och ersätts.' },
+    ],
+  },
+  {
     version: '3.118.1',
     date: '2026-11-04',
     title: 'Avtalsfakturans text visar rätt premie och period',

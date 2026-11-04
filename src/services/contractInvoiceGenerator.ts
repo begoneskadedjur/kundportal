@@ -210,6 +210,11 @@ export interface BillingPlanEntry {
   billingGroupId?: string | null
   /** Gruppens namn, för förhandsvisningen */
   billingGroupName?: string
+  /**
+   * Glappfaktura per ärende (2026-11-04): värdet som skrivs i invoices.case_id
+   * (ärendet som satte ut stationerna). undefined = kolumnen rörs inte.
+   */
+  caseId?: string | null
 }
 
 export interface BillingPlan {
@@ -293,6 +298,7 @@ type CustomerRow = CustomerForPlanning & {
 
 type ExistingInvoice = {
   id: string
+  case_id?: string | null
   invoice_number?: string | null
   status: string | null
   billing_period_start: string | null
@@ -835,6 +841,8 @@ export class ContractInvoiceGenerator {
         for (const e of buildGapDiff(groups, existingGap)) {
           const groupMarking = e.gap ? e.gap.marking : marking
           const entry = decorate(e, 'equipment_gap', groupMarking, e.gap ? markingKeyColumn(e.gap.markingKey) : null, byId)
+          // Ärendet som satte ut stationerna: märkning, arbetsorder och adress vid sändning
+          if (e.gap?.caseId) entry.caseId = e.gap.caseId
           if (e.gap?.billingGroupId) {
             entry.billingGroupId = e.gap.billingGroupId
             entry.billingGroupName = v2.billingGroups.find((g) => g.id === e.gap!.billingGroupId)?.name
@@ -1110,7 +1118,7 @@ export class ContractInvoiceGenerator {
     let q = supabase
       .from('invoices')
       .select(
-        'id, invoice_number, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, is_consolidated, contract_id, invoice_type, contract_invoice_kind, marking_key, addon_billing_group_id, fortnox_document_number, invoice_items(article_name, line_kind, contract_id, total_price)'
+        'id, invoice_number, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, is_consolidated, contract_id, invoice_type, contract_invoice_kind, marking_key, addon_billing_group_id, case_id, fortnox_document_number, invoice_items(article_name, line_kind, contract_id, total_price)'
       )
       .eq('customer_id', customerId)
       .in('invoice_type', ['contract', 'adhoc'])
@@ -1754,7 +1762,9 @@ export class ContractInvoiceGenerator {
         contract_id: contractId,
         is_consolidated: entry?.consolidated ?? false,
         contract_invoice_kind: planned.kind ?? 'premium',
-        case_id: null,
+        // Glappfaktura per ärende: ärendet (cases.id). case_type är null som på
+        // alla avtalsfakturor; fakturamodalen härleder 'contract'.
+        case_id: entry?.caseId ?? null,
         case_type: null,
         customer_name: customer.company_name,
         customer_email: customer.billing_email ?? customer.contact_email,
@@ -2084,6 +2094,7 @@ export class ContractInvoiceGenerator {
     if (entry?.marking !== undefined) updatePayload.invoice_marking = entry.marking
     if (entry?.markingKey !== undefined) updatePayload.marking_key = entry.markingKey
     if (entry?.billingGroupId !== undefined) updatePayload.addon_billing_group_id = entry.billingGroupId
+    if (entry?.caseId !== undefined) updatePayload.case_id = entry.caseId
     if (entry?.consolidated) updatePayload.is_consolidated = true
     if (planned.kind) updatePayload.contract_invoice_kind = planned.kind
     // En redan godkänd faktura vars rader ändras ska granskas igen

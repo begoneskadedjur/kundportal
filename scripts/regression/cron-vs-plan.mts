@@ -73,6 +73,7 @@ type Write = {
   action: string
   marking?: string | null
   notes?: string
+  caseId?: string
   rows?: Row[]
 }
 
@@ -106,7 +107,7 @@ const writes = new Map<string, Write>()
 for (const v2 of [false, true]) {
   const ctx = { dryRun: true, v2, planned: [] as Write[] }
   await cron.runContinuingContracts(ctx)
-  for (const w of ctx.planned) writes.set(`${w.action}|${w.customer_id}|${w.contract_id}|${w.kind}|${w.periodStart}|${w.periodEnd}`, w)
+  for (const w of ctx.planned) writes.set(`${w.action}|${w.customer_id}|${w.contract_id}|${w.kind}|${w.periodStart}|${w.periodEnd}|${w.caseId ?? ''}`, w)
 }
 
 // Planera fakturor per kund
@@ -125,6 +126,8 @@ for (const w of writes.values()) {
       (e.kind ?? 'premium') === w.kind &&
       e.planned.periodStart === w.periodStart &&
       e.planned.periodEnd === w.periodEnd &&
+      // Glappfakturor per ärende (2026-11-04): samma ärende
+      (w.kind !== 'equipment_gap' || (e.caseId ?? null) === (w.caseId ?? null)) &&
       (w.contract_id ? e.contractId === w.contract_id && !e.consolidated : e.consolidated)
   )
   const base = {

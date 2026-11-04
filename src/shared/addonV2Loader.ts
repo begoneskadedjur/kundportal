@@ -107,6 +107,30 @@ export async function loadAddonV2Inputs(
   }
 
   const { data: gaps, error: gapErr } = await sb.rpc('addon_gap_candidates', { p_contract_id: args.contractId })
-  const gapRows = ((gaps ?? []) as GapCandidate[]).map((g) => (stationGroup.has(g.station_id) ? { ...g, billing_group_id: stationGroup.get(g.station_id) } : g))
+  let gapRows = ((gaps ?? []) as GapCandidate[]).map((g) => (stationGroup.has(g.station_id) ? { ...g, billing_group_id: stationGroup.get(g.station_id) } : g))
+  // Glappfakturor per ärende (2026-11-04): ärendet som satte ut stationen och
+  // ärendets fakturamärkning, så att fakturan får ärendets märkning,
+  // arbetsorder och adress när den skickas till Fortnox.
+  if (gapRows.length > 0) {
+    const ids = [...new Set(gapRows.map((g) => g.station_id))]
+    const [{ data: outCase }, { data: inCase }] = await Promise.all([
+      sb.from('equipment_placements').select('id, placed_case_id').in('id', ids),
+      sb.from('indoor_stations').select('id, placed_case_id').in('id', ids),
+    ])
+    const caseOf = new Map<string, string>()
+    for (const r of [...((outCase ?? []) as Array<{ id: string; placed_case_id: string | null }>), ...((inCase ?? []) as Array<{ id: string; placed_case_id: string | null }>)]) {
+      if (r.placed_case_id) caseOf.set(r.id, r.placed_case_id)
+    }
+    const caseIds = [...new Set(caseOf.values())]
+    const markingOf = new Map<string, string | null>()
+    if (caseIds.length > 0) {
+      const { data: caseRows } = await sb.from('cases').select('id, invoice_marking').in('id', caseIds)
+      for (const c of (caseRows ?? []) as Array<{ id: string; invoice_marking: string | null }>) markingOf.set(c.id, c.invoice_marking?.trim() || null)
+    }
+    gapRows = gapRows.map((g) => {
+      const caseId = caseOf.get(g.station_id)
+      return caseId ? { ...g, placed_case_id: caseId, case_marking: markingOf.get(caseId) ?? null } : g
+    })
+  }
   return { split, lines, coverage, gaps: gapRows, gapError: gapErr ? gapErr.message : null, billingGroups, groupSplit }
 }

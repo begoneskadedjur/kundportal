@@ -313,3 +313,88 @@ describe('A6: glappfaktura', () => {
     ])
   })
 })
+
+describe('Glappfakturor per ärende (Falu kommun 2026-10-27)', () => {
+  const cand = (over: Partial<GapCandidate> = {}): GapCandidate => ({
+    station_kind: 'outdoor',
+    station_id: 's1',
+    unit_id: 'U1',
+    unit_name: 'Falu kommun',
+    station_type_id: 'T1',
+    type_name: 'Mekanisk fälla',
+    model: 'per_year',
+    annual: 2348,
+    start_day: '2026-10-27',
+    gap_from: '2026-10-27',
+    gap_to: '2027-06-29',
+    days: 246,
+    end_day: '2027-06-30',
+    marking_key: '',
+    on_open_gap_invoice: null,
+    ...over,
+  })
+  const falu = [
+    cand({ placed_case_id: 'case45', case_marking: '91FTO01' }),
+    cand({ station_id: 's2', station_type_id: 'T2', type_name: 'Ljusfälla', annual: 1686, placed_case_id: 'case44', case_marking: ' 91MPE46 ' }),
+  ]
+  const opts = { today: '2026-11-04', markingFor: () => null }
+
+  it('två ärenden samma dag ger två fakturor med ärende, märkning och belopp', () => {
+    const groups = planGapGroups(falu, opts)
+    expect(groups.map((g) => [g.caseId, g.marking, g.markingKey, g.period.subtotal])).toEqual([
+      ['case45', '91FTO01', '91FTO01', 1582.49],
+      ['case44', '91MPE46', '91MPE46', 1136.32],
+    ])
+  })
+  it('det ihopklumpade utkastet utan ärende raderas, två nya skapas; nästa planering behåller dem', () => {
+    const groups = planGapGroups(falu, opts)
+    const old = {
+      id: 'g0053',
+      status: 'pending_approval',
+      marking_key: null,
+      case_id: null,
+      billing_period_start: '2026-10-27',
+      billing_period_end: '2027-06-29',
+      total_amount: 3398.51,
+      subtotal: 2718.81,
+      is_historical: false,
+      invoice_type: 'contract',
+    }
+    expect(buildGapDiff(groups, [old]).map((e) => [e.action, e.existingId ?? e.gap?.caseId])).toEqual([
+      ['create', 'case45'],
+      ['create', 'case44'],
+      ['delete', 'g0053'],
+    ])
+    const created = groups.map((g, i) => ({
+      ...old,
+      id: `n${i}`,
+      marking_key: g.markingKey,
+      case_id: g.caseId,
+      subtotal: g.period.subtotal,
+    }))
+    expect(buildGapDiff(groups, created).map((e) => e.action)).toEqual(['keep', 'keep'])
+  })
+  it('ett låst ihopklumpat glapp lämnas', () => {
+    const groups = planGapGroups(falu, opts)
+    const locked = { id: 'L', status: 'sent', marking_key: null, case_id: null, billing_period_start: '2026-10-27', billing_period_end: '2027-06-29', total_amount: 1, subtotal: 1, is_historical: false, invoice_type: 'contract' }
+    expect(buildGapDiff(groups, [locked]).map((e) => e.action)).toEqual(['create', 'create'])
+  })
+  it('ärende utan egen märkning: dagens märkningsregel, ärendet ändå på fakturan', () => {
+    const groups = planGapGroups([cand({ marking_key: 'YX201', placed_case_id: 'c1' })], { today: '2026-11-04', markingFor: (k) => `ref ${k}` })
+    expect(groups.map((g) => [g.caseId, g.marking, g.markingKey])).toEqual([['c1', 'ref YX201', 'YX201']])
+  })
+  it('två ärenden på samma plats i unika indexet faktureras ihop utan ärende som förut', () => {
+    const groups = planGapGroups(
+      [cand({ placed_case_id: 'c1' }), cand({ station_id: 's2', placed_case_id: 'c2' }), cand({ station_id: 's3', placed_case_id: 'c3', case_marking: 'EGEN' })],
+      opts
+    )
+    expect(groups.map((g) => [g.caseId ?? null, g.markingKey, g.period.equipmentRows[0].quantity])).toEqual([
+      [null, '', 2],
+      ['c3', 'EGEN', 1],
+    ])
+  })
+  it('stationer utan ärende grupperas som förut', () => {
+    const groups = planGapGroups([cand(), cand({ station_id: 's2' })], opts)
+    expect(groups.map((g) => [g.caseId ?? null, g.period.equipmentRows[0].quantity])).toEqual([[null, 2]])
+  })
+})
