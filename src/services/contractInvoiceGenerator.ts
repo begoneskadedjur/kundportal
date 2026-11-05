@@ -18,7 +18,10 @@
 //     redan passerat utan faktura visas som 'uncovered' (importera från
 //     Fortnox). Synth-avtal (kunder utan avtalsrad) behåller dagens beteende.
 //   * Fakturadatum = periodstart minus ledtid (DEFAULT_INVOICE_LEAD_DAYS), så
-//     fakturan är betald innan kundens nya avtalsår börjar.
+//     fakturan är betald innan kundens nya avtalsår börjar. Månadsfakturor
+//     har fakturadatum periodstart (contractPlanner, sedan 3.120.0).
+//     Planera fakturor skapar alla perioder i bindningsfönstret direkt;
+//     bara nattjobbet väntar på skapandedagen (isDueForCreation).
 
 import { supabase } from '../lib/supabase'
 import { ImportedCustomerContractService } from './importedCustomerContractService'
@@ -1748,7 +1751,7 @@ export class ContractInvoiceGenerator {
     const invoiceNumber = await this.generateInvoiceNumber()
     const rows = entry?.rows ?? (await this.buildLegacyRows(customer, planned))
     const notes = entry?.notes ?? this.buildLegacyNotes(planned)
-    // Fakturadatum = ledtiden före periodstart (planerarens invoiceDate)
+    // Fakturadatum = planerarens invoiceDate (ledtid före periodstart, månad: periodstart)
     const createdAt = parseLocalDate(planned.invoiceDate).toISOString()
     const subtotal = Math.round(rows.reduce((s, r) => s + r.total_price, 0) * 100) / 100
     const vat = Math.round(rows.reduce((s, r) => s + (r.total_price * r.vat_rate) / 100, 0) * 100) / 100

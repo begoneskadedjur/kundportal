@@ -4,8 +4,10 @@
 // och signeringen planerar bara nuvarande bindningstid. Dagen efter sista
 // uppsägningsdag (slutdatum minus uppsägningstid) utan uppsägning skapar
 // cronen hela nästa bindningsperiods fakturor direkt, med fakturadatum
-// periodstart minus ledtid men aldrig före idag. Saknade perioder inom
-// nuvarande bindningstid skapas som förut när fakturadatumet är inne.
+// periodstart minus ledtid men aldrig före idag (månadsfakturor: periodstart).
+// Saknade perioder inom nuvarande bindningstid skapas när skapandedagen är
+// inne: fakturadatumet, för månadsfakturor en vecka före (contractPlanner
+// MONTHLY_DRAFT_LEAD_DAYS).
 // Körs varje natt 03:00 UTC via Vercel Cron, så förlängningen hinner skapas
 // före fakturadatumet även vid kort uppsägningstid. Idempotent: bara perioder
 // som saknar faktura skapas.
@@ -659,6 +661,7 @@ async function generateForCustomerContracts(ctx: RunCtx, customer: CustomerRow, 
           slot.rows.push(...buildRows(pl.contract, pl.sources, p))
           if (p.renewal) slot.p.renewal = true
           if (p.invoiceDate < slot.p.invoiceDate) slot.p.invoiceDate = p.invoiceDate
+          if ((p.creationDate ?? p.invoiceDate) < (slot.p.creationDate ?? slot.p.invoiceDate)) slot.p.creationDate = p.creationDate ?? p.invoiceDate
           if (p.dueDate < slot.p.dueDate) slot.p.dueDate = p.dueDate
           if (p.periodEnd > slot.p.periodEnd) slot.p.periodEnd = p.periodEnd
           // Samma anteckning som Planera fakturor (planConsolidatedForCustomer)

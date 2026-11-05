@@ -992,6 +992,7 @@ function cronForCustomerContracts(customer: CustomerRow, list: ContractRow[]) {
           slot.rowCount += buildRows(pl.contract, pl.sources, p).length
           if (p.renewal) slot.p.renewal = true
           if (p.invoiceDate < slot.p.invoiceDate) slot.p.invoiceDate = p.invoiceDate
+          if ((p.creationDate ?? p.invoiceDate) < (slot.p.creationDate ?? slot.p.invoiceDate)) slot.p.creationDate = p.creationDate ?? p.invoiceDate
           if (p.dueDate < slot.p.dueDate) slot.p.dueDate = p.dueDate
           if (p.periodEnd > slot.p.periodEnd) slot.p.periodEnd = p.periodEnd
           byPeriod.set(p.periodStart, slot)

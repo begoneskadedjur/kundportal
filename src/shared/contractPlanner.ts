@@ -138,8 +138,18 @@ export interface PlannedPeriod {
   subtotal: number
   vatAmount: number
   totalAmount: number
-  /** Dagen fakturan ska skapas: periodstart minus ledtid, aldrig före idag */
+  /**
+   * Fakturadatum (dagen fakturan ska skickas): periodstart minus ledtid för
+   * års-, halvårs- och kvartalsfakturor, periodstart för månadsfakturor.
+   * Aldrig före idag.
+   */
   invoiceDate: string
+  /**
+   * Dagen nattjobbet skapar utkastet när den skiljer sig från fakturadatumet.
+   * Månadsfakturor: en vecka före fakturadatumet (MONTHLY_DRAFT_LEAD_DAYS),
+   * aldrig före idag. Saknas = fakturadatumet.
+   */
+  creationDate?: string
   dueDate: string
   /** Perioden började före innevarande månad */
   isHistorical: boolean
@@ -161,7 +171,8 @@ export interface PlanOptions {
   paymentTermsDays?: number
   /**
    * Ledtid: fakturan skapas så många dagar före periodstart att den med
-   * betalningsvillkoren är betald innan kundens nya avtalsår börjar.
+   * betalningsvillkoren är betald innan kundens nya avtalsår börjar. Gäller
+   * inte månadsfakturor, som har fakturadatum periodstart.
    */
   leadDays?: number
   /** Idag (lokal ÅÅÅÅ-MM-DD), för tester */
@@ -186,6 +197,13 @@ export interface PlanOptions {
 
 /** Standardledtid: 30 dagars betalningsvillkor plus tio dagars marginal. */
 export const DEFAULT_INVOICE_LEAD_DAYS = 40
+
+/**
+ * Månadsfakturor (billing_frequency monthly) har fakturadatum periodstart
+ * (den 1:a, eller avtalsdagen i exakt läge). Nattjobbet skapar utkastet så
+ * många dagar innan, så att det hinner godkännas före fakturadatumet.
+ */
+export const MONTHLY_DRAFT_LEAD_DAYS = 7
 
 export function toLocalIsoDate(d: Date): string {
   const y = d.getFullYear()
@@ -361,10 +379,12 @@ export function nextRenewal(
 /**
  * Cronens regel för när en planerad period blir utkast: en förlängning
  * (säker sedan sista uppsägningsdag passerat) direkt, övriga perioder när
- * fakturadatumet är inne. Fakturadatumet är aldrig före planeringsdagen.
+ * skapandedagen är inne (creationDate, annars fakturadatumet). Månadsfakturor
+ * skapas en vecka före fakturadatumet. Fakturadatumet är aldrig före
+ * planeringsdagen.
  */
-export function isDueForCreation(p: Pick<PlannedPeriod, 'renewal' | 'invoiceDate'>, todayIso: string): boolean {
-  return !!p.renewal || p.invoiceDate <= todayIso
+export function isDueForCreation(p: Pick<PlannedPeriod, 'renewal' | 'invoiceDate' | 'creationDate'>, todayIso: string): boolean {
+  return !!p.renewal || (p.creationDate ?? p.invoiceDate) <= todayIso
 }
 
 /** Högst så många dagar efter periodstart får billing_start_date ligga för att raden ska tas med från periodstart. */
@@ -650,10 +670,19 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
 
     const isHistorical = periodStart < startOfCurrentMonth
     // Fakturadatum: ledtiden före periodstart, men aldrig bakåt i tiden.
-    let invoiceDate = addDays(periodStart, -leadDays)
+    // Månadsfakturor: periodstart (den 1:a, eller avtalsdagen i exakt läge),
+    // som Fortnox har fakturerat månadskunderna. Beslut 2026-11-05.
+    const monthly = freq === 'monthly'
+    let invoiceDate = monthly ? new Date(periodStart.getTime()) : addDays(periodStart, -leadDays)
     if (invoiceDate < today) invoiceDate = today
     if (isHistorical) invoiceDate = new Date(periodStart.getTime())
     const due = addDays(invoiceDate, paymentTermsDays)
+    // Nattjobbet skapar månadsutkastet en vecka före fakturadatumet
+    let creation: Date | null = null
+    if (monthly && !isHistorical) {
+      creation = addDays(invoiceDate, -MONTHLY_DRAFT_LEAD_DAYS)
+      if (creation < today) creation = today
+    }
 
     return {
       kind: 'premium' as const,
@@ -667,6 +696,7 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
       vatAmount,
       totalAmount: Math.round((subtotal + vatAmount) * 100) / 100,
       invoiceDate: toLocalIsoDate(invoiceDate),
+      ...(creation ? { creationDate: toLocalIsoDate(creation) } : {}),
       dueDate: toLocalIsoDate(due),
       isHistorical,
       sequenceNumber: idx + 1,

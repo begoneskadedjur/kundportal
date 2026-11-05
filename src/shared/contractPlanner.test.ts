@@ -4,6 +4,7 @@ import {
   computePlannedMonthlyEquipmentPeriods,
   computePlannedPeriods,
   isDueForCreation,
+  MONTHLY_DRAFT_LEAD_DAYS,
   lastNoticeDay,
   nextRenewal,
   snapsToPeriodStart,
@@ -229,5 +230,62 @@ describe('exakt avtalsdag: § 6-rad som började den 1:a (FEV, steg 11)', () => 
     expect(snapsToPeriodStart('2027-08-01', '2027-06-30', '2028-06-29')).toBe(false)
     expect(snapsToPeriodStart('2027-07-31', '2027-06-30', '2028-06-29')).toBe(true)
     expect(snapsToPeriodStart('2027-07-05', '2027-06-30', '2027-07-29')).toBe(false)
+  })
+})
+
+describe('månadsfakturor: fakturadatum periodstart (3.120.0)', () => {
+  const monthly = (over: Partial<PlanningContract> = {}) =>
+    base({
+      billing_frequency: 'monthly',
+      contract_start_date: '2026-09-01',
+      contract_end_date: '2029-02-28',
+      notice_period_months: 3,
+      ...over,
+    })
+
+  it('fakturadatum = periodstart, förfallodag = periodstart plus 30', () => {
+    const periods = plan(monthly(), '2026-11-05')
+    const jan = periods.find((p) => p.periodStart === '2027-01-01')!
+    expect(jan.invoiceDate).toBe('2027-01-01')
+    expect(jan.dueDate).toBe('2027-01-31')
+    const feb = periods.find((p) => p.periodStart === '2027-02-01')!
+    expect(feb.invoiceDate).toBe('2027-02-01')
+    expect(feb.dueDate).toBe('2027-03-03')
+  })
+
+  it('perioden som redan börjat får idag, som förut', () => {
+    const nov = plan(monthly(), '2026-11-05').find((p) => p.periodStart === '2026-11-01')!
+    expect(nov.invoiceDate).toBe('2026-11-05')
+  })
+
+  it('nattjobbet skapar utkastet en vecka före fakturadatumet', () => {
+    expect(MONTHLY_DRAFT_LEAD_DAYS).toBe(7)
+    const dec = plan(monthly(), '2026-11-05').find((p) => p.periodStart === '2026-12-01')!
+    expect(dec.creationDate).toBe('2026-11-24')
+    expect(isDueForCreation(dec, '2026-11-23')).toBe(false)
+    expect(isDueForCreation(dec, '2026-11-24')).toBe(true)
+    // Skapandedagen aldrig före idag
+    const dec2 = plan(monthly(), '2026-11-28').find((p) => p.periodStart === '2026-12-01')!
+    expect(dec2.creationDate).toBe('2026-11-28')
+  })
+
+  it('exakt avtalsdag: fakturadatum är avtalsdagen', () => {
+    const c = monthly({ billing_anchor_mode: 'start_day', contract_start_date: '2026-09-04', contract_end_date: '2027-09-03' })
+    const p = plan(c, '2026-11-05').find((x) => x.periodStart === '2027-01-04')!
+    expect(p.invoiceDate).toBe('2027-01-04')
+    expect(p.creationDate).toBe('2026-12-28')
+  })
+
+  it('årsavtal oförändrat: ledtid 40 dagar, ingen egen skapandedag', () => {
+    const periods = plan(base(), '2027-07-15')
+    expect(periods[1].invoiceDate).toBe('2027-08-22')
+    expect(periods[1].creationDate).toBeUndefined()
+  })
+
+  it('kvartalsavtal oförändrat: 40 dagar före periodstart', () => {
+    const q = plan(base({ billing_frequency: 'quarterly', contract_start_date: '2026-10-01', contract_end_date: '2027-09-30' }), '2026-10-05')
+    const jan = q.find((p) => p.periodStart === '2027-01-01')!
+    expect(jan.invoiceDate).toBe('2026-11-22')
+    expect(jan.creationDate).toBeUndefined()
   })
 })

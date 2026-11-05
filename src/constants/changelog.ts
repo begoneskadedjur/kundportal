@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.120.0',
+    date: '2026-11-05',
+    title: 'Månadsfakturor skickas den 1:a',
+    items: [
+      { kind: 'andring', text: 'Månadsfakturor för avtal får fakturadatum den 1:a i den månad de gäller och förfaller 30 dagar senare. Års-, halvårs- och kvartalsfakturor skickas som förut 40 dagar före perioden.' },
+      { kind: 'andring', text: 'Nattjobbet skapar månadsutkastet en vecka före fakturadatumet, så att det hinner godkännas.' },
+      { kind: 'andring', text: 'Maserfrakt Moras och Miniriders kommande månadsutkast har fått fakturadatum den 1:a. Kista Galleria är orört tills frågan om efterskott är avgjord.' },
+    ],
+  },
+  {
     version: '3.119.1',
     date: '2026-11-05',
     title: 'Fakturadatum i svensk tid',
