@@ -3,6 +3,7 @@ import {
   addDaysIso,
   daysBetween,
   dueNoteText,
+  earlySendCheck,
   frequencyFromPeriod,
   invoiceSchedule,
   scheduleStatusText,
@@ -94,5 +95,35 @@ describe('frequencyFromPeriod', () => {
     expect(frequencyFromPeriod('2027-01-01', '2027-06-30')).toBe('semi_annual')
     expect(frequencyFromPeriod('2026-11-01', '2027-10-31')).toBe('annual')
     expect(frequencyFromPeriod(null, '2027-10-31')).toBeNull()
+  })
+})
+
+describe('earlySendCheck', () => {
+  it('månadsfaktura mer än 10 dagar före sin period varnar', () => {
+    const r = earlySendCheck({ frequency: 'monthly', sendDate: '2027-01-01', periodStart: '2027-01-01' }, '2026-11-22')
+    expect(r.tooEarly).toBe(true)
+    expect(r.daysEarly).toBe(40)
+    expect(r.waitUntil).toBe('2027-01-01')
+    expect(r.monthly).toBe(true)
+  })
+  it('månadsfaktura 10 dagar före eller närmare varnar inte', () => {
+    expect(earlySendCheck({ frequency: 'monthly', sendDate: '2026-12-01', periodStart: '2026-12-01' }, '2026-11-21').tooEarly).toBe(false)
+    expect(earlySendCheck({ frequency: 'monthly', sendDate: '2026-12-01', periodStart: '2026-12-01' }, '2026-11-20').tooEarly).toBe(true)
+  })
+  it('årsfaktura mer än 60 dagar före periodstart varnar, väntar till skickdatumet', () => {
+    const r = earlySendCheck({ frequency: 'annual', sendDate: '2027-01-20', periodStart: '2027-03-01' }, '2026-11-05')
+    expect(r.tooEarly).toBe(true)
+    expect(r.daysEarly).toBe(116)
+    expect(r.waitUntil).toBe('2027-01-20')
+  })
+  it('årsfaktura på sitt skickdatum (40 dagar före) varnar inte', () => {
+    expect(earlySendCheck({ frequency: 'annual', sendDate: '2026-11-05', periodStart: '2026-12-15' }, '2026-11-05').tooEarly).toBe(false)
+  })
+  it('kvartal och halvår räknas som årsfaktura', () => {
+    expect(earlySendCheck({ frequency: 'quarterly', sendDate: '2027-02-19', periodStart: '2027-04-01' }, '2026-11-05').tooEarly).toBe(true)
+    expect(earlySendCheck({ frequency: 'semi_annual', sendDate: '2026-11-22', periodStart: '2027-01-01' }, '2026-11-05').tooEarly).toBe(false)
+  })
+  it('okänd frekvens eller glappfaktura kontrolleras inte', () => {
+    expect(earlySendCheck({ frequency: null, sendDate: '2027-06-01', periodStart: '2027-06-01' }, '2026-11-05').tooEarly).toBe(false)
   })
 })

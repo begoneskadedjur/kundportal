@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.122.0',
+    date: '2026-11-05',
+    title: 'Varning innan en avtalsfaktura skickas för tidigt',
+    items: [
+      { kind: 'nyhet', text: 'Fakturamodalen visar för ej skickade avtalsfakturor när fakturan skulle skickas, när perioden börjar och när den förfaller om den skickas idag. Förfallodagen blir röd om kunden betalar efter att perioden börjat.' },
+      { kind: 'nyhet', text: 'Portalen frågar innan en månadsfaktura skickas mer än 10 dagar före sin period, eller en års-, halvårs- eller kvartalsfaktura mer än 60 dagar före periodstart. Välj Vänta till datumet eller Skicka ändå. Gäller både Skapa utkast i Fortnox och Skicka godkända till Fortnox.' },
+    ],
+  },
+  {
     version: '3.121.0',
     date: '2026-11-05',
     title: 'Avtalskunder som faktureringsschema',

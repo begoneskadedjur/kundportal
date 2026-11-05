@@ -145,3 +145,40 @@ export const FREQUENCY_LABEL: Record<string, string> = {
   semi_annual: 'Halvårsvis',
   annual: 'Årsvis',
 }
+
+/**
+ * Varning vid för tidig sändning (3.122.0): en månadsfaktura som skickas mer
+ * än 10 dagar före sitt skickdatum (periodstart), eller en års-, halvårs- eller
+ * kvartalsfaktura som skickas mer än 60 dagar före periodstart.
+ */
+export const EARLY_SEND_LIMIT_MONTHLY = 10
+export const EARLY_SEND_LIMIT_OTHER = 60
+
+export interface EarlySendInput {
+  /** monthly, quarterly, semi_annual, annual; null = ingen kontroll */
+  frequency: string | null
+  sendDate: string
+  periodStart: string | null
+}
+
+export interface EarlySend {
+  tooEarly: boolean
+  /** Dagar kvar till dagen kontrollen räknar från (skickdatum för månad, periodstart annars) */
+  daysEarly: number
+  /** Dagen att vänta till: fakturans skickdatum */
+  waitUntil: string
+  monthly: boolean
+}
+
+export function earlySendCheck(inv: EarlySendInput, todayIso: string): EarlySend {
+  const monthly = inv.frequency === 'monthly'
+  const known = monthly || inv.frequency === 'quarterly' || inv.frequency === 'semi_annual' || inv.frequency === 'annual'
+  const ref = monthly ? (inv.periodStart ?? inv.sendDate) : inv.periodStart
+  if (!known || !ref) return { tooEarly: false, daysEarly: 0, waitUntil: inv.sendDate, monthly }
+  const daysEarly = daysBetween(todayIso, ref)
+  const limit = monthly ? EARLY_SEND_LIMIT_MONTHLY : EARLY_SEND_LIMIT_OTHER
+  // Vänta till skickdatumet, men aldrig så att varningen fortfarande slår till
+  const latestOk = addDaysIso(ref, -limit)
+  const waitUntil = inv.sendDate > todayIso ? (inv.sendDate < latestOk ? latestOk : inv.sendDate) : latestOk
+  return { tooEarly: daysEarly > limit, daysEarly, waitUntil, monthly }
+}

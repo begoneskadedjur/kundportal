@@ -21,6 +21,7 @@ import {
   FREQUENCY_LABEL,
   addDaysIso,
   dueNoteText,
+  earlySendCheck,
   frequencyFromPeriod,
   invoiceSchedule,
   scheduleStatusText,
@@ -41,6 +42,7 @@ import {
 import { fakturor, fmtKr, fmtNum, groupCheckState, toggleGroup, toggleOne, type Tone } from './queueUtils'
 import { MonthCalendar } from './MonthCalendar'
 import { approveInvoices, exportReadyInvoices } from './queueActions'
+import EarlySendDialog, { type EarlySendItem } from './EarlySendDialog'
 
 type ContractInvoice = Invoice & {
   contract_id: string | null
@@ -110,6 +112,7 @@ const RULES = [
   { title: 'Årsvis, halvårsvis och kvartalsvis', text: 'Skickas 40 dagar före periodstart. Kunden betalar innan perioden börjar.' },
   { title: 'Månadsvis', text: 'Skickas den 1:a i den månad fakturan gäller. Utkastet syns en vecka innan.' },
   { title: 'Tillägg per månad', text: 'Skickas den 1:a, tillsammans med månadens premie.' },
+  { title: 'Varning', text: 'Portalen frågar innan en månadsfaktura skickas mer än 10 dagar före sin period, eller en årsfaktura mer än 60 dagar före.' },
 ]
 
 const chunks = <T,>(list: T[], size = 100): T[][] => {
@@ -142,6 +145,7 @@ export default function ContractSchedule({ onShowArchive }: { onShowArchive?: ()
   const [search, setSearch] = useState('')
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('alla')
   const [showAllUpcoming, setShowAllUpcoming] = useState(false)
+  const [earlyItems, setEarlyItems] = useState<EarlySendItem[]>([])
 
   const today = swedishDay(new Date())
 
@@ -315,7 +319,7 @@ export default function ContractSchedule({ onShowArchive }: { onShowArchive?: ()
   // Knappraden
   const selectedRows = rows.filter((r) => selected.has(r.inv.id))
   const approveList = selectedRows.filter((r) => r.inv.status === 'pending_approval').map((r) => r.inv)
-  const sendList = (selectedRows.length > 0 ? selectedRows : rows).filter((r) => r.inv.status === 'ready').map((r) => r.inv)
+  const sendRows = (selectedRows.length > 0 ? selectedRows : rows).filter((r) => r.inv.status === 'ready')
 
   const handleApprove = async () => {
     if (!user || !canApprove) return
@@ -328,13 +332,37 @@ export default function ContractSchedule({ onShowArchive }: { onShowArchive?: ()
     }
   }
 
-  const handleSend = async () => {
+  const doSend = async () => {
     setBusy(true)
     try {
-      await exportReadyInvoices(sendList.map((i) => i.id))
+      await exportReadyInvoices(sendRows.map((r) => r.inv.id))
     } finally {
       setBusy(false)
     }
+  }
+
+  // Varna först om någon av fakturorna skickas för tidigt (3.122.0)
+  const handleSend = () => {
+    const early: EarlySendItem[] = []
+    for (const r of sendRows) {
+      const e = earlySendCheck({ frequency: r.frequency, sendDate: r.s.sendDate, periodStart: r.s.periodStart }, today)
+      if (e.tooEarly) {
+        early.push({
+          id: r.inv.id,
+          customerName: r.inv.customer_name,
+          invoiceNumber: r.inv.invoice_number,
+          waitUntil: e.waitUntil,
+          periodStart: r.s.periodStart,
+          daysEarly: e.daysEarly,
+          monthly: e.monthly,
+        })
+      }
+    }
+    if (early.length > 0) {
+      setEarlyItems(early)
+      return
+    }
+    doSend()
   }
 
   const GRID = 'grid grid-cols-[120px_minmax(200px,1.6fr)_118px_150px_100px_120px_16px] gap-3 items-center'
@@ -444,7 +472,7 @@ export default function ContractSchedule({ onShowArchive }: { onShowArchive?: ()
             approveCount={approveList.length}
             onApprove={handleApprove}
             busy={busy}
-            sendCount={sendList.length}
+            sendCount={sendRows.length}
             onSend={handleSend}
             sendTitle="Godkända fakturor exporteras till Fortnox. Utan markering tas alla godkända."
           />
@@ -548,6 +576,16 @@ export default function ContractSchedule({ onShowArchive }: { onShowArchive?: ()
           </SideCard>
         </div>
       </div>
+
+      <EarlySendDialog
+        items={earlyItems}
+        today={today}
+        onWait={() => setEarlyItems([])}
+        onSendAnyway={() => {
+          setEarlyItems([])
+          doSend()
+        }}
+      />
 
       <InvoiceDetailModal
         isOpen={openId !== null}

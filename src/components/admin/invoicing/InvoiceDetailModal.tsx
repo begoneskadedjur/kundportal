@@ -63,6 +63,8 @@ import ServiceCostBreakdown from '../../shared/ServiceCostBreakdown'
 import CaseModalSection from '../../shared/CaseModalSection'
 import InvoiceStatusStepper from '../../shared/InvoiceStatusStepper'
 import InvoicePulseRow from './InvoicePulseRow'
+import EarlySendDialog, { type EarlySendItem } from './queue/EarlySendDialog'
+import { earlySendCheck, frequencyFromPeriod, invoiceSchedule, swedishDay } from '../../../shared/invoiceSchedule'
 import InvoiceDeliveryPanel from './InvoiceDeliveryPanel'
 import { caseMarkingOnInvoice } from '../../../shared/caseMarking'
 import { invoiceWorkAddress } from '../../../shared/invoiceWorkAddress'
@@ -1305,6 +1307,66 @@ export default function InvoiceDetailModal({
   const addonByItemId = new Map(addons.lines.map(l => [l.invoiceItemId, l]))
   const priceCheck = usePriceListCheck(isOpen ? invoice : null, caseBillingItems, addons.lines)
 
+  // Faktureringsschemat (3.122.0): ej skickad avtalsfaktura får raden Skulle
+  // skickas, Perioden börjar och Förfaller om skickad idag, och en varning
+  // innan den skickas för tidigt. Regeln i src/shared/invoiceSchedule.ts.
+  const scheduleInvoice = invoice as (InvoiceWithItems & { contract_id?: string | null; contract_invoice_kind?: string | null }) | null
+  const isUnsentContract =
+    !!scheduleInvoice &&
+    scheduleInvoice.invoice_type === 'contract' &&
+    !scheduleInvoice.fortnox_document_number &&
+    (scheduleInvoice.status === 'pending_approval' || scheduleInvoice.status === 'ready')
+  const [scheduleFreq, setScheduleFreq] = useState<string | null>(null)
+  const [contractTermsDays, setContractTermsDays] = useState(30)
+  const [earlyItems, setEarlyItems] = useState<EarlySendItem[]>([])
+  useEffect(() => {
+    setEarlyItems([])
+    if (!isOpen || !scheduleInvoice || !isUnsentContract) return
+    let cancelled = false
+    PaymentTermsService.getDays('contract').then((d) => { if (!cancelled) setContractTermsDays(d) }).catch(() => {})
+    const kind = scheduleInvoice.contract_invoice_kind
+    const fallback =
+      kind === 'equipment_monthly' ? 'monthly'
+      : kind === 'equipment_gap' ? null
+      : frequencyFromPeriod(scheduleInvoice.billing_period_start, scheduleInvoice.billing_period_end)
+    setScheduleFreq(fallback)
+    if (scheduleInvoice.contract_id && kind !== 'equipment_monthly' && kind !== 'equipment_gap') {
+      supabase
+        .from('contracts')
+        .select('billing_frequency')
+        .eq('id', scheduleInvoice.contract_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          const f = (data as { billing_frequency?: string | null } | null)?.billing_frequency
+          if (!cancelled && f) setScheduleFreq(f)
+        })
+    }
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, scheduleInvoice?.id, isUnsentContract])
+  const todaySe = swedishDay(new Date())
+  const schedule = isUnsentContract && scheduleInvoice ? invoiceSchedule(scheduleInvoice, todaySe, contractTermsDays) : null
+
+  // Skapa utkast i Fortnox: varna först om avtalsfakturan skickas för tidigt
+  const requestSendToFortnox = () => {
+    if (schedule && scheduleInvoice) {
+      const early = earlySendCheck({ frequency: scheduleFreq, sendDate: schedule.sendDate, periodStart: schedule.periodStart }, todaySe)
+      if (early.tooEarly) {
+        setEarlyItems([{
+          id: scheduleInvoice.id,
+          customerName: scheduleInvoice.customer_name,
+          invoiceNumber: scheduleInvoice.invoice_number,
+          waitUntil: early.waitUntil,
+          periodStart: schedule.periodStart,
+          daysEarly: early.daysEarly,
+          monthly: early.monthly,
+        }])
+        return
+      }
+    }
+    handleSendToFortnox()
+  }
+
   if (!isOpen) return null
 
   const isOverdue = invoice ? isInvoiceOverdue(invoice.due_date, invoice.status) : false
@@ -1451,6 +1513,22 @@ export default function InvoiceDetailModal({
               isOverdue={isInvoiceOverdue(invoice.due_date, invoice.status)}
               nextStepText={INVOICE_STATUS_CONFIG[invoice.status]?.description}
             />
+          </div>
+        )}
+
+        {/* Faktureringsschemat för ej skickad avtalsfaktura (3.122.0) */}
+        {invoice && schedule && (
+          <div className="flex-shrink-0 flex flex-wrap items-baseline gap-x-6 gap-y-1 px-4 py-2 border-b border-slate-700/50 text-xs">
+            <span className="text-slate-400">
+              Skulle skickas <span className="font-mono text-white">{schedule.sendDate}</span>
+            </span>
+            <span className="text-slate-400">
+              Perioden börjar <span className="font-mono text-white">{schedule.periodStart ?? '-'}</span>
+            </span>
+            <span className={schedule.paysAfterPeriodStart ? 'text-red-400' : 'text-slate-400'}>
+              Förfaller om skickad idag <span className={`font-mono ${schedule.paysAfterPeriodStart ? 'text-red-400' : 'text-white'}`}>{schedule.dueIfSentToday}</span>
+              {schedule.paysAfterPeriodStart && <> · Betalas efter periodstart</>}
+            </span>
           </div>
         )}
 
@@ -2409,7 +2487,7 @@ export default function InvoiceDetailModal({
               )}
               {(invoice.status === 'pending_approval' || invoice.status === 'ready') && (
                 <button
-                  onClick={() => handleSendToFortnox()}
+                  onClick={requestSendToFortnox}
                   disabled={sendingToFortnox || invoice.status === 'pending_approval' || (!!deliveryEval && !deliveryEval.ok) || premiumUnconfirmed}
                   title={invoice.status === 'pending_approval'
                     ? 'Låst tills fakturan godkänts av faktureringsansvarig'
@@ -2468,6 +2546,17 @@ export default function InvoiceDetailModal({
           </div>
         )}
       </div>
+
+      {/* Varning vid för tidig sändning till Fortnox */}
+      <EarlySendDialog
+        items={earlyItems}
+        today={todaySe}
+        onWait={() => setEarlyItems([])}
+        onSendAnyway={() => {
+          setEarlyItems([])
+          handleSendToFortnox()
+        }}
+      />
     </div>
   )
 }
