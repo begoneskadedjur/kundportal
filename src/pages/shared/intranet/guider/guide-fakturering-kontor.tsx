@@ -6,7 +6,7 @@
 // Sök fakturanr, kund..., Arkiv, Till Fortnox (n), radknapparna Godkänn/Detaljer/Makulera),
 // InvoiceDetailModal (◔ Delfaktura, Att granska innan godkännande, Godkänn, Skapa utkast i
 // Fortnox, Fortnox (nr ...), Synka, Exportera, Makulera) och InvoiceCaseChain (Ärendets
-// fakturakedja). queue/AdhocQueue.tsx: Utfört arbete utan faktura, Skapa faktura (3.124.0).
+// fakturakedja). Fliken Merförsäljning Avtal ritas med _fakturakoer.tsx (AdhocQueue, 3.126.0).
 // Påhittade kunder, ingenting sparas.
 
 import { useState } from 'react'
@@ -14,6 +14,7 @@ import { Icon } from '../../../../components/icons/Icon'
 import { Dator, DatorSida, Markor, Notis, OvningRam, PKnapp, Status, type OvningSvar } from '../skarmkit'
 import type { GuideModul } from './registry'
 import { mk } from './_fakturering'
+import { MerforsaljningLista, Valrad, type MRad } from './_fakturakoer'
 
 type FStatus = 'pending_approval' | 'ready' | 'draft' | 'sent'
 
@@ -173,25 +174,26 @@ function Skarm({ l, tryck, markera, nr, notis }: Bas & { notis?: string }) {
     <Dator adress="fakturering">
       <div className="min-h-[430px]">
         <DatorSida meny={['Översikt', 'Ärenden', 'Fakturering']} aktiv="Fakturering" titel="Fakturering">
-          <div className="mb-2 flex gap-4 border-b border-slate-700">
+          <div className="mb-2 flex flex-wrap items-end justify-between gap-2 border-b border-slate-700">
+            <div className="flex gap-4">
             {flikar.map((f, i) => (
               <Markor key={f} markor={i === 2 ? mk(markera, 'flik-merforsaljning', nr) : undefined}>
                 <button type="button" onClick={() => tryck(i === 2 ? 'flik-merforsaljning' : `flik-${i}`)}
                   className={`-mb-px border-b-2 py-1.5 text-[12px] font-semibold ${l.flik === i ? 'border-[#20c58f] text-[#20c58f]' : 'border-transparent text-slate-400'}`}>{f}</button>
               </Markor>
             ))}
+            </div>
+            {l.flik === 2 && (
+              <span className="mb-1 inline-flex overflow-hidden rounded-md border border-slate-700 text-[11px]">
+                <span className="bg-slate-800 px-2 py-0.5 font-semibold text-white">Att hantera</span>
+                <span className="border-l border-slate-700 px-2 py-0.5 text-slate-400">Arkiv</span>
+              </span>
+            )}
           </div>
           {l.flik === 2 ? (
             <div className="grid gap-2">
-              <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60">
-                <p className="flex items-center gap-1.5 bg-slate-800/40 px-2 py-1.5 text-[12px] font-semibold text-white"><span className="h-2 w-2 rounded-full bg-red-400" />Utfört arbete utan faktura <span className="text-[10.5px] font-normal text-slate-500">1 ärende · 1 625 kr</span></p>
-                <div className="flex items-center justify-between gap-2 border-t border-slate-800/60 px-2 py-1.5">
-                  <span className="min-w-0"><span className="block font-mono text-[11px] text-white">2026-10-27</span><span className="flex items-center gap-1 text-[9.5px] text-red-400"><span className="h-1.5 w-1.5 rounded-full bg-current" />Utfört för 9 dagar sedan</span></span>
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-white">Exempel AB <span className="font-mono text-[10.5px] text-slate-500">BE-0003456</span></span>
-                  <PKnapp prim ikon="allman.plus" onClick={() => tryck('skapa-faktura')}>Skapa faktura</PKnapp>
-                </div>
-                <p className="flex items-center gap-1.5 border-t border-slate-800 bg-slate-800/40 px-2 py-1.5 text-[12px] font-semibold text-white"><span className="h-2 w-2 rounded-full bg-orange-400" />Kräver godkännande <span className="text-[10.5px] font-normal text-slate-500">0 fakturor</span></p>
-              </div>
+              <Valrad antal={0} summa="" godkannAntal={0} skickaAntal={1} tryck={tryck} nr={nr} />
+              <MerforsaljningLista utan={[MERF_UTAN]} vantar={[]} godkanda={[MERF_GODKAND]} valda={INGA} tryck={tryck} nr={nr} />
             </div>
           ) : (
             <div className="grid gap-2">
@@ -219,6 +221,12 @@ function Skarm({ l, tryck, markera, nr, notis }: Bas & { notis?: string }) {
     </Dator>
   )
 }
+
+// Merförsäljning Avtal i sista steget (queue/AdhocQueue.tsx, samma delar som
+// guide-merforsaljning-avtal-kontor)
+const MERF_UTAN: MRad = { id: 'bygg', utfort: '2026-10-27', status: 'Utfört för 9 dagar sedan', ton: 'red', kund: 'Exempel AB', arende: 'BE-0003456 · Getingbekämpning · 2 rader', markning: 'Anna Exempel', order: 'AO 4471', tekniker: 'Erik Exempel', belopp: '2 031' }
+const MERF_GODKAND: MRad = { id: 'lager', utfort: '2026-10-30', status: 'Godkänd av Anna Exempel', ton: 'green', kund: 'Exempel Lager AB', arende: 'BE-0003420 · Tätning', markning: 'Lager 2', order: 'Objekt 12', tekniker: 'Erik Exempel', belopp: '4 375' }
+const INGA = new Set<string>()
 
 // ─── Visning ───
 

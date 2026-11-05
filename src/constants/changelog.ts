@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.126.0',
+    date: '2026-11-05',
+    title: 'Guiderna för nya Fakturering',
+    items: [
+      { kind: 'andring', text: 'Guiden Skicka avtalsfakturor i tid är omskriven efter nya Avtalskunder: statusgrupperna, datumraden i fakturan, Godkänn markerade, Skicka godkända till Fortnox med resultatet och varningen när en faktura skickas för tidigt. Den visas som oläst igen.' },
+      { kind: 'nyhet', text: 'Ny guide i handboken: Fakturera extraarbeten hos avtalskunder, om arbetslistan i Merförsäljning Avtal.' },
+      { kind: 'nyhet', text: 'Ny guide i handboken: Följ upp skickade fakturor i arkivet, om period, statusfilter, Visa makulerade och Exportera.' },
+      { kind: 'andring', text: 'Guiden Fakturera från ärende till betalning visar Merförsäljning Avtal som den ser ut nu och förklarar skillnaden mellan Till Fortnox och Skicka godkända till Fortnox.' },
+    ],
+  },
+  {
     version: '3.125.0',
     date: '2026-11-05',
     title: 'Skicka godkända skapar utkast i Fortnox',
