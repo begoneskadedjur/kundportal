@@ -18,6 +18,7 @@ import { supabase } from '../../../lib/supabase'
 import type { ContractInvoice, BillingFrequency } from '../../../types/contractBilling'
 import { BILLING_ITEM_STATUS_CONFIG, BILLING_FREQUENCY_CONFIG, formatBillingAmount, formatBillingPeriod } from '../../../types/contractBilling'
 import ServiceCostBreakdown from '../../shared/ServiceCostBreakdown'
+import { toLocalISOStringWithOffset } from '../../../utils/dateHelpers'
 import type { CaseBillingItem } from '../../../types/caseBilling'
 
 interface ContractInvoiceModalProps {
@@ -428,7 +429,8 @@ export function ContractInvoiceModal({
 
   const isPeriodicBilling = billingFrequency && billingFrequency !== 'annual' && billingFrequency !== 'on_demand'
   const statusConfig = invoice ? BILLING_ITEM_STATUS_CONFIG[invoice.derived_status] : null
-  const today = new Date().toISOString().split('T')[0]
+  // Svensk dag: toISOString() gav gårdagens datum vid sändning före 01.00
+  const today = toLocalISOStringWithOffset(new Date()).slice(0, 10)
   const invoiceDate = invoice?.items[0]?.invoiced_at
     ? new Date(invoice.items[0].invoiced_at).toISOString().split('T')[0]
     : today

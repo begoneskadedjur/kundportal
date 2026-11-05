@@ -1094,7 +1094,8 @@ export default function InvoiceDetailModal({
       // Betalningsvillkoret gäller FRÅN sändningen till Fortnox: förfallodatum
       // = idag + kategorins dagar (PaymentTermsService). Ett ev. preliminärt/
       // manuellt satt due_date på fakturan skrivs medvetet över här.
-      const today = new Date().toISOString().split('T')[0]
+      // Svensk dag: toISOString() gav gårdagens datum vid sändning före 01.00
+      const today = toLocalISOStringWithOffset(new Date()).slice(0, 10)
       const termsCategory: BillingCategory =
         invoice.case_type === 'private' ? 'private'
         : invoice.case_type === 'business' ? 'business'

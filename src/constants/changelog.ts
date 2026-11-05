@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.119.1',
+    date: '2026-11-05',
+    title: 'Fakturadatum i svensk tid',
+    items: [
+      { kind: 'buggfix', text: 'En faktura som skickades till Fortnox mellan midnatt och klockan ett fick gårdagens fakturadatum. Fakturadatum och förfallodag räknas nu från svensk dag.' },
+    ],
+  },
+  {
     version: '3.119.0',
     date: '2026-11-04',
     title: 'Glappfakturor delas per ärende',
