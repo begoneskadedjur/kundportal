@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.124.0',
+    date: '2026-11-05',
+    title: 'Nytt arkiv för avtalsfakturor och merförsäljning',
+    items: [
+      { kind: 'nyhet', text: 'Avtalskunder och Merförsäljning avtal har växeln Att hantera och Arkiv. Arkivet visar skickade fakturor per månad med status Skickad, Förfallen, Betald eller Krediterad, och summerar Fakturerat, Betalt, Obetalt och Förfallet för vald period.' },
+      { kind: 'nyhet', text: 'Filtrera arkivet på period och status, sök på kund, fakturanummer, Fortnox-nummer eller ärende och exportera listan till en fil för Excel. Makulerade utkast som aldrig skickades är dolda tills du bockar i Visa makulerade.' },
+      { kind: 'nyhet', text: 'Ny guide i handboken: Skicka avtalsfakturor i tid.' },
+    ],
+  },
+  {
     version: '3.123.0',
     date: '2026-11-05',
     title: 'Merförsäljning avtal som arbetslista',

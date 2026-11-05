@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { Receipt, TrendingUp } from 'lucide-react'
 import PrivateBusinessInvoicing from './PrivateBusinessInvoicing'
 import AdhocQueue from '../../../components/admin/invoicing/queue/AdhocQueue'
+import InvoiceArchive from '../../../components/admin/invoicing/queue/InvoiceArchive'
 import ContractSchedule from '../../../components/admin/invoicing/queue/ContractSchedule'
 import { ModeSwitch } from '../../../components/admin/invoicing/queue/QueueParts'
 
@@ -85,13 +86,13 @@ export default function InvoicingPage() {
           <ContractSchedule onShowArchive={() => setContractMode('arkiv')} />
         )}
         {activeTab === 'contracts' && contractMode === 'arkiv' && (
-          <PrivateBusinessInvoicing invoiceType="contract" defaultShowArchive />
+          <InvoiceArchive kind="contract" />
         )}
         {activeTab === 'adhoc' && adhocMode === 'hantera' && (
           <AdhocQueue onShowArchive={() => setAdhocMode('arkiv')} />
         )}
         {activeTab === 'adhoc' && adhocMode === 'arkiv' && (
-          <PrivateBusinessInvoicing invoiceType="adhoc" defaultShowArchive />
+          <InvoiceArchive kind="adhoc" />
         )}
       </div>
     </div>
