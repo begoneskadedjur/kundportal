@@ -22,7 +22,8 @@ import { Icon } from '../../../icons/Icon'
 import InvoiceDetailModal from '../InvoiceDetailModal'
 import { Checkbox, GroupHeader, KpiRow, RuleList, SelectionBar, SideCard, StatusText, type Kpi } from './QueueParts'
 import { fakturor, fmtKr, fmtNum, groupCheckState, toggleGroup, toggleOne, type Tone } from './queueUtils'
-import { approveInvoices, exportReadyInvoices } from './queueActions'
+import { approveInvoices, type BatchInvoice } from './queueActions'
+import FortnoxBatchDialog from './FortnoxBatchDialog'
 
 interface CaseInfo {
   case_number: string | null
@@ -119,6 +120,7 @@ export default function AdhocQueue({ onShowArchive }: { onShowArchive?: () => vo
   const [generating, setGenerating] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [openId, setOpenId] = useState<string | null>(null)
+  const [batch, setBatch] = useState<BatchInvoice[]>([])
 
   const today = swedishDay(new Date())
 
@@ -325,13 +327,14 @@ export default function AdhocQueue({ onShowArchive }: { onShowArchive?: () => vo
     }
   }
 
-  const handleSend = async () => {
-    setBusy(true)
-    try {
-      await exportReadyInvoices(sendList.map((i) => i.id))
-    } finally {
-      setBusy(false)
-    }
+  // Bekräftelsen med listan; utkasten skapas en i taget i FortnoxBatchDialog (3.125.0)
+  const handleSend = () => {
+    setBatch(sendList.map((i) => ({
+      id: i.id,
+      customerName: i.customer_name,
+      invoiceNumber: i.invoice_number,
+      amount: Number(i.total_amount || 0),
+    })))
   }
 
   const GRID = 'grid grid-cols-[140px_minmax(220px,1.6fr)_190px_130px_110px_16px] gap-3 items-center'
@@ -479,7 +482,7 @@ export default function AdhocQueue({ onShowArchive }: { onShowArchive?: () => vo
             busy={busy}
             sendCount={sendList.length}
             onSend={handleSend}
-            sendTitle="Godkända fakturor exporteras till Fortnox. Utan markering tas alla godkända."
+            sendTitle="Skapar ett utkast i Fortnox för varje godkänd faktura, en i taget. Utan markering tas alla godkända."
           />
           <p className="text-xs text-slate-500">
             En faktura per ärende. Märkning, arbetsorder, objekt och adress hämtas från ärendet. Klicka på en faktura för att öppna den, där makuleras den också.
@@ -553,6 +556,14 @@ export default function AdhocQueue({ onShowArchive }: { onShowArchive?: () => vo
           )}
         </div>
       </div>
+
+      <FortnoxBatchDialog
+        invoices={batch}
+        amountLabel="inkl. moms"
+        actor={user ? { userId: user.id, name: profile?.display_name || profile?.email || 'Okänd' } : null}
+        onClose={() => setBatch([])}
+        onFinished={load}
+      />
 
       <InvoiceDetailModal isOpen={openId !== null} onClose={() => setOpenId(null)} invoiceId={openId} onStatusChange={load} />
     </div>

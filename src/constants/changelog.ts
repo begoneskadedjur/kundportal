@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.125.0',
+    date: '2026-11-05',
+    title: 'Skicka godkända skapar utkast i Fortnox',
+    items: [
+      { kind: 'andring', text: 'Skicka godkända till Fortnox under Avtalskunder och Merförsäljning avtal skapar nu ett utkast i Fortnox för varje godkänd faktura, en i taget, på samma sätt som Skapa utkast i Fortnox i fakturan. Förut laddades en fil ner.' },
+      { kind: 'nyhet', text: 'Innan något skickas visas listan med kund, faktura och belopp. Under sändningen syns hur många som är klara, och efteråt vilka som blev utkast med Fortnox-nummer, vilka som misslyckades och varför.' },
+      { kind: 'andring', text: 'En faktura som inte går att skicka stoppar inte de andra. Den ligger kvar i listan och öppnas för att rätta det som saknas.' },
+    ],
+  },
+  {
     version: '3.124.0',
     date: '2026-11-05',
     title: 'Nytt arkiv för avtalsfakturor och merförsäljning',

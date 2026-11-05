@@ -41,8 +41,9 @@ import {
 } from './QueueParts'
 import { fakturor, fmtKr, fmtNum, groupCheckState, toggleGroup, toggleOne, type Tone } from './queueUtils'
 import { MonthCalendar } from './MonthCalendar'
-import { approveInvoices, exportReadyInvoices } from './queueActions'
+import { approveInvoices, type BatchInvoice } from './queueActions'
 import EarlySendDialog, { type EarlySendItem } from './EarlySendDialog'
+import FortnoxBatchDialog from './FortnoxBatchDialog'
 
 type ContractInvoice = Invoice & {
   contract_id: string | null
@@ -146,6 +147,7 @@ export default function ContractSchedule({ onShowArchive }: { onShowArchive?: ()
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('alla')
   const [showAllUpcoming, setShowAllUpcoming] = useState(false)
   const [earlyItems, setEarlyItems] = useState<EarlySendItem[]>([])
+  const [batch, setBatch] = useState<BatchInvoice[]>([])
 
   const today = swedishDay(new Date())
 
@@ -332,13 +334,14 @@ export default function ContractSchedule({ onShowArchive }: { onShowArchive?: ()
     }
   }
 
-  const doSend = async () => {
-    setBusy(true)
-    try {
-      await exportReadyInvoices(sendRows.map((r) => r.inv.id))
-    } finally {
-      setBusy(false)
-    }
+  // Bekräftelsen med listan; utkasten skapas en i taget i FortnoxBatchDialog (3.125.0)
+  const doSend = () => {
+    setBatch(sendRows.map((r) => ({
+      id: r.inv.id,
+      customerName: r.inv.customer_name,
+      invoiceNumber: r.inv.invoice_number,
+      amount: Number(r.inv.subtotal || 0),
+    })))
   }
 
   // Varna först om någon av fakturorna skickas för tidigt (3.122.0)
@@ -474,7 +477,7 @@ export default function ContractSchedule({ onShowArchive }: { onShowArchive?: ()
             busy={busy}
             sendCount={sendRows.length}
             onSend={handleSend}
-            sendTitle="Godkända fakturor exporteras till Fortnox. Utan markering tas alla godkända."
+            sendTitle="Skapar ett utkast i Fortnox för varje godkänd faktura, en i taget. Utan markering tas alla godkända."
           />
           <p className="text-xs text-slate-500">
             Bocka i fakturor för att godkänna flera samtidigt. Klicka på en faktura för att öppna den, där makuleras den också.
@@ -585,6 +588,14 @@ export default function ContractSchedule({ onShowArchive }: { onShowArchive?: ()
           setEarlyItems([])
           doSend()
         }}
+      />
+
+      <FortnoxBatchDialog
+        invoices={batch}
+        amountLabel="exkl. moms"
+        actor={user ? { userId: user.id, name: profile?.display_name || profile?.email || 'Okänd' } : null}
+        onClose={() => setBatch([])}
+        onFinished={load}
       />
 
       <InvoiceDetailModal

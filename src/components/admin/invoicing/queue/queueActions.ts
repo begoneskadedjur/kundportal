@@ -1,13 +1,14 @@
 // src/components/admin/invoicing/queue/queueActions.ts
 // Godkänn flera och Skicka godkända till Fortnox för arbetslistorna i
-// /admin/fakturering. Samma vägar som fakturalistan använt sedan tidigare
-// (PrivateBusinessInvoicing): InvoiceService.approveInvoice per faktura och
-// InvoiceService.exportForFortnox för fakturor med status ready.
+// /admin/fakturering. Godkännandet går via InvoiceService.approveInvoice per
+// faktura. Skicka godkända skapar sedan 3.125.0 ett utkast i Fortnox per
+// faktura, en i taget, via sendInvoiceToFortnox (samma väg som knappen Skapa
+// utkast i Fortnox i fakturamodalen). Förut laddades en CSV-fil ner.
 
 import toast from 'react-hot-toast'
 import { InvoiceService } from '../../../../services/invoiceService'
 import { InvoiceDeliveryError } from '../../../../services/invoiceDeliveryService'
-import { swedishDay } from '../../../../shared/invoiceSchedule'
+import type { FortnoxSendNotify, FortnoxSendResult } from '../../../../services/invoiceFortnoxSendService'
 
 export interface ApprovableInvoice {
   id: string
@@ -49,24 +50,95 @@ export async function approveInvoices(list: ApprovableInvoice[], userId: string,
   return approved
 }
 
-/** Fortnox-filen (CSV) för fakturor med status ready, som knappen Till Fortnox. */
-export async function exportReadyInvoices(ids: string[]): Promise<void> {
-  if (ids.length === 0) {
-    toast.error('Inga godkända fakturor att skicka')
-    return
+// --- Skapa utkast i Fortnox för flera fakturor ------------------------------
+
+/** En rad i bekräftelsedialogen */
+export interface BatchInvoice {
+  id: string
+  customerName: string
+  invoiceNumber: string | null
+  amount: number
+}
+
+export type BatchStatus = 'created' | 'failed' | 'skipped'
+
+export interface BatchOutcome {
+  id: string
+  status: BatchStatus
+  /** Fortnox-numret för lyckade, annars orsaken */
+  message: string
+  documentNumber?: string
+  /** Övriga besked under sändningen (ny Fortnox-kund, ROT/RUT som inte gick in ...) */
+  notes: string[]
+}
+
+/** Fortnox tillåter 25 anrop per 5 sekunder; en faktura kostar flera anrop. */
+export const FORTNOX_BATCH_PAUSE_MS = 1500
+
+/** Besked i listan skrivs med kommatecken i stället för tankstreck. */
+export const plainText = (s: string) => s.replace(/\s*[—–]\s*/g, ', ')
+
+export function outcomeOf(id: string, result: FortnoxSendResult, notes: string[]): BatchOutcome {
+  const resultMessage = 'message' in result ? result.message : null
+  const extra = notes.filter((n) => n !== resultMessage && !n.startsWith('Utkast skapat i Fortnox')).map(plainText)
+  if (result.status === 'created') {
+    return { id, status: 'created', message: `Fortnox nr ${result.documentNumber}`, documentNumber: result.documentNumber, notes: extra }
   }
-  try {
-    const csv = await InvoiceService.exportForFortnox(ids)
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `fortnox-export-${swedishDay(new Date())}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-    toast.success(`${ids.length} fakturor exporterade`)
-  } catch (error) {
-    console.error('Fel vid export:', error)
-    toast.error('Kunde inte exportera')
+  if (result.status === 'failed') return { id, status: 'failed', message: plainText(result.message), notes: extra }
+  if (result.status === 'candidates') {
+    return {
+      id,
+      status: 'skipped',
+      message: result.kind === 'multiple'
+        ? 'Flera Fortnox-kunder har samma org.nr. Öppna fakturan och välj kund.'
+        : 'Kunden är inaktiv i Fortnox. Öppna fakturan och välj återaktivering eller nytt nummer.',
+      notes: extra,
+    }
   }
+  return { id, status: 'skipped', message: plainText(result.message), notes: extra }
+}
+
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+/**
+ * Skapar utkast en faktura i taget, med paus mellan för Fortnox gräns för
+ * antal anrop. Ett fel stoppar inte resten. send är sendInvoiceToFortnox i
+ * appen och en mock i testerna.
+ */
+export async function runFortnoxBatch(
+  invoices: BatchInvoice[],
+  deps: {
+    send: (invoiceId: string, notify: FortnoxSendNotify) => Promise<FortnoxSendResult>
+    onProgress?: (outcome: BatchOutcome, done: number) => void
+    pauseMs?: number
+    sleep?: (ms: number) => Promise<void>
+  }
+): Promise<BatchOutcome[]> {
+  const pause = deps.pauseMs ?? FORTNOX_BATCH_PAUSE_MS
+  const sleep = deps.sleep ?? wait
+  const out: BatchOutcome[] = []
+  for (let i = 0; i < invoices.length; i++) {
+    if (i > 0 && pause > 0) await sleep(pause)
+    const inv = invoices[i]
+    const notes: string[] = []
+    const collect: FortnoxSendNotify = {
+      success: (m) => { notes.push(m) },
+      error: (m) => { notes.push(m) },
+      info: (m) => { notes.push(m) },
+    }
+    let outcome: BatchOutcome
+    try {
+      outcome = outcomeOf(inv.id, await deps.send(inv.id, collect), notes)
+    } catch (err) {
+      outcome = {
+        id: inv.id,
+        status: 'failed',
+        message: plainText('Kunde inte skicka till Fortnox: ' + (err instanceof Error ? err.message : String(err))),
+        notes: [],
+      }
+    }
+    out.push(outcome)
+    deps.onProgress?.(outcome, i + 1)
+  }
+  return out
 }

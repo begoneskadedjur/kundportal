@@ -44,6 +44,92 @@ interface UseInvoiceVisitResult {
 const VISIT_COLUMNS =
   'id, visit_number, visit_date, technician_name, technicians, work_performed, findings, recommendations, materials_used, time_spent_minutes, pest_level, problem_rating'
 
+type InvoiceVisitInput = {
+  case_id: string | null
+  items?: Array<{ case_billing_item_id?: string | null; contract_billing_item_id?: string | null }> | null
+}
+
+/**
+ * Läser besökssnapshotet fakturan avser (kedjan ovan). Kastar vid databasfel;
+ * hooken och sändningen till Fortnox (invoiceFortnoxSendService) sväljer felet
+ * och kör vidare utan snapshot.
+ */
+export async function fetchInvoiceVisit(invoice: InvoiceVisitInput): Promise<VisitSnapshot | null> {
+  const caseId = invoice.case_id
+  if (!caseId) return null
+  const items = invoice.items || []
+
+  // 1. Direkt väg: fakturaraderna pekar på case_billing_items
+  const directIds = items
+    .map(i => (i as { case_billing_item_id?: string | null }).case_billing_item_id)
+    .filter(Boolean) as string[]
+
+  const visitNumbers = new Set<number>()
+
+  if (directIds.length > 0) {
+    const { data, error } = await supabase
+      .from('case_billing_items')
+      .select('visit_number')
+      .in('id', directIds)
+    if (error) throw error
+    for (const row of (data as { visit_number: number | null }[] | null) || []) {
+      if (row.visit_number != null) visitNumbers.add(row.visit_number)
+    }
+  }
+
+  // 2. Adhoc/contract: raderna pekar på contract_billing_items, som bär
+  //    case_id. Besöksnumret finns på ärendets fakturerade tjänsterader.
+  if (visitNumbers.size === 0) {
+    const contractIds = items
+      .map(i => (i as { contract_billing_item_id?: string | null }).contract_billing_item_id)
+      .filter(Boolean) as string[]
+
+    let chainCaseIds: string[] = []
+    if (contractIds.length > 0) {
+      const { data, error } = await supabase
+        .from('contract_billing_items')
+        .select('case_id')
+        .in('id', contractIds)
+      if (error) throw error
+      chainCaseIds = Array.from(
+        new Set(
+          ((data as { case_id: string | null }[] | null) || [])
+            .map(r => r.case_id)
+            .filter(Boolean) as string[]
+        )
+      )
+    }
+    // Fakturans eget case_id duger som utgångspunkt när radkopplingen
+    // saknas (t.ex. manuellt skapade adhoc-rader)
+    if (chainCaseIds.length === 0) chainCaseIds = [caseId]
+
+    const { data: billed, error: billedError } = await supabase
+      .from('case_billing_items')
+      .select('visit_number')
+      .in('case_id', chainCaseIds)
+      .in('status', ['billed', 'invoiced'])
+    if (billedError) throw billedError
+    for (const row of (billed as { visit_number: number | null }[] | null) || []) {
+      if (row.visit_number != null) visitNumbers.add(row.visit_number)
+    }
+  }
+
+  if (visitNumbers.size === 0) return null
+
+  // Flera besök på samma faktura: det senaste utförda besöket gäller
+  const targetVisitNumber = Math.max(...visitNumbers)
+
+  const { data: visitRow, error: visitError } = await supabase
+    .from('visits')
+    .select(VISIT_COLUMNS)
+    .eq('case_id', caseId)
+    .eq('visit_number', targetVisitNumber)
+    .maybeSingle()
+  if (visitError) throw visitError
+
+  return (visitRow as VisitSnapshot | null) ?? null
+}
+
 export function useInvoiceVisit(invoice: InvoiceWithItems | null): UseInvoiceVisitResult {
   const [visit, setVisit] = useState<VisitSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -64,81 +150,9 @@ export function useInvoiceVisit(invoice: InvoiceWithItems | null): UseInvoiceVis
     const load = async () => {
       setIsLoading(true)
       try {
-        // 1. Direkt väg: fakturaraderna pekar på case_billing_items
-        const directIds = items
-          .map(i => (i as { case_billing_item_id?: string | null }).case_billing_item_id)
-          .filter(Boolean) as string[]
-
-        const visitNumbers = new Set<number>()
-
-        if (directIds.length > 0) {
-          const { data, error } = await supabase
-            .from('case_billing_items')
-            .select('visit_number')
-            .in('id', directIds)
-          if (error) throw error
-          for (const row of (data as { visit_number: number | null }[] | null) || []) {
-            if (row.visit_number != null) visitNumbers.add(row.visit_number)
-          }
-        }
-
-        // 2. Adhoc/contract: raderna pekar på contract_billing_items, som bär
-        //    case_id. Besöksnumret finns på ärendets fakturerade tjänsterader.
-        if (visitNumbers.size === 0) {
-          const contractIds = items
-            .map(i => (i as { contract_billing_item_id?: string | null }).contract_billing_item_id)
-            .filter(Boolean) as string[]
-
-          let chainCaseIds: string[] = []
-          if (contractIds.length > 0) {
-            const { data, error } = await supabase
-              .from('contract_billing_items')
-              .select('case_id')
-              .in('id', contractIds)
-            if (error) throw error
-            chainCaseIds = Array.from(
-              new Set(
-                ((data as { case_id: string | null }[] | null) || [])
-                  .map(r => r.case_id)
-                  .filter(Boolean) as string[]
-              )
-            )
-          }
-          // Fakturans eget case_id duger som utgångspunkt när radkopplingen
-          // saknas (t.ex. manuellt skapade adhoc-rader)
-          if (chainCaseIds.length === 0) chainCaseIds = [caseId]
-
-          const { data: billed, error: billedError } = await supabase
-            .from('case_billing_items')
-            .select('visit_number')
-            .in('case_id', chainCaseIds)
-            .in('status', ['billed', 'invoiced'])
-          if (billedError) throw billedError
-          for (const row of (billed as { visit_number: number | null }[] | null) || []) {
-            if (row.visit_number != null) visitNumbers.add(row.visit_number)
-          }
-        }
-
+        const snapshot = await fetchInvoiceVisit({ case_id: caseId, items })
         if (cancelled) return
-
-        if (visitNumbers.size === 0) {
-          setVisit(null)
-          return
-        }
-
-        // Flera besök på samma faktura: det senaste utförda besöket gäller
-        const targetVisitNumber = Math.max(...visitNumbers)
-
-        const { data: visitRow, error: visitError } = await supabase
-          .from('visits')
-          .select(VISIT_COLUMNS)
-          .eq('case_id', caseId)
-          .eq('visit_number', targetVisitNumber)
-          .maybeSingle()
-        if (visitError) throw visitError
-        if (cancelled) return
-
-        setVisit((visitRow as VisitSnapshot | null) ?? null)
+        setVisit(snapshot)
       } catch (err) {
         console.error('[useInvoiceVisit] Kunde inte hämta besökssnapshot:', err)
         if (!cancelled) setVisit(null)

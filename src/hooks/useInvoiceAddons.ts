@@ -78,6 +78,44 @@ async function countPendingStations(unitId: string): Promise<number> {
   return (outdoor.count ?? 0) + (indoor.count ?? 0)
 }
 
+/**
+ * Fakturans tilläggsrader (kedjan ovan) utan kalkylunderlaget. Används av
+ * hooken och av sändningen till Fortnox (invoiceFortnoxSendService), som
+ * behöver raderna för perioden under varje tilläggsrad. Kastar vid fel.
+ */
+export async function fetchInvoiceAddonLines(
+  invoice: Pick<InvoiceWithItems, 'invoice_type' | 'items'>
+): Promise<{ lines: InvoiceAddonLine[]; caseIds: string[] }> {
+  const billingIds = (invoice.items ?? [])
+    .map((i) => (i as { contract_billing_item_id?: string | null }).contract_billing_item_id)
+    .filter((x): x is string => !!x)
+  if (invoice.invoice_type !== 'adhoc' || billingIds.length === 0) return { lines: [], caseIds: [] }
+  const { data: links } = await supabase
+    .from('contract_billing_items')
+    .select('id, case_id, case_billing_item_id, article_code')
+    .in('id', billingIds)
+  const billing = (links ?? []) as BillingItemLink[]
+  const caseIds = [...new Set(billing.map((b) => b.case_id).filter((x): x is string => !!x))]
+  if (caseIds.length === 0) return { lines: [], caseIds }
+  const { data: rows } = await supabase
+    .from('case_billing_items')
+    .select(ROW_COLUMNS)
+    .in('case_id', caseIds)
+    .eq('item_type', 'service')
+    .eq('is_addon_prorata_line', true)
+    .neq('status', 'cancelled')
+  const lines = matchInvoiceAddonLines(
+    invoice.items.map((i) => ({
+      id: i.id,
+      article_code: i.article_code,
+      contract_billing_item_id: (i as { contract_billing_item_id?: string | null }).contract_billing_item_id ?? null,
+    })),
+    billing,
+    (rows ?? []) as unknown as AddonCaseRow[]
+  )
+  return { lines, caseIds }
+}
+
 export function useInvoiceAddons(invoice: InvoiceWithItems | null): InvoiceAddons {
   const [state, setState] = useState<{
     loading: boolean
@@ -100,32 +138,7 @@ export function useInvoiceAddons(invoice: InvoiceWithItems | null): InvoiceAddon
     const load = async () => {
       setState((s) => ({ ...s, loading: true }))
       try {
-        const { data: links } = await supabase
-          .from('contract_billing_items')
-          .select('id, case_id, case_billing_item_id, article_code')
-          .in('id', billingIds)
-        const billing = (links ?? []) as BillingItemLink[]
-        const caseIds = [...new Set(billing.map((b) => b.case_id).filter((x): x is string => !!x))]
-        if (caseIds.length === 0) {
-          if (!cancelled) setState({ loading: false, lines: [], summary: null, pendingStations: 0 })
-          return
-        }
-        const { data: rows } = await supabase
-          .from('case_billing_items')
-          .select(ROW_COLUMNS)
-          .in('case_id', caseIds)
-          .eq('item_type', 'service')
-          .eq('is_addon_prorata_line', true)
-          .neq('status', 'cancelled')
-        const lines = matchInvoiceAddonLines(
-          invoice.items.map((i) => ({
-            id: i.id,
-            article_code: i.article_code,
-            contract_billing_item_id: (i as { contract_billing_item_id?: string | null }).contract_billing_item_id ?? null,
-          })),
-          billing,
-          (rows ?? []) as unknown as AddonCaseRow[]
-        )
+        const { lines, caseIds } = await fetchInvoiceAddonLines(invoice)
         if (lines.length === 0) {
           if (!cancelled) setState({ loading: false, lines: [], summary: null, pendingStations: 0 })
           return

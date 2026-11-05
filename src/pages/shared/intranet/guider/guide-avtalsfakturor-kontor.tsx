@@ -249,7 +249,7 @@ const TIPS: Record<string, string> = {
   'rad-manad': 'Det är en månadsfaktura som ska skickas 2027-01-01. Uppdraget gäller de försenade.',
   'rad-brf': 'Raden öppnar fakturan. Bocka i rutan på gruppraden Försenade för att markera båda.',
   'rad-ab': 'Raden öppnar fakturan. Bocka i rutan på gruppraden Försenade för att markera båda.',
-  'skicka-godkanda': 'Skicka godkända tar fakturor som redan är godkända. Godkänn de försenade först.',
+  'skicka-godkanda': 'Skicka godkända skapar utkast i Fortnox för fakturor som redan är godkända. Godkänn de försenade först.',
   arkiv: 'Arkivet visar skickade fakturor. De försenade är inte skickade än.',
 }
 
