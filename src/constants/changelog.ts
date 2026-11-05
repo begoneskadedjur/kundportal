@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.123.0',
+    date: '2026-11-05',
+    title: 'Merförsäljning avtal som arbetslista',
+    items: [
+      { kind: 'nyhet', text: 'Fliken Merförsäljning avtal visar tre grupper: Utfört arbete utan faktura, Kräver godkännande och Godkända, redo för Fortnox. Varje rad visar när jobbet utfördes, ärendet, märkningen som kommer på fakturan och teknikern.' },
+      { kind: 'andring', text: 'Den gula rutan Ofakturerad merförsäljning är borta. Ärendena finns nu överst i gruppen Utfört arbete utan faktura, med knappen Skapa faktura som förut.' },
+      { kind: 'nyhet', text: 'Bocka i fakturor eller en hel grupp och godkänn dem på en gång. Utfört för mer än en vecka sedan visas i orange.' },
+    ],
+  },
+  {
     version: '3.122.0',
     date: '2026-11-05',
     title: 'Varning innan en avtalsfaktura skickas för tidigt',

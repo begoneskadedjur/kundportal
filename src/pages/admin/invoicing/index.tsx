@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Receipt, TrendingUp } from 'lucide-react'
 import PrivateBusinessInvoicing from './PrivateBusinessInvoicing'
-import UnbilledAdhocBanner from '../../../components/admin/invoicing/UnbilledAdhocBanner'
+import AdhocQueue from '../../../components/admin/invoicing/queue/AdhocQueue'
 import ContractSchedule from '../../../components/admin/invoicing/queue/ContractSchedule'
 import { ModeSwitch } from '../../../components/admin/invoicing/queue/QueueParts'
 
@@ -16,6 +16,8 @@ export default function InvoicingPage() {
   const [activeTab, setActiveTab] = useState<InvoicingTab>('private-business')
   // Avtalskunder: Att hantera (faktureringsschemat) eller Arkiv
   const [contractMode, setContractMode] = useState<'hantera' | 'arkiv'>('hantera')
+  // Merförsäljning avtal: Att hantera eller Arkiv
+  const [adhocMode, setAdhocMode] = useState<'hantera' | 'arkiv'>('hantera')
 
   const tabs: { id: InvoicingTab; label: string }[] = [
     { id: 'private-business', label: 'Privat & Företag' },
@@ -69,6 +71,11 @@ export default function InvoicingPage() {
             <ModeSwitch mode={contractMode} onChange={setContractMode} />
           </div>
         )}
+        {activeTab === 'adhoc' && (
+          <div className="mb-2">
+            <ModeSwitch mode={adhocMode} onChange={setAdhocMode} />
+          </div>
+        )}
       </div>
 
       {/* Tab Content */}
@@ -80,11 +87,11 @@ export default function InvoicingPage() {
         {activeTab === 'contracts' && contractMode === 'arkiv' && (
           <PrivateBusinessInvoicing invoiceType="contract" defaultShowArchive />
         )}
-        {activeTab === 'adhoc' && (
-          <>
-            <UnbilledAdhocBanner />
-            <PrivateBusinessInvoicing invoiceType="adhoc" />
-          </>
+        {activeTab === 'adhoc' && adhocMode === 'hantera' && (
+          <AdhocQueue onShowArchive={() => setAdhocMode('arkiv')} />
+        )}
+        {activeTab === 'adhoc' && adhocMode === 'arkiv' && (
+          <PrivateBusinessInvoicing invoiceType="adhoc" defaultShowArchive />
         )}
       </div>
     </div>
