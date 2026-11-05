@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.121.0',
+    date: '2026-11-05',
+    title: 'Avtalskunder som faktureringsschema',
+    items: [
+      { kind: 'nyhet', text: 'Fliken Avtalskunder visar fakturorna som ett schema: när varje faktura ska skickas, när perioden börjar och när den förfaller om den skickas idag. Grupperna Perioden har börjat, Försenade, Skicka denna vecka, Kommande och Väntar på beslut visar vad som ska göras först.' },
+      { kind: 'nyhet', text: 'Bocka i fakturor eller en hel grupp och godkänn alla på en gång med Godkänn markerade. Skicka godkända till Fortnox tar de godkända.' },
+      { kind: 'nyhet', text: 'Sidopanelen har en kalender med skickdatum, reglerna för när avtalen faktureras och det som skickats senaste veckan. Det gamla arkivet finns under Arkiv.' },
+    ],
+  },
+  {
     version: '3.120.0',
     date: '2026-11-05',
     title: 'Månadsfakturor skickas den 1:a',

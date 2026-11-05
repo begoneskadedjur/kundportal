@@ -6,12 +6,16 @@ import { useNavigate } from 'react-router-dom'
 import { Receipt, TrendingUp } from 'lucide-react'
 import PrivateBusinessInvoicing from './PrivateBusinessInvoicing'
 import UnbilledAdhocBanner from '../../../components/admin/invoicing/UnbilledAdhocBanner'
+import ContractSchedule from '../../../components/admin/invoicing/queue/ContractSchedule'
+import { ModeSwitch } from '../../../components/admin/invoicing/queue/QueueParts'
 
 type InvoicingTab = 'private-business' | 'contracts' | 'adhoc'
 
 export default function InvoicingPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<InvoicingTab>('private-business')
+  // Avtalskunder: Att hantera (faktureringsschemat) eller Arkiv
+  const [contractMode, setContractMode] = useState<'hantera' | 'arkiv'>('hantera')
 
   const tabs: { id: InvoicingTab; label: string }[] = [
     { id: 'private-business', label: 'Privat & Företag' },
@@ -37,7 +41,8 @@ export default function InvoicingPage() {
       </div>
 
       {/* Fliknavigering – understrukna tabbar utan ikoner */}
-      <div className="flex gap-6 border-b border-slate-700 mb-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-b border-slate-700 mb-4">
+      <div className="flex gap-6">
         {tabs.map(tab => {
           const isActive = activeTab === tab.id
 
@@ -59,11 +64,22 @@ export default function InvoicingPage() {
           )
         })}
       </div>
+        {activeTab === 'contracts' && (
+          <div className="mb-2">
+            <ModeSwitch mode={contractMode} onChange={setContractMode} />
+          </div>
+        )}
+      </div>
 
       {/* Tab Content */}
       <div className="mt-4">
         {activeTab === 'private-business' && <PrivateBusinessInvoicing invoiceType="private-business" />}
-        {activeTab === 'contracts' && <PrivateBusinessInvoicing invoiceType="contract" />}
+        {activeTab === 'contracts' && contractMode === 'hantera' && (
+          <ContractSchedule onShowArchive={() => setContractMode('arkiv')} />
+        )}
+        {activeTab === 'contracts' && contractMode === 'arkiv' && (
+          <PrivateBusinessInvoicing invoiceType="contract" defaultShowArchive />
+        )}
         {activeTab === 'adhoc' && (
           <>
             <UnbilledAdhocBanner />

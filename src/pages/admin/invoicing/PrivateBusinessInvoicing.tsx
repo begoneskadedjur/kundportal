@@ -37,6 +37,8 @@ const REVIEW_FILTERS: { id: ReviewFilter; label: string }[] = [
 
 interface Props {
   invoiceType?: InvoiceTabType
+  /** Visa arkivet direkt (Avtalskunder i läget Arkiv) */
+  defaultShowArchive?: boolean
 }
 
 // Arbetslägen – status som kräver handling. Övriga (booked, sent, paid, cancelled) bor i arkivet.
@@ -58,7 +60,7 @@ const STATUS_DOT: Record<InvoiceStatus, string> = {
 const compactAmount = (n: number): string =>
   n >= 10000 ? `${Math.round(n / 1000).toLocaleString('sv-SE')} tkr` : formatInvoiceAmount(n)
 
-export default function PrivateBusinessInvoicing({ invoiceType = 'private-business' }: Props) {
+export default function PrivateBusinessInvoicing({ invoiceType = 'private-business', defaultShowArchive = false }: Props) {
   // Godkännande-åtgärder visas bara för faktureringsansvariga
   const { user, profile } = useAuth()
   const canApproveInvoices = !!profile?.can_approve_invoices
@@ -88,7 +90,7 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
 
   // Filter state – arbetskö-cell + arkiv-toggle
   const [queueFilter, setQueueFilter] = useState<QueueFilter>(null)
-  const [showArchive, setShowArchive] = useState(false)
+  const [showArchive, setShowArchive] = useState(defaultShowArchive)
   const [searchTerm, setSearchTerm] = useState('')
 
   // Kontrollerat avtal: läget per faktura (bara fliken Avtalskunder)
