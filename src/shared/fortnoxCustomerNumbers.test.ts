@@ -17,6 +17,7 @@ import {
   toVatInclusivePrice,
   type AutoLinkMirrorRow,
   type AutoLinkPortalRow,
+  unitFortnoxState,
   type FortnoxMirrorHit,
 } from './fortnoxCustomerNumbers'
 
@@ -323,5 +324,22 @@ describe('parseSwedishAddress / buildFortnoxCustomerCard', () => {
     expect(bad.card.OrganisationNumber).toBeUndefined()
     expect(bad.orgNrSkipped).toBe(true)
     expect(bad.type).toBe('COMPANY')
+  })
+})
+
+describe('unitFortnoxState', () => {
+  const hk = { id: 'hk', customer_number: 6001, organization_number: '212000-0142' }
+  it('enhet utan eget nummer med huvudkontorets org.nr faktureras via HK', () => {
+    const unit = { id: 'u1', customer_number: null, organization_number: '212000-0142' }
+    expect(unitFortnoxState(unit, hk.organization_number, [hk, unit])).toBeNull()
+  })
+  it('förvaltning med eget kundkort och samma org.nr visar sitt eget nummer', () => {
+    const unit = { id: 'u2', customer_number: 5508, organization_number: '212000-0142', fortnox_verified_at: '2026-11-06' }
+    expect(unitFortnoxState(unit, hk.organization_number, [hk, unit])).toEqual({ number: 5508, verified: true, sharedWith: null })
+  })
+  it('eget bolag utan nummer delar med raden som bär samma org.nr', () => {
+    const holder = { id: 'h', customer_number: 4006, organization_number: '556000-0001', site_name: 'Lidingö' }
+    const unit = { id: 'u3', customer_number: null, organization_number: '5560000001' }
+    expect(unitFortnoxState(unit, hk.organization_number, [hk, holder, unit])).toEqual({ number: 4006, verified: false, sharedWith: 'Lidingö' })
   })
 })

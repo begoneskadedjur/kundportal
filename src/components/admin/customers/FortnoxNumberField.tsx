@@ -532,7 +532,7 @@ export default function FortnoxNumberField({
         if (initialNumber != null) {
           return line('inherit', (
             <span className="text-slate-400">
-              Bär bolagets nummer <span className="font-mono text-slate-200">#{initialNumber}</span> (samma bolag som huvudkontoret)
+              Eget kundnummer <span className="font-mono text-slate-200">#{initialNumber}</span> (eget kundkort i Fortnox, samma org.nr som huvudkontoret)
             </span>
           ))
         }

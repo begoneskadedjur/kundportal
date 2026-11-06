@@ -259,8 +259,10 @@ export interface FortnoxUnitRow {
 
 /**
  * Fortnox-läget för en enhet under ett huvudkontor, samma regel som
- * src/utils/fortnoxCustomerResolver.ts. null = enheten saknar eget org.nr
- * eller har huvudkontorets, dvs. samma bolag, och faktureras via HK.
+ * src/utils/fortnoxCustomerResolver.ts. Radens eget nummer går först, även
+ * när org.nr är huvudkontorets: Stockholms stads förvaltningar delar org.nr
+ * men har varsitt kundkort i Fortnox. null = enheten saknar eget nummer och
+ * eget org.nr, eller har huvudkontorets, och faktureras via HK.
  * Annars är enheten ett eget bolag: eget nummer, delat nummer (en annan rad i
  * familjen med samma org.nr bär det) eller saknas.
  */
@@ -269,11 +271,11 @@ export function unitFortnoxState(
   hkOrgNr: string | null | undefined,
   family: FortnoxUnitRow[]
 ): { number: number | null; verified: boolean; sharedWith: string | null } | null {
-  const digits = orgDigits(unit.organization_number)
-  if (!digits || digits === orgDigits(hkOrgNr)) return null
   if (unit.customer_number != null) {
     return { number: unit.customer_number, verified: !!unit.fortnox_verified_at, sharedWith: null }
   }
+  const digits = orgDigits(unit.organization_number)
+  if (!digits || digits === orgDigits(hkOrgNr)) return null
   const holder = family.find(
     r => r.id !== unit.id && r.customer_number != null && orgDigits(r.organization_number) === digits
   )

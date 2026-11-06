@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.126.2',
+    date: '2026-11-06',
+    title: 'Enheter med eget kundkort i Fortnox',
+    items: [
+      { kind: 'andring', text: 'En enhet med eget kundnummer visar nu sitt eget nummer även när den har samma org.nr som huvudkontoret. Gäller till exempel Stockholms stads förvaltningar, som har varsitt kundkort i Fortnox.' },
+    ],
+  },
+  {
     version: '3.126.1',
     date: '2026-11-06',
     title: 'Ärendehistoriken skiljer på faktura och delfaktura',
