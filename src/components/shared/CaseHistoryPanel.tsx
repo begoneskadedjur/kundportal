@@ -90,6 +90,8 @@ export default function CaseHistoryPanel({
             invoice_number: inv.invoice_number,
             amount: inv.total_amount,
             status: inv.status,
+            // Bara fakturor av typen partial är delfakturor; övriga är vanliga fakturor
+            is_partial: inv.invoice_type === 'partial',
           },
         }))
 
@@ -244,7 +246,7 @@ function InvoiceEntry({ entry }: { entry: HistoryEntry }) {
     <div>
       <div className="flex items-center gap-1.5 mb-1.5">
         <Receipt className="w-3.5 h-3.5 text-[#20c58f] shrink-0" />
-        <span className="text-xs font-semibold text-[#20c58f]">Delfaktura skapad</span>
+        <span className="text-xs font-semibold text-[#20c58f]">{d.is_partial === false ? 'Faktura skapad' : 'Delfaktura skapad'}</span>
       </div>
       <div className="flex items-center justify-between text-xs">
         <span className="text-slate-300 font-medium">{d.invoice_number}</span>

@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.126.1',
+    date: '2026-11-06',
+    title: 'Ärendehistoriken skiljer på faktura och delfaktura',
+    items: [
+      { kind: 'buggfix', text: 'Ärendehistoriken skrev Delfaktura skapad för alla fakturor på ett ärende. Nu står det Faktura skapad för en vanlig faktura och Delfaktura skapad bara för delfakturor.' },
+    ],
+  },
+  {
     version: '3.126.0',
     date: '2026-11-05',
     title: 'Guiderna för nya Fakturering',
