@@ -33,8 +33,9 @@ import { mapBillingItemsToPrefillServices, mapBillingItemsToSelectedArticles } f
 import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES, getTemplateById, type OneflowTemplate } from '../../constants/oneflowTemplates'
 import {
-  KOLUMN_PRIS, KUNDNAMN, ROT_RUT_ROLLER, avdragsradNamn, avserText, kolumnEfterAvdrag, oneflowRader, fastighetText, giltigFastighetsbeteckning, giltigtOrgNr, giltigtPersonnummer,
-  mallensTyp, rollForKod, rotRutBrister, sammanstallRotRut, type Avdrag, type BristKod, type RotRutBrist,
+  avdragsradNamn, fastighetText, giltigFastighetsbeteckning, giltigtOrgNr, giltigtPersonnummer,
+  mallensTyp, rollForKod, rotRutBrister, rotRutForhandsvisning, rotRutForslagText, sammanstallRotRut, wizardTjanstRader,
+  type Avdrag, type BristKod, type RotRutBrist, type WizardTjanstKalla,
 } from '../../shared/rotRutOffert'
 import {
   FALT_UNDERTEXT, FASTIGHET_HJALP, INTRO_HJALP, KVAR_RUBRIK, PERSONNUMMER_HJALP, ROT_RUT_GUIDE_SLUG, ROT_RUT_GUIDE_SLUG_TEKNIKER,
@@ -187,15 +188,11 @@ const rotTypForMall = (templateId: string | null | undefined): Avdrag | null =>
  * ROT/RUT-mall: offertinnehållet nämner kundraderna, aldrig timmar, antal
  * eller interna kostnader. Arbetsraden heter bara Arbetskostnad. Rubriken
  * Avser står ovanför prisraderna i Oneflow (create-contract), inte här.
+ * Samma rader som förhandsvisningen och Oneflow (rotRutForslagText).
  */
-function skrivRotRutForslag(tjanster: Array<{ service_code?: string | null; service_name?: string | null; total_price: number }>): string | null {
+function skrivRotRutForslag(tjanster: WizardTjanstKalla[], typ: Avdrag): string | null {
   if (tjanster.length === 0) return null
-  const rader = ROT_RUT_ROLLER
-    .filter(r => tjanster.some(t => rollForKod(t.service_code) === r && Math.abs(Number(t.total_price) || 0) >= 0.005))
-    .map(r => `- ${KUNDNAMN[r]}`)
-  const delar: string[] = []
-  if (rader.length > 0) delar.push(`Offerten omfattar:\n\n${rader.join('\n')}`)
-  return delar.length > 0 ? delar.join('\n\n') : null
+  return rotRutForslagText(wizardTjanstRader(tjanster), typ)
 }
 
 // Avtalets standardtext gäller bara avtal. En offert får aldrig den som
@@ -215,8 +212,9 @@ function skrivForslagFranTjanster(d: ForslagsKalla): string | null {
   const articleDraftItems = d.draftItems.filter(i => i.item_type === 'article')
   if (!hasPrefill && serviceDraftItems.length === 0) return null
   // ROT/RUT-mall (3.127.0): bara rubriken och kundraderna
-  if (d.documentType === 'offer' && rotTypForMall(d.selectedTemplate)) {
-    return skrivRotRutForslag(hasPrefill ? d.prefillServices! : serviceDraftItems)
+  const rotTyp = d.documentType === 'offer' ? rotTypForMall(d.selectedTemplate) : null
+  if (rotTyp) {
+    return skrivRotRutForslag(hasPrefill ? d.prefillServices! : serviceDraftItems, rotTyp)
   }
   const lines: string[] = []
   if (hasPrefill) {
@@ -1256,17 +1254,7 @@ export default function OneflowContractCreator() {
   // fakturan (src/shared/rotRutOffert.ts). Övriga mallar påverkas inte.
   const rotMall: Avdrag | null = wizardData.documentType === 'offer' ? mallensTyp(selectedTemplate?.deduction ?? null) : null
   const rotKallRader: CaseBillingItemWithRelations[] = wizardData.case_id ? wizardData.caseItems : wizardData.draftItems
-  const rotTjanstRader = rotKallRader
-    .filter(i => i.item_type === 'service')
-    .map(i => ({
-      id: i.id,
-      roll: rollForKod(i.service_code ?? i.service?.code ?? null),
-      service_name: i.service_name,
-      total_price: Number(i.total_price || 0),
-      vat_rate: i.vat_rate,
-      rot_rut_type: i.rot_rut_type ?? null,
-      house_work_hours: i.house_work_hours ?? null,
-    }))
+  const rotTjanstRader = wizardTjanstRader(rotKallRader.filter(i => i.item_type === 'service'))
   const rotArtikelRader = rotKallRader
     .filter(i => i.item_type === 'article')
     .map(a => ({
@@ -1292,6 +1280,8 @@ export default function OneflowContractCreator() {
   // Offertinnehållet kontrolleras i sitt eget steg och i granskningen
   const rotTjansterBrister = rotBrister.filter(b => b.kod !== 'fritext')
   const rotSammanstallning = rotMall ? sammanstallRotRut(rotTjanstRader, rotMall) : null
+  // Det Oneflow visar: rubrik, rader, båda kolumnerna och deras summor
+  const rotVisning = rotSammanstallning ? rotRutForhandsvisning(rotSammanstallning) : null
   const uppdateraRotFastighet = (patch: Partial<RotFastighet>) =>
     setWizardData(prev => ({ ...prev, rotFastighet: { ...prev.rotFastighet, ...patch } }))
 
@@ -2056,34 +2046,36 @@ export default function OneflowContractCreator() {
           ))}
         </div>
 
-        <p className="text-sm text-slate-300">
-          {KOLUMN_PRIS}: <strong className="text-white tabular-nums">{fmtSEK(s.totaltInkl)}</strong>.
-          {' '}{kolumnEfterAvdrag(s.typ)}: <strong className="text-white tabular-nums">{fmtSEK(s.attBetala)}</strong>
-          <span className="text-slate-400"> ({avdragsradNamn(s.typ)}: {fmtSEK(s.avdrag)})</span>
-        </p>
+        {rotVisning && (
+          <p className="text-sm text-slate-300">
+            {rotVisning.kolumnPris}: <strong className="text-white tabular-nums">{fmtSEK(rotVisning.summaPris)}</strong>.
+            {' '}{rotVisning.kolumnEfterAvdrag}: <strong className="text-white tabular-nums">{fmtSEK(rotVisning.summaEfterAvdrag)}</strong>
+            <span className="text-slate-400"> ({avdragsradNamn(s.typ)}: {fmtSEK(s.avdrag)})</span>
+          </p>
+        )}
       </div>
     )
   }
 
   /** Granskningen och sidokortet: samma rader och belopp som Oneflow-dokumentet */
   const renderRotPrisrader = () => {
-    if (!rotMall || !rotSammanstallning) return null
-    const s = rotSammanstallning
+    if (!rotMall || !rotVisning) return null
+    const v = rotVisning
     const f = wizardData.rotFastighet
     const fastighet = fastighetText({ brf: f.brf, fastighetsbeteckning: f.fastighetsbeteckning, brfOrgNr: f.brfOrgNr, lagenhetsnummer: f.lagenhetsnummer })
     return (
       <div className="flex flex-col gap-2">
-        {s.avser && <p className="text-[15px] text-slate-300">{avserText(s.avser)}</p>}
+        {v.rubrik && <p className="text-[15px] text-slate-300">{v.rubrik}</p>}
         <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,0.6fr)_minmax(0,1.2fr)_minmax(0,1.2fr)] gap-x-3 text-[15px] border-t border-slate-700">
           <span className="py-2.5 text-[13px] text-slate-400">Tjänst</span>
           <span className="py-2.5 text-[13px] text-slate-400 text-right">Antal</span>
-          <span className="py-2.5 text-[13px] text-slate-400 text-right">{KOLUMN_PRIS}</span>
-          <span className="py-2.5 text-[13px] text-slate-400 text-right">{kolumnEfterAvdrag(s.typ)}</span>
-          {s.rader.length === 0 && (
+          <span className="py-2.5 text-[13px] text-slate-400 text-right">{v.kolumnPris}</span>
+          <span className="py-2.5 text-[13px] text-slate-400 text-right">{v.kolumnEfterAvdrag}</span>
+          {v.rader.length === 0 && (
             <span className="col-span-4 py-2.5 border-t border-slate-700/60 text-red-400">Inga rader med pris</span>
           )}
           {/* Samma rader som i Oneflow: fullt pris och att betala efter avdraget, avdraget i arbetsradens beskrivning */}
-          {oneflowRader(s).map(r => (
+          {v.rader.map(r => (
             <React.Fragment key={r.namn}>
               <span className="py-2.5 border-t border-slate-700/60 flex flex-col gap-0.5 min-w-0">
                 <span className="text-white">{r.namn}</span>
@@ -2096,12 +2088,11 @@ export default function OneflowContractCreator() {
           ))}
           <span className="py-2.5 border-t border-slate-600 font-bold text-white">Summa</span>
           <span className="py-2.5 border-t border-slate-600" />
-          <span className="py-2.5 border-t border-slate-600 text-right font-bold text-white tabular-nums">{fmtSEK(s.totaltInkl)}</span>
-          <span className="py-2.5 border-t border-slate-600 text-right font-bold text-white tabular-nums">{fmtSEK(s.attBetala)}</span>
+          <span className="py-2.5 border-t border-slate-600 text-right font-bold text-white tabular-nums">{fmtSEK(v.summaPris)}</span>
+          <span className="py-2.5 border-t border-slate-600 text-right font-bold text-white tabular-nums">{fmtSEK(v.summaEfterAvdrag)}</span>
         </div>
-        <p className="text-[13px] text-slate-400">
-          {avdragsradNamn(s.typ)} på arbetskostnaden {fmtSEK(s.arbetskostnadInkl)}: {fmtSEK(s.avdrag)}.
-        </p>
+        {/* Mallens datafält "pris", samma text som i Oneflow */}
+        <p className="text-[13px] text-slate-400">{v.prisText}</p>
         {rotMall === 'ROT' && (
           <p className="text-[13px] text-slate-400">
             {f.brf ? 'Bostadsrätt' : 'Fastighetsbeteckning'}: <span className="text-slate-200">{fastighet || 'saknas'}</span>
@@ -2989,12 +2980,12 @@ export default function OneflowContractCreator() {
         klar: maxReachedStep > begoneStep && !!avtalslangdText,
       },
     ] : []),
-    rotSammanstallning
+    rotVisning
       ? {
           namn: 'Pris',
           // Som i Oneflow: båda kolumnernas summor
-          text: `${KOLUMN_PRIS} ${fmtSEK(rotSammanstallning.totaltInkl)}, ${kolumnEfterAvdrag(rotSammanstallning.typ).toLowerCase()} ${fmtSEK(rotSammanstallning.attBetala)}`,
-          klar: rotSammanstallning.totaltInkl > 0,
+          text: `${rotVisning.kolumnPris} ${fmtSEK(rotVisning.summaPris)}, ${rotVisning.kolumnEfterAvdrag.charAt(0).toLowerCase()}${rotVisning.kolumnEfterAvdrag.slice(1)} ${fmtSEK(rotVisning.summaEfterAvdrag)}`,
+          klar: rotVisning.summaPris > 0,
         }
       : {
           namn: isContract ? 'Årspremie' : 'Pris',

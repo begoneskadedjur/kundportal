@@ -77,7 +77,7 @@ export const PERSONNUMMER_HJALP: HjalpText = {
 export const FALT_UNDERTEXT = {
   fastighet: 'Skriv som Kommun område 1:23, med kolon.',
   brf: 'Föreningens org.nr och lägenhetsnumret, till exempel 1102.',
-  personnummer: 'ÅÅÅÅMMDD-XXXX. Ett org.nr fungerar inte.',
+  personnummer: 'ÅÅÅÅMMDD-XXXX eller ÅÅMMDD-XXXX. Ett org.nr fungerar inte.',
 }
 
 export const TIMMAR_UNDERTEXT =

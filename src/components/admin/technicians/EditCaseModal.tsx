@@ -2524,7 +2524,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                     placeholder="Personnummer"
                     value={formData.personnummer || ''}
                     onChange={handleChange}
-                    helperText="Krävs för ROT och RUT. Fastighetsbeteckningen fyller du i på ROT- eller RUT-raden nedanför."
+                    helperText="Krävs för ROT och RUT. Vid ROT fyller du också i fastighetsbeteckningen på ROT-raden nedanför. RUT har ingen fastighet."
                   />
                 )}
               </div>

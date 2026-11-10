@@ -257,6 +257,141 @@ export function oneflowRader(s: RotRutSammanstallning): OneflowRad[] {
 
 export const avserText = (avser: string | null): string | null => (avser ? `Avser: ${avser}` : null)
 
+/** Produktgruppen som create-contract skickar till Oneflow (variant D). */
+export interface OneflowProduktgrupp {
+  products: Array<{
+    name: string
+    description: string
+    price_1: { base_amount: { amount: string }; discount_amount: { amount: string } }
+    price_2: { base_amount: { amount: string }; discount_amount: { amount: string } }
+    quantity: { type: 'quantity'; amount: number }
+    counterparty_lock: boolean
+  }>
+  configuration: {
+    hide_price_summation: boolean
+    counterpart_edit: boolean
+    name?: { enabled: boolean; label: string }
+    columns: Array<{ key: string; enabled: boolean; label: string }>
+  }
+}
+
+/**
+ * Kundraderna inkl. moms, hela kronor, 1 st, låsta för kunden. Två synliga
+ * priskolumner: price_1 "Pris inkl. moms" och price_2 "Att betala efter
+ * ROT/RUT". Rubriken "Avser: <tjänst>" är produktgruppens namn.
+ */
+export function oneflowProduktgrupp(s: RotRutSammanstallning): OneflowProduktgrupp {
+  const pris = (belopp: number) => ({ base_amount: { amount: String(belopp) }, discount_amount: { amount: '0' } })
+  const rubrik = avserText(s.avser)
+  return {
+    products: oneflowRader(s).map(r => ({
+      name: r.namn,
+      description: r.beskrivning,
+      price_1: pris(r.belopp),
+      price_2: pris(r.efterAvdrag),
+      quantity: { type: 'quantity' as const, amount: 1 },
+      counterparty_lock: true,
+    })),
+    configuration: {
+      hide_price_summation: false,
+      counterpart_edit: false,
+      ...(rubrik ? { name: { enabled: true, label: rubrik } } : {}),
+      columns: [
+        // Mallarnas beskrivningskolumn heter "Avser", som krockar med rubriken
+        // "Avser: <tjänst>" (utkast 16806487 visade "Avser: Inget avdrag").
+        // Varje prisrubrik blir även sin summas etikett i Oneflow.
+        { key: 'description', enabled: true, label: KOLUMN_BESKRIVNING },
+        { key: 'price_1', enabled: true, label: KOLUMN_PRIS },
+        { key: 'price_2', enabled: true, label: kolumnEfterAvdrag(s.typ) },
+      ],
+    },
+  }
+}
+
+/** Det wizarden visar i Granska och sidokortet: samma rader, kolumner och summor som Oneflow. */
+export interface RotRutForhandsvisning {
+  rubrik: string | null
+  kolumnPris: string
+  kolumnEfterAvdrag: string
+  rader: OneflowRad[]
+  summaPris: number
+  summaEfterAvdrag: number
+  /** Datafältet "pris" i mallen */
+  prisText: string
+}
+
+export function rotRutForhandsvisning(s: RotRutSammanstallning): RotRutForhandsvisning {
+  const rader = oneflowRader(s)
+  return {
+    rubrik: avserText(s.avser),
+    kolumnPris: KOLUMN_PRIS,
+    kolumnEfterAvdrag: kolumnEfterAvdrag(s.typ),
+    rader,
+    // Oneflow summerar kolumnerna, så summan räknas på raderna
+    summaPris: rader.reduce((sum, r) => sum + r.belopp, 0),
+    summaEfterAvdrag: rader.reduce((sum, r) => sum + r.efterAvdrag, 0),
+    prisText: prisText(s),
+  }
+}
+
+/** En tjänsterad som wizarden har den (case_billing_items eller utkastets rader). */
+export interface WizardTjanstKalla {
+  id: string
+  service_code?: string | null
+  /** Katalogtjänsten. rot_eligible finns bara för att prefill-raderna (utan code) ska passa typen */
+  service?: { code?: string | null; rot_eligible?: boolean | null } | null
+  service_name?: string | null
+  total_price: number | string | null
+  vat_rate?: number | null
+  rot_rut_type?: Avdrag | null
+  house_work_hours?: number | null
+}
+
+/** Wizardens tjänsterader i ROT/RUT-läget. Rollen ur tjänstekoden. */
+export function wizardTjanstRader(rader: WizardTjanstKalla[]): OffertTjanstRad[] {
+  return rader.map(i => ({
+    id: i.id,
+    roll: rollForKod(i.service_code ?? i.service?.code ?? null),
+    service_name: i.service_name ?? null,
+    total_price: Number(i.total_price || 0),
+    vat_rate: i.vat_rate,
+    rot_rut_type: i.rot_rut_type ?? null,
+    house_work_hours: i.house_work_hours ?? null,
+  }))
+}
+
+/** En tjänsterad som servern får i draftItems. */
+export interface ServerTjanstKalla {
+  draft_id?: string | null
+  service_id?: string | null
+  service_name?: string | null
+  total_price: number | string | null
+  vat_rate?: number | null
+  rot_rut_type?: Avdrag | null
+}
+
+/** Serverns tjänsterader. Rollen ur katalogens kod för service_id, klientens kod används inte. */
+export function serverTjanstRader(rader: ServerTjanstKalla[], kodFor: (serviceId: string) => string | null | undefined): OffertTjanstRad[] {
+  return rader.map((r, idx) => ({
+    id: r.draft_id || `rad-${idx}`,
+    roll: r.service_id ? rollForKod(kodFor(r.service_id)) : null,
+    service_name: r.service_name ?? null,
+    total_price: Number(r.total_price) || 0,
+    vat_rate: r.vat_rate ?? 25,
+    rot_rut_type: r.rot_rut_type ?? null,
+  }))
+}
+
+/**
+ * Offertinnehållet som Skriv förslag från tjänsterna ger i ROT/RUT-mallen:
+ * kundraderna med pris, aldrig timmar, antal eller interna kostnader.
+ * Rubriken Avser står ovanför prisraderna i Oneflow, inte här.
+ */
+export function rotRutForslagText(rader: OffertTjanstRad[], typ: Avdrag): string | null {
+  const namn = sammanstallRotRut(rader, typ).rader.map(r => `- ${r.namn}`)
+  return namn.length > 0 ? `Offerten omfattar:\n\n${namn.join('\n')}` : null
+}
+
 // ─── Identitet och fastighet ────────────────────────────────────────────────
 
 const siffror = (s: string | null | undefined) => String(s ?? '').replace(/\D/g, '')

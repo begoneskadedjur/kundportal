@@ -12,22 +12,20 @@
 //     stegen          Dokument, Mall, BeGone, Motpart, Tjänster, Offertinnehåll, Granska
 //                     (Avtalspart döljs när offertmallen är vald, mallen bär kundtypen)
 //     Mall            mallkorten med "Privatperson · ROT-avdrag" (template.deduction)
-//     Tjänster        CaseServiceSelector: Tjänster & fakturarader, Lägg till tilläggstjänst,
-//                     Dela upp för ROT/RUT, formuläret Varav arbetskostnad, Timmar, Avdrag,
-//                     Kunden betalar, Dela upp. Mallen bestämmer vilket avdrag som syns
-//                     (allowedDeduction). Inskjutet: "Varav arbetskostnad ..., ROT",
-//                     "Material och övrigt", Fastighetsbeteckning *.
-//     bottenlisten    getValidationHint, med ROT/RUT-felet ur src/shared/rotRutDokument.ts
-//     Granska         Kontroll före utskick (kontrolleraAvtal + ROT/RUT-punkten)
+//     Tjänster        CaseServiceSelector: Tjänster & fakturarader, Lägg till tilläggstjänst
+//     bottenlisten    getValidationHint
+//     Granska         Kontroll före utskick (kontrolleraAvtal)
 //     utkastet        Så här ser kunden offerten, Skicka offerten, Tillbaka och ändra, Spara som utkast
 //   Motpart          rutan Befintlig kund (AvtalsKundVal), ritad i _avtalsforslag.tsx
-// Påhittad kund, ingenting skickas.
+// Exemplet är en offert utan avdrag med mallen för privatpersoner inklusive moms.
+// ROT- och RUT-mallarna bygger offerten på ett eget sätt (3.127.0) och har en
+// egen guide, guide-rot-rut-offert-kontor. Dela upp för ROT/RUT används inte i
+// offerten sedan dess. Påhittad kund, ingenting skickas.
 
 import { useState } from 'react'
 import { Icon } from '../../../../components/icons/Icon'
 import { OFFER_TEMPLATES } from '../../../../constants/oneflowTemplates'
 import { AVTALSOBJEKT_MAX_TECKEN, harStopp, kontrolleraAvtal, type KontrollAvsnitt, type KontrollPunkt } from '../../../../shared/avtalsKontroll'
-import { mallensAvdrag, rotRutFel, tillatnaAvdrag } from '../../../../shared/rotRutDokument'
 import { Dator, Markor, Notis, OvningRam, type OvningSvar } from '../skarmkit'
 import type { GuideModul } from './registry'
 import { Knapp, ingenMk, mkFor, type Mk, type Tryck } from './_nyvy_salja'
@@ -40,18 +38,15 @@ const TEL = '070-123 45 67'
 const EPOST = 'familjen@exempel.se'
 const TJANST = 'Tätning av ventil'
 const TOTAL = 3750
-const ARBETE = 2500
-const TIMMAR = 2
-const FASTIGHET = 'Exempelby 1:23'
 const FORSLAG = `Tjänster som ingår:\n\n- ${TJANST}`
+const MALL_PRIVAT = '8919037'
 const MALL_ROT = '8919012'
+const MALL_RUT = '8919059'
 const SKAPA = 'Skapa Avtal & Offerter'
 const MENY = ['Översikt', SKAPA, 'Ärenden', 'Befintliga kunder', 'Dokumentsignering', 'Leads (B2B)']
-const ARBETSTJANST = { rot_eligible: true, rut_eligible: true }
 
 const kr = (n: number) => `${Math.round(n).toLocaleString('sv-SE')} kr`
 const mallNamn = (namn: string) => namn.replace(/\s*[\u2013\u2014]\s*/g, ', ')
-const mallen = (id: string | null) => OFFER_TEMPLATES.find(t => t.id === id)
 
 type Vy = 'start' | 'dokument' | 'mall' | 'begone' | 'motpart' | 'tjanster' | 'innehall' | 'granska' | 'pdf' | 'klart'
 
@@ -65,22 +60,16 @@ interface Lage {
   epost: boolean
   tjanst: boolean
   valjare: boolean
-  /** Formuläret Dela upp för ROT/RUT är öppet */
-  form: boolean
-  /** Avdraget som är valt i formuläret */
-  formAvdrag: 'ROT' | 'RUT' | null
-  /** Arbetskostnaden är uppdelad på en egen rad med detta avdrag */
-  avdrag: 'ROT' | 'RUT' | null
-  fastighet: boolean
   text: boolean
 }
 
 const BAS: Lage = {
   vy: 'start', typ: 'contract', mall: null, sok: 'tom', namn: false, tel: false, epost: false,
-  tjanst: false, valjare: false, form: false, formAvdrag: null, avdrag: null, fastighet: false, text: false,
+  tjanst: false, valjare: false, text: false,
 }
-const MED_TJANST: Lage = { ...BAS, typ: 'offer', mall: MALL_ROT, sok: 'ingen', namn: true, tel: true, epost: true, tjanst: true }
-const IFYLLD: Lage = { ...MED_TJANST, avdrag: 'ROT', fastighet: true, text: true }
+const MED_KUND: Lage = { ...BAS, typ: 'offer', mall: MALL_PRIVAT, sok: 'ingen', namn: true, tel: true, epost: true }
+const MED_TJANST: Lage = { ...MED_KUND, tjanst: true }
+const IFYLLD: Lage = { ...MED_TJANST, text: true }
 
 const STEGEN: { vy: Vy; namn: string }[] = [
   { vy: 'dokument', namn: 'Dokument' },
@@ -92,19 +81,8 @@ const STEGEN: { vy: Vy; namn: string }[] = [
   { vy: 'granska', namn: 'Granska' },
 ]
 
-/** ROT/RUT-felet med portalens egen regel och text */
-function rotFel(l: Lage): string {
-  if (!l.avdrag) return ''
-  const m = mallen(l.mall)
-  const avdrag = mallensAvdrag(m)
-  return rotRutFel(
-    [{ rot_rut_type: l.avdrag, service_name: 'Skadedjurstekniker timpris', service: ARBETSTJANST }],
-    avdrag ? { avdrag, namn: m ? mallNamn(m.name) : null } : null
-  )
-}
-
 function kontroll(l: Lage): KontrollPunkt[] {
-  const punkter = kontrolleraAvtal({
+  return kontrolleraAvtal({
     dokumentTyp: 'offer',
     partTyp: 'individual',
     foretag: '',
@@ -118,8 +96,6 @@ function kontroll(l: Lage): KontrollPunkt[] {
     avtalsobjekt: l.text ? FORSLAG : '',
     antalTjanster: l.tjanst ? 1 : 0,
   })
-  const fel = rotFel(l)
-  return fel ? [...punkter, { niva: 'rod', text: fel, avsnitt: 'tjanster' }] : punkter
 }
 
 const AVSNITT: Record<KontrollAvsnitt, string> = { motpart: 'Motpart', avtalstid: 'BeGone', avtalsobjekt: 'Offertinnehåll', tjanster: 'Tjänster' }
@@ -132,7 +108,6 @@ function tips(l: Lage): string {
   }
   if (l.vy === 'tjanster') {
     if (!l.tjanst) return 'Lägg till minst en tjänst'
-    return rotFel(l)
   }
   return ''
 }
@@ -174,79 +149,14 @@ function Band({ l, procent, tryck }: { l: Lage; procent: number; tryck: Tryck })
 
 const PUNKT_FARG = { rod: 'bg-red-500', gul: 'bg-amber-500', gron: 'bg-[#20c58f]' }
 
-/** Formuläret Dela upp för ROT/RUT. Mallen bestämmer vilka avdrag som syns. */
-function DelaUpp({ l, tryck, mk }: { l: Lage; tryck: Tryck; mk: Mk }) {
-  const tillat = tillatnaAvdrag(mallensAvdrag(mallen(l.mall)))
-  const pct = l.formAvdrag === 'ROT' ? 30 : l.formAvdrag === 'RUT' ? 50 : 0
-  const avdrag = ARBETE * pct / 100
-  return (
-    <div className="grid gap-1.5 rounded-md border border-slate-700/50 bg-slate-800/30 p-2">
-      <p className="text-[10px] leading-snug text-slate-400">ROT/RUT gäller bara arbetskostnaden. Ange hur stor del av totalpriset {kr(TOTAL)} som är arbete. Arbetet blir en egen rad "Skadedjurstekniker timpris" som bär avdraget. Totalen mot kund ändras inte.</p>
-      <div className="grid grid-cols-3 gap-1.5">
-        <Falt id="form:arbete" etikett="Varav arbetskostnad" varde={kr(ARBETE)} tryck={tryck} mk={mk} />
-        <Falt id="form:timmar" etikett="Timmar" varde={`${TIMMAR} h`} tryck={tryck} mk={mk} />
-        <div className="grid gap-0.5">
-          <span className="text-[10px] font-bold text-slate-300">Avdrag</span>
-          <div className="flex flex-wrap gap-x-2 gap-y-1 pt-0.5">
-            {(['ROT', 'RUT'] as const).filter(t => (t === 'ROT' ? tillat.rot : tillat.rut)).map(t => (
-              <Markor key={t} markor={mk(`form:${t}`)}>
-                <button type="button" onClick={() => tryck(`form:${t}`)} className="flex items-center gap-1 text-[10.5px] text-slate-300">
-                  <span className={`flex h-3 w-3 items-center justify-center rounded-full border ${l.formAvdrag === t ? 'border-[#20c58f]' : 'border-slate-500'}`}>
-                    {l.formAvdrag === t && <span className="h-1.5 w-1.5 rounded-full bg-[#20c58f]" />}
-                  </span>
-                  {t} ({t === 'ROT' ? 30 : 50} %)
-                </button>
-              </Markor>
-            ))}
-          </div>
-        </div>
-      </div>
-      <dl className="grid grid-cols-[1fr_auto] gap-x-3 text-[10px]">
-        <dt className="text-slate-400">Material och övrigt</dt><dd className="text-right text-slate-200">{kr(TOTAL - ARBETE)}</dd>
-        <dt className="text-slate-400">Arbetskostnad</dt><dd className="text-right text-slate-200">{kr(ARBETE)}</dd>
-        <dt className="text-slate-400">{l.formAvdrag ? `${l.formAvdrag}-avdrag (${pct} %)` : 'ROT- eller RUT-avdrag'}</dt>
-        <dd className={`text-right ${l.formAvdrag ? 'text-[#20c58f]' : 'text-slate-500'}`}>{l.formAvdrag ? `-${kr(avdrag)}` : 'Välj ROT eller RUT'}</dd>
-        <dt className="border-t border-slate-700/50 pt-0.5 font-medium text-slate-300">Kunden betalar</dt>
-        <dd className="border-t border-slate-700/50 pt-0.5 text-right font-semibold text-white">{kr(TOTAL - avdrag)}</dd>
-      </dl>
-      <div className="flex items-center justify-end gap-2">
-        <button type="button" onClick={() => tryck('form:avbryt')} className="text-[10.5px] text-slate-400">Avbryt</button>
-        <Markor markor={mk('form:ok')}>
-          <button type="button" onClick={() => tryck('form:ok')} className="rounded-md bg-[#20c58f] px-2 py-0.5 text-[10.5px] font-medium text-[#fff]">Dela upp</button>
-        </Markor>
-      </div>
-    </div>
-  )
-}
-
 function Tjanster({ l, tryck, mk }: { l: Lage; tryck: Tryck; mk: Mk }) {
-  const pct = l.avdrag === 'ROT' ? 30 : l.avdrag === 'RUT' ? 50 : 0
   return (
     <div className="grid gap-1.5 rounded-xl border border-slate-700 bg-slate-800/30 p-2">
       <p className="flex items-center gap-1.5 text-[11.5px] font-semibold text-white"><Icon name="sok.faktura" size={16} className="h-3.5 w-3.5 text-[#20c58f]" />Tjänster &amp; fakturarader</p>
       {l.tjanst ? (
         <div className="grid gap-1 rounded-lg border border-slate-700/50 bg-slate-800/40 p-2">
-          <p className="flex justify-between text-[11.5px] text-white"><span>{TJANST}</span><span className="font-semibold">{kr(TOTAL)}{l.avdrag ? ' totalt' : ''}</span></p>
-          {l.avdrag && (
-            <div className="ml-1 grid gap-0.5 border-l-2 border-[#20c58f]/40 pl-2">
-              <p className="text-[10.5px] text-slate-300"><span className="mr-1 text-[#20c58f]">●</span>Varav arbetskostnad <b className="font-semibold text-white">{kr(ARBETE)}</b>, {TIMMAR} h, {l.avdrag}</p>
-              <p className="text-[10px] text-slate-500">Material och övrigt {kr(TOTAL - ARBETE)}</p>
-              <Markor markor={mk('fastighet')} block>
-                <button type="button" onClick={() => tryck('fastighet')}
-                  className={`block w-full rounded border px-1.5 py-0.5 text-left text-[10px] ${l.fastighet ? 'border-slate-600 text-white' : 'border-slate-600 text-slate-500'}`}>
-                  {l.fastighet ? FASTIGHET : 'Fastighetsbeteckning *'}
-                </button>
-              </Markor>
-            </div>
-          )}
-          {l.form && <DelaUpp l={l} tryck={tryck} mk={mk} />}
-          {!l.avdrag && !l.form && (
-            <Markor markor={mk('dela-upp')}>
-              <button type="button" onClick={() => tryck('dela-upp')} className="flex items-center gap-1 text-[10.5px] text-slate-400">
-                <Icon name="allman.kalkyl" size={16} className="h-3 w-3" />Dela upp för ROT/RUT
-              </button>
-            </Markor>
-          )}
+          <p className="flex justify-between text-[11.5px] text-white"><span>{TJANST}</span><span className="font-semibold">{kr(TOTAL)}</span></p>
+          <p className="text-[10px] text-slate-500">1 st, inkl. moms</p>
         </div>
       ) : (
         <p className="py-1 text-center text-[10.5px] text-slate-500">Inga tjänster tillagda än</p>
@@ -266,13 +176,6 @@ function Tjanster({ l, tryck, mk }: { l: Lage; tryck: Tryck; mk: Mk }) {
         <Markor markor={mk('lagg-till')}>
           <button type="button" onClick={() => tryck('lagg-till')} className="flex items-center gap-1 text-[10.5px] text-slate-400"><Icon name="allman.plus" size={16} className="h-3 w-3" />Lägg till tilläggstjänst</button>
         </Markor>
-      )}
-      {l.avdrag && (
-        <div className="grid gap-0.5 border-t border-slate-700/50 pt-1 text-[10.5px]">
-          <p className="flex justify-between"><span className="text-slate-400">Inkl. moms</span><span className="font-semibold text-white">{kr(TOTAL)}</span></p>
-          <p className="flex justify-between text-[#20c58f]"><span>{l.avdrag}-avdrag</span><span>-{kr(ARBETE * pct / 100)}</span></p>
-          <p className="flex justify-between"><span className="font-medium text-slate-300">Att betala (kund)</span><span className="font-bold text-[#20c58f]">{kr(TOTAL - ARBETE * pct / 100)}</span></p>
-        </div>
       )}
     </div>
   )
@@ -409,8 +312,7 @@ function Innehall({ l, tryck, mk }: { l: Lage; tryck: Tryck; mk: Mk }) {
               <span className="text-[11px] font-bold text-slate-900">Offert</span>
               <span>Kund: {KUND}</span>
               <span className="whitespace-pre-line">{FORSLAG}</span>
-              <span className="flex justify-between border-t border-slate-200 pt-0.5"><span>{TJANST}</span><span>{kr((TOTAL - ARBETE) / 1.25)} exkl. moms</span></span>
-              <span className="flex justify-between"><span>Skadedjurstekniker timpris, {TIMMAR} h</span><span>{kr(ARBETE / 1.25)} exkl. moms</span></span>
+              <span className="flex justify-between border-t border-slate-200 pt-0.5"><span>{TJANST}</span><span>{kr(TOTAL)}</span></span>
             </button>
             <div className="grid content-start gap-1 rounded-xl border border-slate-700 bg-slate-800/40 p-2">
               <p className="text-[11.5px] font-bold text-white">Ser allt rätt ut?</p>
@@ -513,10 +415,10 @@ function Skarm({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
 const VISNING: { lage: Lage; markera: string }[] = [
   { lage: BAS, markera: `nav:${SKAPA}` },
   { lage: { ...BAS, vy: 'dokument' }, markera: 'typ:offer' },
-  { lage: { ...BAS, typ: 'offer', vy: 'mall' }, markera: `mall:${MALL_ROT}` },
-  { lage: { ...BAS, typ: 'offer', mall: MALL_ROT, vy: 'motpart' }, markera: 'sok' },
-  { lage: { ...MED_TJANST, vy: 'tjanster' }, markera: 'dela-upp' },
-  { lage: { ...MED_TJANST, vy: 'tjanster', form: true, formAvdrag: 'ROT' }, markera: 'form:ok' },
+  { lage: { ...BAS, typ: 'offer', vy: 'mall' }, markera: `mall:${MALL_PRIVAT}` },
+  { lage: { ...BAS, typ: 'offer', mall: MALL_PRIVAT, vy: 'motpart' }, markera: 'sok' },
+  { lage: { ...MED_KUND, vy: 'tjanster', valjare: true }, markera: 'tj:tatning' },
+  { lage: { ...MED_TJANST, vy: 'innehall' }, markera: 'forslag' },
   { lage: { ...IFYLLD, vy: 'granska' }, markera: 'skapa-pdf' },
 ]
 
@@ -527,19 +429,16 @@ function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
 
 // --- Övning ---
 
-const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: `${KUND} vill ha en offert på ${TJANST.toLowerCase()}, ${kr(TOTAL)} inkl. moms. ${kr(ARBETE)} av det är arbete, ${TIMMAR} timmar, och familjen ska ha ROT. Skapa offerten och skicka den. Börja i sidomenyn.` }
+const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: `${KUND} vill ha en offert på ${TJANST.toLowerCase()}, ${kr(TOTAL)} inkl. moms, utan ROT eller RUT. Skapa offerten och skicka den. Börja i sidomenyn.` }
 
 const FEL: Record<string, string> = {
   avbryt: 'Avbryt lämnar Skapa avtal eller offert och det du fyllt i försvinner. Fortsätt i stället.',
   band: 'Avtal & Offerter tar dig till Dokumentsignering. Gör klart offerten först.',
-  'f:pnr': 'Personnumret behövs för ROT, men stoppar inte här. Fyll i namn, telefon och e-post.',
+  'f:pnr': 'Personnumret behövs bara med ROT- eller RUT-mallen. Fyll i namn, telefon och e-post.',
   'f:faktura': 'E-post för faktura kan kunden fylla i vid signeringen. Fyll i namn, telefon och e-post.',
   'f:ansvarig': 'Ditt namn står redan här. Tryck Nästa.',
   'f:ansvarig-epost': 'Din e-post står redan här. Tryck Nästa.',
   'tj:inspektion': 'Uppdraget gäller tätningen. Välj Tätning av ventil.',
-  'form:arbete': `Arbetskostnaden ${kr(ARBETE)} står redan i rutan.`,
-  'form:timmar': `${TIMMAR} timmar står redan i rutan.`,
-  'form:avbryt': 'Avbryt stänger formuläret utan att dela upp. Familjen ska ha ROT, så dela upp.',
   textruta: 'Du kan skriva egen text här. Enklast är Skriv förslag från tjänsterna.',
   'pdf-yta': 'Det här är Oneflows PDF. Ser den rätt ut skickar du med knappen bredvid.',
   andra: 'Tillbaka och ändra tar bort utkastet. Allt stämmer, så skicka i stället.',
@@ -574,19 +473,19 @@ function Ovning() {
         else if (id === 'typ:contract') miss('Avtalsförslag är för löpande avtal med årspremie. Tätningen är ett engångsjobb, alltså Offert.')
         else if (id === 'nasta') {
           if (l.typ !== 'offer') miss('Avtalsförslag är förvalt. Välj Offert först.')
-          else { ga('mall'); tips2('Välj mall', 'Familjen ska ha ROT. Mallen bestämmer avdraget, så välj ROT-mallen.') }
+          else { ga('mall'); tips2('Välj mall', 'Familjen är privatpersoner och ska inte ha avdrag. Välj Offertförslag, Inkl moms (Privatperson).') }
         } else miss('Välj Offert och tryck Nästa.')
         return
       case 'mall':
         if (id.startsWith('mall:')) {
           const mall = id.slice(5)
           ga('mall', { mall })
-          if (mall === MALL_ROT) tips2('Rätt mall', 'Med ROT-mallen går bara ROT att välja i Tjänster. Tryck Nästa.')
+          if (mall === MALL_PRIVAT) tips2('Rätt mall', 'Priserna står inklusive moms, utan avdrag. Tryck Nästa.')
           else if (mall === '8598798') miss('Den mallen är för företag. Familjen Exempel är privatpersoner.')
-          else if (mall === '8919059') miss('RUT-mallen söker RUT-avdrag. Familjen ska ha ROT, välj ROT-mallen.')
-          else miss('Den mallen har inget avdrag. Med den går ROT inte att välja i Tjänster. Välj ROT-mallen.')
+          else if (mall === MALL_ROT || mall === MALL_RUT) miss('ROT- och RUT-mallarna bygger offerten med Arbetskostnad och avdrag och har en egen guide, Skapa en ROT- eller RUT-offert. Familjen ska inte ha avdrag, välj mallen Inkl moms (Privatperson).')
+          else miss('Välj Offertförslag, Inkl moms (Privatperson).')
         } else if (id === 'nasta') {
-          if (l.mall !== MALL_ROT) miss('Välj Offertförslag, ROT (Privatperson) först.')
+          if (l.mall !== MALL_PRIVAT) miss('Välj Offertförslag, Inkl moms (Privatperson) först.')
           else { ga('begone'); tips2('Ansvarig', 'Ditt namn och din e-post är redan ifyllda. Tryck Nästa.') }
         } else miss('Välj en mall och tryck Nästa.')
         return
@@ -607,17 +506,11 @@ function Ovning() {
         return
       case 'tjanster':
         if (id === 'lagg-till') { ga('tjanster', { valjare: true }); tips2('Sök tjänsten', `Välj ${TJANST} i listan.`) }
-        else if (id === 'tj:tatning') { ga('tjanster', { tjanst: true, valjare: false }); tips2('Tjänsten är tillagd', 'Avdraget gäller bara arbetet. Tryck Dela upp för ROT/RUT under tjänsten.') }
-        else if (id === 'dela-upp') { ga('tjanster', { form: true, formAvdrag: 'ROT' }); tips2('Dela upp', `Arbetskostnad ${kr(ARBETE)} och ${TIMMAR} timmar står i rutorna. Bara ROT syns, eftersom mallen är ROT-mallen. Tryck Dela upp.`) }
-        else if (id === 'form:ROT') { ga('tjanster', { formAvdrag: 'ROT' }); tips2('ROT är valt', 'Tryck Dela upp.') }
-        else if (id === 'form:ok') { ga('tjanster', { form: false, avdrag: 'ROT' }); tips2('Arbetet är uppdelat', 'Under tjänsten står Varav arbetskostnad med ROT. Fyll i Fastighetsbeteckning.') }
-        else if (id === 'fastighet') { ga('tjanster', { fastighet: true }); tips2('Fastighetsbeteckningen är ifylld', `${FASTIGHET}. Tryck Nästa.`) }
+        else if (id === 'tj:tatning') { ga('tjanster', { tjanst: true, valjare: false }); tips2('Tjänsten är tillagd', `${TJANST}, ${kr(TOTAL)} inkl. moms. Tryck Nästa.`) }
         else if (id === 'nasta') {
           if (!l.tjanst) miss('Det står Lägg till minst en tjänst. Tryck Lägg till tilläggstjänst.')
-          else if (!l.avdrag) miss('Familjen ska ha ROT. Tryck Dela upp för ROT/RUT först.')
-          else if (!l.fastighet) miss('Fyll i Fastighetsbeteckning under arbetskostnaden. Utan den går ärendet inte att fakturera med avdrag.')
           else { ga('innehall'); tips2('Offertinnehåll', 'Texten kunden läser i offerten. Tryck Skriv förslag från tjänsterna.') }
-        } else miss('Lägg till tjänsten och dela upp arbetet för ROT.')
+        } else miss('Lägg till tjänsten för tätningen.')
         return
       case 'innehall':
         if (id === 'forslag') { ga('innehall', { text: true }); tips2('Texten är skriven', 'Läs igenom och tryck Granska offerten.') }
@@ -640,7 +533,7 @@ function Ovning() {
       case 'pdf':
         if (id === 'skicka') {
           ga('klart')
-          setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Offerten på ${kr(TOTAL)} med ROT på arbetskostnaden är skickad från info@begone.se till ${EPOST}. Arbetsraden följer med till ärendet när offerten bokas in.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
+          setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Offerten på ${kr(TOTAL)} inkl. moms är skickad från info@begone.se till ${EPOST}. Tjänsten följer med till ärendet när offerten bokas in.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
         } else miss('Tryck Skicka offerten.')
         return
     }

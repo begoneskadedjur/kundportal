@@ -34,6 +34,8 @@ const MATERIAL = '2 000 kr'
 const BIL = '500 kr'
 const TOTALT = '14 500 kr'
 const AVDRAG = '3 600 kr'
+/** Arbetskostnad i kolumnen Att betala efter ROT: 12 000 minus 3 600 */
+const ARBETE_EFTER = '8 400 kr'
 const ATT_BETALA = '10 900 kr'
 
 const klar = (l: RotLage) => l.rot && l.fastighet && l.pnr
@@ -57,6 +59,45 @@ function Rad({ namn, belopp, under, gron, children }: { namn: string; belopp: st
       </div>
       {under && <p className="text-[10px] text-slate-500">{under}</p>}
       {children}
+    </div>
+  )
+}
+
+/**
+ * Prisraderna som i Granska och i Oneflow (variant D, 3.127.5): rubriken Avser,
+ * två priskolumner, inget avdrag som egen rad. Avdraget står i arbetsradens
+ * beskrivning och bara arbetsraden skiljer mellan kolumnerna.
+ */
+function PrisTabell({ ljus }: { ljus?: boolean }) {
+  const linje = ljus ? 'border-slate-300' : 'border-slate-700/60'
+  const svag = ljus ? 'text-slate-500' : 'text-slate-400'
+  const stark = ljus ? 'text-slate-900' : 'text-white'
+  const rader: Array<[string, string | null, string, string]> = [
+    ['Arbetskostnad', `ROT-avdrag 30 %: ${AVDRAG}.`, ARBETE, ARBETE_EFTER],
+    ['Material och utrustning', null, MATERIAL, MATERIAL],
+    ['Servicebil', null, BIL, BIL],
+  ]
+  return (
+    <div className="grid gap-1 text-[10.5px]">
+      <p className={`font-semibold ${stark}`}>Avser: Tätning gnagare</p>
+      <div className={`grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] gap-x-1.5 border-t ${linje}`}>
+        <span className={`pt-1 ${svag}`}>Beskrivning</span>
+        <span className={`pt-1 text-right ${svag}`}>Pris inkl. moms</span>
+        <span className={`pt-1 text-right ${svag}`}>Att betala efter ROT</span>
+        {rader.map(([namn, besk, pris, efter]) => (
+          <div key={namn} className={`col-span-3 grid grid-cols-subgrid border-t ${linje} pt-1`}>
+            <span className="flex flex-col">
+              <span className={stark}>{namn}</span>
+              {besk && <span className={svag}>{besk}</span>}
+            </span>
+            <span className={`text-right tabular-nums ${stark}`}>{pris}</span>
+            <span className={`text-right tabular-nums ${pris !== efter ? 'font-semibold text-[#20c58f]' : stark}`}>{efter}</span>
+          </div>
+        ))}
+        <span className={`border-t ${linje} pt-1 font-semibold ${stark}`}>Summa</span>
+        <span className={`border-t ${linje} pt-1 text-right font-semibold tabular-nums ${stark}`}>{TOTALT}</span>
+        <span className={`border-t ${linje} pt-1 text-right font-semibold tabular-nums ${stark}`}>{ATT_BETALA}</span>
+      </div>
     </div>
   )
 }
@@ -132,7 +173,9 @@ export function RotWizard({ l, mk, tryck }: { l: RotLage; mk: Mk; tryck: Tryck }
             <Kvar ok={l.pnr} text="Personnummer ifyllt" />
           </div>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-slate-300">Att betala efter avdrag: <b className="text-white">{l.rot ? ATT_BETALA : '2 500 kr'}</b></span>
+            <span className="text-[11px] text-slate-300">
+              Pris inkl. moms: <b className="text-white">{l.rot ? TOTALT : '2 500 kr'}</b>. Att betala efter ROT: <b className="text-white">{l.rot ? ATT_BETALA : '2 500 kr'}</b>
+            </span>
             <Markor markor={mk('nasta')}>
               <button type="button" onClick={() => tryck('nasta')} aria-disabled={!klar(l)} className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold ${klar(l) ? 'bg-[#20c58f] text-[#052e22]' : 'bg-slate-700 text-slate-400'}`}>Nästa</button>
             </Markor>
@@ -143,12 +186,7 @@ export function RotWizard({ l, mk, tryck }: { l: RotLage; mk: Mk; tryck: Tryck }
       {l.vy === 'granska' && (
         <div className="grid gap-1.5">
           <p className="text-[13px] font-semibold text-white">Granska offerten</p>
-          <p className="text-[10.5px] text-slate-300">Avser: Tätning gnagare</p>
-          {[['Arbetskostnad', ARBETE], ['Material och utrustning', MATERIAL], ['Servicebil', BIL], ['Totalt inkl. moms', TOTALT]].map(([n, b]) => (
-            <div key={n} className="flex justify-between border-t border-slate-700/60 pt-1 text-[11.5px]"><span>{n}</span><span className="tabular-nums">{b}</span></div>
-          ))}
-          <div className="flex justify-between text-[11.5px] text-[#20c58f]"><span>ROT-avdrag 30 %</span><span>-{AVDRAG}</span></div>
-          <div className="flex justify-between border-t border-slate-600 pt-1 text-[12px] font-semibold text-white"><span>Att betala</span><span>{ATT_BETALA}</span></div>
+          <PrisTabell />
           <Markor markor={mk('skapa-pdf')} block>
             <button type="button" onClick={() => tryck('skapa-pdf')} className="w-full rounded-lg bg-[#20c58f] px-3 py-2 text-[12px] font-semibold text-[#052e22]">Skapa och visa Oneflows PDF</button>
           </Markor>
@@ -158,10 +196,8 @@ export function RotWizard({ l, mk, tryck }: { l: RotLage; mk: Mk; tryck: Tryck }
       {(l.vy === 'pdf' || l.vy === 'klart') && (
         <div className="grid gap-1.5">
           <p className="text-[13px] font-semibold text-white">Så här ser kunden offerten</p>
-          <div className="rounded-md bg-white p-2 text-[10.5px] text-slate-800">
-            <p className="font-semibold">Avser: Tätning gnagare</p>
-            <p>Arbetskostnad {ARBETE} · Material och utrustning {MATERIAL} · Servicebil {BIL}</p>
-            <p>Totalt inkl. moms {TOTALT}, ROT-avdrag 30 %: -{AVDRAG}. Att betala: {ATT_BETALA}.</p>
+          <div className="rounded-md bg-white p-2 text-slate-800">
+            <PrisTabell ljus />
           </div>
           <Markor markor={mk('skicka')} block>
             <button type="button" onClick={() => tryck('skicka')} className="w-full rounded-lg bg-[#20c58f] px-3 py-2 text-[12px] font-semibold text-[#052e22]">Skicka offerten</button>
@@ -188,11 +224,11 @@ export function rotOvningTryck(l: RotLage, id: string): { lage?: RotLage; svar: 
       if (id === 'pnr') return { lage: { ...l, pnr: true }, svar: { typ: 'tips', titel: 'Personnumret är ifyllt', text: 'Är listan grön kan du trycka Nästa.' } }
       if (id === 'nasta') {
         if (!klar(l)) return fel('Nästa går inte förrän listan Kvar innan du kan gå vidare är grön. Tryck på det som saknas.')
-        return { lage: { ...l, vy: 'granska' }, svar: { typ: 'tips', titel: 'Granska', text: 'Raderna, avdraget och att betala är samma som i Oneflow. Tryck Skapa och visa Oneflows PDF.' } }
+        return { lage: { ...l, vy: 'granska' }, svar: { typ: 'tips', titel: 'Granska', text: 'Raderna och båda kolumnerna, Pris inkl. moms och Att betala efter ROT, är samma som i Oneflow. Avdraget står i Arbetskostnads beskrivning. Tryck Skapa och visa Oneflows PDF.' } }
       }
       return null
     case 'granska':
-      if (id === 'skapa-pdf') return { lage: { ...l, vy: 'pdf' }, svar: { typ: 'tips', titel: 'Oneflows PDF', text: 'Kontrollera raderna. Tryck Skicka offerten.' } }
+      if (id === 'skapa-pdf') return { lage: { ...l, vy: 'pdf' }, svar: { typ: 'tips', titel: 'Oneflows PDF', text: 'Kontrollera raderna och summan i båda kolumnerna. Tryck Skicka offerten.' } }
       return fel('Tryck Skapa och visa Oneflows PDF.')
     case 'pdf':
       if (id === 'skicka') return { lage: { ...l, vy: 'klart' }, svar: { typ: 'ok', titel: 'Klart', text: 'Offerten är skickad. När kunden har godkänt bokas jobbet in, och timmarna och fastigheten följer med till fakturan.' } }

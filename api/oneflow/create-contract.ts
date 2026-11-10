@@ -9,7 +9,7 @@ import { identityNumberVariants } from '../../src/shared/contractSigning'
 import { delaArbetsrader, mallensAvdrag, rotRutFel, type MallAvdrag } from '../../src/shared/rotRutDokument'
 import { getTemplateById } from '../../src/constants/oneflowTemplates'
 import {
-  KOLUMN_BESKRIVNING, KOLUMN_PRIS, kolumnEfterAvdrag, avserText, fastighetKravs, fastighetText, oneflowRader, prisText, rollForKod, rotRutBrister,
+  avserText, fastighetKravs, fastighetText, oneflowProduktgrupp, oneflowRader, prisText, rotRutBrister, serverTjanstRader,
   sammanstallRotRut, timmarForArbete, type Avdrag, type KontrollArtikel, type OffertTjanstRad, type RotRutSammanstallning,
 } from '../../src/shared/rotRutOffert'
 // Node.js 18+ har inbyggd fetch
@@ -520,14 +520,7 @@ export default async function handler(
         rot_rut_type: a.rot_rut_type === 'ROT' || a.rot_rut_type === 'RUT' ? a.rot_rut_type : null,
         quantity: Number(a.quantity) || 0,
       }))
-      const tjanster: OffertTjanstRad[] = tjanstRader.map((r, idx) => ({
-        id: r.draft_id || `rad-${idx}`,
-        roll: r.service_id ? rollForKod(kodFor.get(r.service_id)) : null,
-        service_name: r.service_name ?? null,
-        total_price: Number(r.total_price) || 0,
-        vat_rate: r.vat_rate ?? 25,
-        rot_rut_type: r.rot_rut_type ?? null,
-      }))
+      const tjanster: OffertTjanstRad[] = serverTjanstRader(tjanstRader, id => kodFor.get(id))
       const arbetsIds = new Set(tjanster.filter(t => t.roll === 'arbete').map(t => t.id))
       const timmar = timmarForArbete(artiklar, arbetsIds, mallTyp)
       const forstaArbete = tjanster.find(t => t.roll === 'arbete')
@@ -719,32 +712,9 @@ export default async function handler(
     // ROT/RUT" (arbetsraden minus avdraget, övriga rader samma pris). Avdraget
     // står i arbetsradens beskrivning. Oneflow summerar båda kolumnerna (utkast
     // 16810395/16810396). Avtalets värde (wizardProductsValue) är price_1,
-    // totalen före avdrag inkl. moms.
-    const s = rotRutPlan.sammanstallning
-    const pris = (belopp: number) => ({ base_amount: { amount: String(belopp) }, discount_amount: { amount: '0' } })
-    productGroups = [{
-      products: oneflowRader(s).map(r => ({
-        name: r.namn,
-        description: r.beskrivning,
-        price_1: pris(r.belopp),
-        price_2: pris(r.efterAvdrag),
-        quantity: { type: 'quantity', amount: 1 },
-        counterparty_lock: true,
-      })),
-      configuration: {
-        hide_price_summation: false,
-        counterpart_edit: false,
-        ...(avserRubrik ? { name: { enabled: true, label: avserRubrik } } : {}),
-        columns: [
-          // Mallarnas beskrivningskolumn heter "Avser", som krockar med rubriken
-          // "Avser: <tjänst>" (utkast 16806487 visade "Avser: Inget avdrag").
-          // Varje prisrubrik blir även sin summas etikett i Oneflow.
-          { key: 'description', enabled: true, label: KOLUMN_BESKRIVNING },
-          { key: 'price_1', enabled: true, label: KOLUMN_PRIS },
-          { key: 'price_2', enabled: true, label: kolumnEfterAvdrag(s.typ) },
-        ],
-      },
-    }]
+    // totalen före avdrag inkl. moms. Wizardens förhandsvisning läser samma
+    // rader (rotRutForhandsvisning), testat i src/shared/rotRutForhandsvisning.test.ts.
+    productGroups = [oneflowProduktgrupp(rotRutPlan.sammanstallning)]
   } else if (selectedProducts && selectedProducts.length > 0) {
     const oneflowProducts = convertProductsToOneflow(selectedProducts, partyType)
     if (oneflowProducts.length > 0) {
