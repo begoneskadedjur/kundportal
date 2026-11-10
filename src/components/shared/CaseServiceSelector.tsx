@@ -1169,14 +1169,14 @@ export default function CaseServiceSelector({
   }
 
   // ──────────────────────────────────────────────────────────────
-  // Uppdatera ROT/RUT-typ + fastighetsbeteckning för en tjänsterad
+  // Uppdatera ROT/RUT-typ + fastighetsbeteckning (bara ROT) för en tjänsterad
   // ──────────────────────────────────────────────────────────────
   const handleRotRutChange = async (id: string, rotRutType: RotRutType | null) => {
     if (saving) return
     if (draftMode && !caseId) {
       const updated = allItems.map(i => {
         if (i.id !== id) return i
-        return { ...i, rot_rut_type: rotRutType, fastighetsbeteckning: rotRutType ? i.fastighetsbeteckning : null }
+        return { ...i, rot_rut_type: rotRutType, fastighetsbeteckning: rotRutType === 'ROT' ? i.fastighetsbeteckning : null }
       })
       setAllItems(updated)
       notifyChange(updated)
@@ -1187,7 +1187,7 @@ export default function CaseServiceSelector({
     try {
       await CaseBillingService.updateCaseArticle(id, {
         rot_rut_type: rotRutType,
-        fastighetsbeteckning: rotRutType ? (allItems.find(i => i.id === id)?.fastighetsbeteckning ?? null) : null,
+        fastighetsbeteckning: rotRutType === 'ROT' ? (allItems.find(i => i.id === id)?.fastighetsbeteckning ?? null) : null,
       })
       await reloadItems()
     } catch (err: any) {
@@ -1323,7 +1323,8 @@ export default function CaseServiceSelector({
     const newMainUnit = unitForRowTotal(item, totalExkl - labor.total)
     const mainDiscounted = calculateDiscountedPrice(newMainUnit, item.discount_percent)
     const mainTotal = calculateTotalPrice(mainDiscounted, item.quantity)
-    const fastighet = child?.fastighetsbeteckning ?? item.fastighetsbeteckning ?? null
+    // Fastighetsbeteckning bara för ROT, RUT har ingen fastighet (3.127.4)
+    const fastighet = splitType === 'ROT' ? (child?.fastighetsbeteckning ?? item.fastighetsbeteckning ?? null) : null
     const nowIso = new Date().toISOString()
 
     if (draftMode && !caseId) {
@@ -1732,7 +1733,7 @@ export default function CaseServiceSelector({
         return {
           ...i,
           rot_rut_type: newType,
-          fastighetsbeteckning: newType ? i.fastighetsbeteckning : null,
+          fastighetsbeteckning: newType === 'ROT' ? i.fastighetsbeteckning : null,
         }
       })
       setAllItems(updated)
@@ -1767,7 +1768,7 @@ export default function CaseServiceSelector({
             .from('case_billing_items')
             .update({
               rot_rut_type: newType,
-              fastighetsbeteckning: newType ? item.fastighetsbeteckning : null,
+              fastighetsbeteckning: newType === 'ROT' ? item.fastighetsbeteckning : null,
               updated_at: new Date().toISOString(),
             })
             .eq('id', sid)
@@ -2349,7 +2350,7 @@ export default function CaseServiceSelector({
                           </label>
                         )}
                       </div>
-                      {item.rot_rut_type && (() => {
+                      {item.rot_rut_type === 'ROT' && (() => {
                         const fastighetValue = editingFastighet[item.id] ?? item.fastighetsbeteckning ?? ''
                         const isMissing = highlightMissingFastighet && String(fastighetValue).trim() === ''
                         return (
@@ -2368,7 +2369,7 @@ export default function CaseServiceSelector({
                             />
                             {isMissing && (
                               <p className="text-[10px] text-red-400 mt-0.5">
-                                Fastighetsbeteckning krävs för ROT/RUT
+                                Fastighetsbeteckning krävs för ROT
                               </p>
                             )}
                           </div>
@@ -2422,7 +2423,7 @@ export default function CaseServiceSelector({
                             </span>
                           </p>
                         )}
-                        {laborChild.rot_rut_type && (
+                        {laborChild.rot_rut_type === 'ROT' && (
                           readOnly ? (
                             laborChild.fastighetsbeteckning ? (
                               <p className="text-xs text-slate-500">Fastighetsbeteckning {laborChild.fastighetsbeteckning}</p>
@@ -2443,7 +2444,7 @@ export default function CaseServiceSelector({
                               />
                               {fastighetMissing && (
                                 <p className="text-[10px] text-red-400 mt-0.5">
-                                  Fastighetsbeteckning krävs för ROT/RUT
+                                  Fastighetsbeteckning krävs för ROT
                                 </p>
                               )}
                             </div>

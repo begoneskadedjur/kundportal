@@ -266,8 +266,9 @@ export function buildFortnoxInvoiceRows(
      */
     splitAddonRows?: boolean
     /**
-     * ROT/RUT (3.127.0): husarbete även utan fastighetsbeteckning (bostadsrätt,
-     * föreningens org.nr och lägenhetsnummer registreras i taxreductions).
+     * ROT/RUT (3.127.0): husarbete även utan fastighetsbeteckning (ROT i
+     * bostadsrätt, föreningens org.nr och lägenhetsnummer registreras i
+     * taxreductions). RUT har ingen fastighet och sätter alltid husarbete (3.127.4).
      */
     husarbete?: boolean
     /** ROT/RUT-offertens radmodell: rader på 0 kr visas inte för kunden */

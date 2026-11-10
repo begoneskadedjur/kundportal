@@ -154,14 +154,14 @@ export async function kontrolleraAvslut(args: {
     hinder.push(...await kontrolleraStationer(caseId))
   }
 
-  // 3. ROT/RUT utan fastighetsbeteckning (bara privatärenden).
+  // 3. ROT utan fastighetsbeteckning (RUT kräver ingen) (bara privatärenden).
   // Källa: EditCaseModal.tsx:1070-1092 (CaseBillingService.getRotRutItemsMissingFastighet)
   if (kalla === 'private_cases') {
     const saknar = await CaseBillingService.getRotRutItemsMissingFastighet(caseId, 'private')
     if (saknar.length > 0) {
       hinder.push({
         id: 'rotrut-fastighet',
-        text: `Fastighetsbeteckning krävs för ROT/RUT på: ${saknar.join(', ')}.`,
+        text: `Fastighetsbeteckning krävs för ROT på: ${saknar.join(', ')}.`,
         steg: 'pris'
       })
     }

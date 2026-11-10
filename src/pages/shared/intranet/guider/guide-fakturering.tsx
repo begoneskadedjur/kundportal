@@ -2,7 +2,7 @@
 // Guidemodul: Stäng ärendet eller bara besöket (tekniker, nya arbetsvyn, telefon och dator).
 // Steget Klart i EditCaseModal (KlartSteg): Kontrollera innan du stänger kör
 // kontrolleraAvslut (arendeAvslutService) och visar hindren med Gå till steget <namn>.
-// Hindret i exemplet är rotrut-fastighet: "Fastighetsbeteckning krävs för ROT/RUT på: ...".
+// Hindret i exemplet är rotrut-fastighet: "Fastighetsbeteckning krävs för ROT på: ...".
 // ROT-raden heter Skadedjurstekniker timpris (tjänst 135, used_for_addon_labour).
 // Stäng hela ärendet: Sparar ärendet..., Kontrollerar ärendet..., Stänger ärendet...
 // Exemplet 3 750 kr inkl. moms ger ingen provision (under 4 000 kr exkl. moms), därför
@@ -14,7 +14,7 @@ import { useGuideEnhet } from '../skarmkit/nyvy'
 import { ArendeRam, KlartInnehall, Notis, PrisInnehall, type KlartLage, type PrisLage } from './_nyvy_arendet'
 import type { GuideModul } from './registry'
 
-const HINDER = { text: 'Fastighetsbeteckning krävs för ROT/RUT på: Skadedjurstekniker timpris.', steg: 'Pris och fakturering' }
+const HINDER = { text: 'Fastighetsbeteckning krävs för ROT på: Skadedjurstekniker timpris.', steg: 'Pris och fakturering' }
 
 type Vy = 'pris' | 'klart' | 'avslutat'
 interface Lage { vy: Vy; fastighet: boolean; fel: boolean; val: 'hela' | 'besok'; notis?: string }

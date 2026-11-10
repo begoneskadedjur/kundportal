@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   arAvdragsradNamn, arRotRutRadmodell, avdragKr, avdragsradNamn, jamforMedOneflow, KUNDBESKRIVNING, oneflowRader, exklFranInkl, fakturaAvdrag, fakturaBrister, fakturaRadIRadmodell,
-  fastighetKlar, fastighetText, giltigFastighetsbeteckning, giltigtPersonnummer, inklMoms, kr, personnummer12,
+  fastighetKlar, fastighetKravs, fastighetText, giltigFastighetsbeteckning, giltigtPersonnummer, inklMoms, kr, personnummer12,
   maskeratPersonnummer, namnerAndraTypen, prisText, rollForKategori, rollForKod, rotRutBrister,
   sammanstallRotRut, timmarTillFortnox, type RotRutKontrollIndata,
 } from './rotRutOffert'
@@ -136,6 +136,23 @@ describe('rotRutBrister', () => {
   it('kräver fastighet', () => {
     expect(koder({ ...komplett, fastighet: { brf: false, fastighetsbeteckning: '' } })).toContain('fastighet')
   })
+  it('ROT utan fastighet stoppas, även bostadsrätt utan lägenhetsnummer', () => {
+    expect(koder({ ...komplett, fastighet: { brf: false, fastighetsbeteckning: null } })).toEqual(['fastighet'])
+    expect(koder({ ...komplett, fastighet: { brf: true, brfOrgNr: '769600-1234', lagenhetsnummer: '' } })).toEqual(['fastighet'])
+  })
+  it('RUT utan fastighet godkänns (3.127.4)', () => {
+    const rut: RotRutKontrollIndata = {
+      ...komplett,
+      mall: 'RUT',
+      fastighet: { brf: false, fastighetsbeteckning: '' },
+      tjanster: rader.map(r => r.roll === 'arbete' ? { ...r, rot_rut_type: 'RUT' as const } : r),
+      artiklar: komplett.artiklar.map(a => a.rot_rut_type ? { ...a, rot_rut_type: 'RUT' as const } : a),
+      fritext: 'Sanering av vägglöss.',
+    }
+    expect(rotRutBrister(rut)).toEqual([])
+    expect(fastighetKravs('RUT')).toBe(false)
+    expect(fastighetKravs('ROT')).toBe(true)
+  })
   it('stoppar blandning av ROT och RUT', () => {
     const d = { ...komplett, artiklar: [...komplett.artiklar, { id: 'a3', namn: 'Arbetstid', category: 'Arbetstid', mappadMot: 'arb', rot_rut_type: 'RUT' as const, quantity: 1 }] }
     expect(koder(d)).toContain('blandning')
@@ -192,6 +209,15 @@ describe('fakturan', () => {
     expect(fakturaBrister({ ...ok, personnummer: '800523-1553' })).toHaveLength(0)
     expect(fakturaBrister({ ...ok, personnummer: '800523-1554' })).toHaveLength(1)
     expect(fakturaBrister({ ...ok, utforandeAdress: '', utforandeDatum: null })).toHaveLength(2)
+  })
+  it('fakturan: ROT utan fastighet stoppas, RUT utan fastighet godkänns', () => {
+    const utan = {
+      privat: true, personnummer: '19800523-1553',
+      fastighet: { brf: false, fastighetsbeteckning: '' },
+      utforandeAdress: 'Dalstigen 5', utforandeDatum: '2026-11-09', harArbetsrad: true,
+    }
+    expect(fakturaBrister({ ...utan, typ: 'ROT' })).toEqual(['Fastighetsbeteckning saknas eller ser fel ut'])
+    expect(fakturaBrister({ ...utan, typ: 'RUT' })).toEqual([])
   })
 })
 

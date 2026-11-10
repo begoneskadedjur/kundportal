@@ -14,7 +14,7 @@ import { formatInvoiceAmount } from '../../../types/invoice'
 import { calculateRotRutSummary } from '../../../utils/rotRutConstants'
 import { toLocalISOStringWithOffset } from '../../../utils/dateHelpers'
 import {
-  ROT_RUT_PROCENT, fakturaArRadmodell, fakturaAvdrag, fastighetKlar, fastighetText, giltigtPersonnummer,
+  ROT_RUT_PROCENT, fakturaArRadmodell, fakturaAvdrag, fastighetKlar, fastighetKravs, fastighetText, giltigtPersonnummer,
   maskeratPersonnummer, type Avdrag,
 } from '../../../shared/rotRutOffert'
 
@@ -45,9 +45,11 @@ export default function RotRutFakturaRuta({ invoice, onChanged }: { invoice: Inv
   const brf = !!String(invoice.brf_org_number ?? '').trim()
   const fastighet = { brf, fastighetsbeteckning: invoice.fastighetsbeteckning, brfOrgNr: invoice.brf_org_number, lagenhetsnummer: invoice.apartment_number }
 
+  // Fastighet bara för ROT, RUT har ingen (3.127.4)
+  const visaFastighet = fastighetKravs(typ)
   const kontroller: Array<{ ok: boolean; text: string }> = [
     { ok: invoice.case_type === 'private' && giltigtPersonnummer(invoice.organization_number), text: 'Privatperson med giltigt personnummer' },
-    { ok: fastighetKlar(fastighet), text: brf ? 'Föreningens org.nr och lägenhetsnummer' : 'Fastighetsbeteckning med kolon' },
+    ...(visaFastighet ? [{ ok: fastighetKlar(fastighet), text: brf ? 'Föreningens org.nr och lägenhetsnummer' : 'Fastighetsbeteckning med kolon' }] : []),
     { ok: arbetskostnadInkl > 0, text: 'Avdraget ligger på arbetskostnaden' },
     { ok: invoice.items.every(i => !i.rot_rut_type || i.rot_rut_type === typ), text: `Bara ${typ} på fakturan` },
   ]
@@ -93,7 +95,7 @@ export default function RotRutFakturaRuta({ invoice, onChanged }: { invoice: Inv
 
       <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
         {rad('Personnummer', maskeratPersonnummer(invoice.organization_number) || 'saknas', invoice.organization_number ? 'text-white' : 'text-amber-400')}
-        {rad(brf ? 'Bostadsrätt' : 'Fastighetsbeteckning', fastighetText(fastighet) || 'saknas', fastighetKlar(fastighet) ? 'text-white' : 'text-amber-400')}
+        {visaFastighet && rad(brf ? 'Bostadsrätt' : 'Fastighetsbeteckning', fastighetText(fastighet) || 'saknas', fastighetKlar(fastighet) ? 'text-white' : 'text-amber-400')}
         {rad('Timmar (bara internt)', `${timmar.toLocaleString('sv-SE', { maximumFractionDigits: 2 })} h`)}
         {rad('Arbetskostnad inkl. moms', formatInvoiceAmount(arbetskostnadInkl))}
         {rad('Material och övrigt inkl. moms', formatInvoiceAmount(Math.max(0, totaltInkl - arbetskostnadInkl)))}

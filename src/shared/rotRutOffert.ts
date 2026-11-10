@@ -313,6 +313,12 @@ export interface Fastighet {
   lagenhetsnummer?: string | null
 }
 
+/**
+ * Skatteverket kräver fastighetsbeteckning (eller bostadsrättens förening och
+ * lägenhet) bara för ROT. RUT har ingen fastighet (3.127.4).
+ */
+export const fastighetKravs = (typ: string | null | undefined): boolean => typ === 'ROT'
+
 export function fastighetKlar(f: Fastighet): boolean {
   if (f.brf) return giltigtOrgNr(f.brfOrgNr) && !!String(f.lagenhetsnummer ?? '').trim()
   return giltigFastighetsbeteckning(f.fastighetsbeteckning)
@@ -428,7 +434,7 @@ export function rotRutBrister(d: RotRutKontrollIndata): RotRutBrist[] {
     })
   }
 
-  if (!fastighetKlar(d.fastighet)) {
+  if (fastighetKravs(typ) && !fastighetKlar(d.fastighet)) {
     const f = d.fastighet
     const tomt = f.brf ? !String(f.brfOrgNr ?? '').trim() && !String(f.lagenhetsnummer ?? '').trim() : !String(f.fastighetsbeteckning ?? '').trim()
     ut.push({
@@ -529,7 +535,7 @@ export function fakturaBrister(d: {
   const ut: string[] = []
   if (!d.privat) ut.push('Bara privatpersoner kan få ROT eller RUT')
   else if (!giltigtPersonnummer(d.personnummer)) ut.push('Giltigt personnummer saknas på fakturan')
-  if (!fastighetKlar(d.fastighet)) {
+  if (fastighetKravs(d.typ) && !fastighetKlar(d.fastighet)) {
     ut.push(d.fastighet.brf ? 'Föreningens org.nr eller lägenhetsnummer saknas' : 'Fastighetsbeteckning saknas eller ser fel ut')
   }
   if (!d.harArbetsrad) ut.push(`Ingen rad bär ${d.typ}-avdraget`)

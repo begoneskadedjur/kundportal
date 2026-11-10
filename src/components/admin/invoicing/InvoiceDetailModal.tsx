@@ -968,8 +968,9 @@ export default function InvoiceDetailModal({
     if ((pulse.overdueTotal ?? 0) > 0) {
       blockers.push({ label: `${formatInvoiceAmount(pulse.overdueTotal ?? 0)} förfallet hos kunden`, severe: true })
     }
-    if (invoice.rot_rut_type && !invoice.fastighetsbeteckning && !(invoice.brf_org_number && invoice.apartment_number)) {
-      blockers.push({ label: 'fastighetsbeteckning saknas för ROT/RUT' })
+    // Fastighet krävs bara för ROT, RUT har ingen (3.127.4)
+    if (invoice.rot_rut_type === 'ROT' && !invoice.fastighetsbeteckning && !(invoice.brf_org_number && invoice.apartment_number)) {
+      blockers.push({ label: 'fastighetsbeteckning saknas för ROT' })
     }
     // Förfallodatum är preliminärt före sändning (sätts om vid sändningen till
     // Fortnox) — därför är villkorsavvikelse inte längre ett hinder här.

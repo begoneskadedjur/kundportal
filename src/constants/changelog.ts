@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.127.4',
+    date: '2026-11-10',
+    title: 'RUT behöver ingen fastighetsbeteckning',
+    items: [
+      { kind: 'andring', text: 'Fastighetsbeteckning behövs bara för ROT. Med RUT-mallen finns inga fält för fastighet eller bostadsrätt, och listan Kvar innan du kan gå vidare frågar inte efter dem.' },
+      { kind: 'andring', text: 'Ett ärende eller en faktura med RUT stoppas inte längre för att fastigheten saknas. ROT fungerar som förut: fastighetsbeteckning, eller föreningens org.nr och lägenhetsnummer vid bostadsrätt, krävs.' },
+      { kind: 'andring', text: 'RUT-fakturan skickas till Fortnox med avdraget men utan fastighet, och raden Fastighetsbeteckning står bara på ROT-fakturor.' },
+    ],
+  },
+  {
     version: '3.127.3',
     date: '2026-11-10',
     title: 'ROT- och RUT-avdraget syns som egen rad i offerten',

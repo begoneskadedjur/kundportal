@@ -38,7 +38,7 @@ import { invoiceWorkAddress } from '../shared/invoiceWorkAddress'
 import { InvoiceDeliveryService } from './invoiceDeliveryService'
 import { toFortnoxDeliveryType, isInvoiceDeliveryMethod } from '../shared/invoiceDelivery'
 import { buildFortnoxInvoiceRows, fortnoxText, type InvoiceAddonLine, type InvoiceItemLike } from '../shared/invoiceAddonLines'
-import { fakturaArRadmodell, fakturaAvdrag, fakturaBrister, fastighetText, personnummer12, type Avdrag } from '../shared/rotRutOffert'
+import { fakturaArRadmodell, fakturaAvdrag, fakturaBrister, fastighetKravs, fastighetText, personnummer12, type Avdrag } from '../shared/rotRutOffert'
 import { workAddressText } from '../shared/invoiceWorkAddress'
 import { createSystemComment } from './communicationService'
 import { fetchInvoiceVisit, type VisitSnapshot } from '../hooks/useInvoiceVisit'
@@ -459,7 +459,13 @@ export async function sendInvoiceToFortnox(invoiceId: string, opts: FortnoxSendO
     // stället för fastighetsbeteckning, och ROT/RUT-offertens radmodell där
     // arbetsraden heter Arbetskostnad och bär timmarna
     const rotTyp: Avdrag | null = invoice.rot_rut_type === 'ROT' || invoice.rot_rut_type === 'RUT' ? invoice.rot_rut_type : null
-    const rotBrf = !!String(invoice.brf_org_number ?? '').trim() && !!String(invoice.apartment_number ?? '').trim()
+    // Fastighet (beteckning eller bostadsrätt) bara för ROT. RUT har ingen
+    // fastighet hos Skatteverket och registreras utan (3.127.4).
+    const rotArRot = !!rotTyp && fastighetKravs(rotTyp)
+    const rotBrf = rotArRot && !!String(invoice.brf_org_number ?? '').trim() && !!String(invoice.apartment_number ?? '').trim()
+    const rotFastighet = rotArRot ? String(invoice.fastighetsbeteckning ?? '').trim() : ''
+    // Avdraget kan registreras: RUT alltid, ROT med fastighetsbeteckning eller bostadsrätt
+    const rotAvdragKlart = !!rotTyp && (!rotArRot || !!rotFastighet || rotBrf)
     const rotRadmodell = !!rotTyp && fakturaArRadmodell(itemsForSend)
     // Raderna byggs i src/shared/invoiceAddonLines.ts (enhetstestad):
     // textrader (index_note) som ren Description, ROT/RUT per rad.
@@ -467,10 +473,10 @@ export async function sendInvoiceToFortnox(invoiceId: string, opts: FortnoxSendO
     // går som timmar och en förklaring om nästa tilläggsfaktura läggs sist.
     const invoiceRows = buildFortnoxInvoiceRows(itemsForSend as unknown as InvoiceItemLike[], {
       vatIncluded,
-      fastighetsbeteckning: invoice.fastighetsbeteckning,
+      fastighetsbeteckning: rotFastighet || null,
       addonLines,
       splitAddonRows,
-      husarbete: !!rotTyp && rotBrf,
+      husarbete: rotAvdragKlart,
       hoppaOverNollrader: rotRadmodell,
     })
 
@@ -522,14 +528,14 @@ export async function sendInvoiceToFortnox(invoiceId: string, opts: FortnoxSendO
       if (brister.length > 0) {
         return fail(`${rotTyp}-fakturan kan inte skickas: ${brister.join('. ')}. Rätta det på ärendet eller fakturan och försök igen.`)
       }
-      // Plats, datum och fastighet som textrader, så att kunden och Skatteverket ser dem
-      const fastighetRad = rotBrf
-        ? fastighetText({ brf: true, brfOrgNr: invoice.brf_org_number, lagenhetsnummer: invoice.apartment_number })
-        : `Fastighetsbeteckning: ${String(invoice.fastighetsbeteckning ?? '').trim()}`
-      invoiceRows.push(
-        { Description: fortnoxText(`Utfört ${deliveryDate} på ${rotPlats}`).slice(0, 200) },
-        { Description: fortnoxText(fastighetRad).slice(0, 200) },
-      )
+      // Plats, datum och (bara ROT) fastighet som textrader, så att kunden och Skatteverket ser dem
+      invoiceRows.push({ Description: fortnoxText(`Utfört ${deliveryDate} på ${rotPlats}`).slice(0, 200) })
+      if (rotArRot) {
+        const fastighetRad = rotBrf
+          ? fastighetText({ brf: true, brfOrgNr: invoice.brf_org_number, lagenhetsnummer: invoice.apartment_number })
+          : `Fastighetsbeteckning: ${rotFastighet}`
+        invoiceRows.push({ Description: fortnoxText(fastighetRad).slice(0, 200) })
+      }
     }
 
     const fortnoxPayload: Record<string, unknown> = {
@@ -614,8 +620,8 @@ export async function sendInvoiceToFortnox(invoiceId: string, opts: FortnoxSendO
     // ROT/RUT: fakturanivån bär bara typen ('rot'/'rut'); raderna är
     // flaggade i steg 3, och fastighetsbeteckning + avdragsbelopp
     // registreras via taxreductions-resursen efter att fakturan skapats.
-    if (invoice.rot_rut_type && (invoice.fastighetsbeteckning || rotBrf)) {
-      fortnoxPayload.TaxReductionType = invoice.rot_rut_type.toLowerCase()
+    if (rotTyp && rotAvdragKlart) {
+      fortnoxPayload.TaxReductionType = rotTyp.toLowerCase()
     }
 
     // Fritexterna tvättas: ett enda tecken Fortnox inte godtar (t.ex. "·" i
@@ -630,7 +636,7 @@ export async function sendInvoiceToFortnox(invoiceId: string, opts: FortnoxSendO
     // 4b. Registrera ROT/RUT-avdraget (fastighetsbeteckning) mot fakturan.
     // Fel här får inte stoppa flödet — fakturan finns redan i Fortnox;
     // admin kompletterar avdraget manuellt om registreringen misslyckas.
-    if (invoice.rot_rut_type && (invoice.fastighetsbeteckning || rotBrf)) {
+    if (rotTyp && rotAvdragKlart) {
       // Begärt avdrag: radmodellen räknar som offerten (hela kronor, nedåt),
       // äldre fakturor som förut. Belopp, Fortnox egen uträkning och ev. fel
       // sparas på fakturan och visas i fakturamodalen.
@@ -642,8 +648,9 @@ export async function sendInvoiceToFortnox(invoiceId: string, opts: FortnoxSendO
         await FortnoxService.createTaxReduction({
           asked_amount: begart,
           customer_name: invoice.customer_name,
-          // Bostadsrätt: lägenhetsnumret är beteckningen, föreningens org.nr skickas separat
-          property_designation: rotBrf ? String(invoice.apartment_number) : String(invoice.fastighetsbeteckning),
+          // Bostadsrätt: lägenhetsnumret är beteckningen, föreningens org.nr skickas separat.
+          // RUT: ingen fastighet, fältet utelämnas (valfritt i Fortnox API, 3.127.4)
+          property_designation: !rotArRot ? null : rotBrf ? String(invoice.apartment_number) : rotFastighet,
           document_number: fortnoxInvoice.DocumentNumber,
           // Tio siffror (ÅÅMMDD-XXXX) skickas med sekel, ÅÅÅÅMMDD-XXXX (3.127.2)
           social_security_number: isPrivatePerson ? (personnummer12(invoice.organization_number) ?? invoice.organization_number) : null,

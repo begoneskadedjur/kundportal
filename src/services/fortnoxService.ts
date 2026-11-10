@@ -281,7 +281,8 @@ export const FortnoxService = {
   async createTaxReduction(reduction: {
     asked_amount: number
     customer_name: string
-    property_designation: string
+    /** Fastighetsbeteckning (ROT). RUT saknar fastighet, null utelämnar fältet. */
+    property_designation?: string | null
     document_number: string
     social_security_number?: string | null
     residence_association_org_nr?: string | null
@@ -290,7 +291,9 @@ export const FortnoxService = {
       TaxReduction: {
         AskedAmount: Math.round(reduction.asked_amount),
         CustomerName: reduction.customer_name,
-        PropertyDesignation: reduction.property_designation,
+        ...(String(reduction.property_designation ?? '').trim()
+          ? { PropertyDesignation: String(reduction.property_designation).trim() }
+          : {}),
         ReferenceDocumentType: 'INVOICE',
         ReferenceNumber: reduction.document_number,
         ...(reduction.social_security_number

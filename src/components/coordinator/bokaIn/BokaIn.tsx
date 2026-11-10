@@ -393,7 +393,7 @@ export default function BokaIn({ kalla, oppen, onStang, onKlar, tekniker }: Boka
                   <><dt className="text-slate-400">{dok.typ === 'contract' ? 'Premie' : 'Pris'}</dt><dd className="text-slate-200">{kr(dok.belopp)}{dok.typ === 'contract' ? ' per år exkl. moms' : ''}</dd></>
                 )}
                 {typ === 'private' && rotRut && (
-                  <><dt className="text-slate-400">{rotRut}</dt><dd className="text-slate-200">{underlag.rader.find(r => r.fastighetsbeteckning)?.fastighetsbeteckning ?? 'Fastighetsbeteckning saknas på raderna'}</dd></>
+                  <><dt className="text-slate-400">{rotRut}</dt><dd className="text-slate-200">{rotRut === 'RUT' ? 'Ingen fastighet behövs för RUT' : underlag.rader.find(r => r.fastighetsbeteckning)?.fastighetsbeteckning ?? 'Fastighetsbeteckning saknas på raderna'}</dd></>
                 )}
                 <dt className="text-slate-400">Ansvarig tekniker</dt>
                 <dd className="text-slate-200">{underlag.ansvarigTeknikerNamn ?? 'Okänd, välj i nästa steg'}</dd>

@@ -1093,8 +1093,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       return;
     }
 
-    // ROT/RUT kräver fastighetsbeteckning (Skatteverket). Blockera spara om någon
-    // ROT/RUT-tjänsterad saknar beteckning. Gäller bara privatärenden (ROT/RUT är
+    // ROT kräver fastighetsbeteckning (Skatteverket), RUT gör det inte. Blockera spara om någon
+    // ROT-tjänsterad saknar beteckning. Gäller bara privatärenden (ROT/RUT är
     // inte valbart för företag/avtal).
     if (currentCase.case_type === 'private') {
       try {
@@ -1105,7 +1105,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         if (missing.length > 0) {
           setRotRutFastighetError(true);
           toast.error(
-            `Fastighetsbeteckning krävs för ROT/RUT på: ${missing.join(', ')}. Fyll i den innan du sparar.`,
+            `Fastighetsbeteckning krävs för ROT på: ${missing.join(', ')}. Fyll i den innan du sparar.`,
             { duration: 6000 }
           );
           return;

@@ -906,9 +906,10 @@ export class CaseBillingService {
   }
 
   /**
-   * Validera att alla ROT/RUT-tjänsterader har fastighetsbeteckning.
-   * ROT/RUT kräver fastighetsbeteckning (Skatteverket) — ett ärende får inte
-   * sparas/faktureras med ROT/RUT om beteckningen saknas.
+   * Validera att alla ROT-tjänsterader har fastighetsbeteckning.
+   * ROT kräver fastighetsbeteckning (Skatteverket), ett ärende får inte
+   * sparas/faktureras med ROT om beteckningen saknas. RUT har ingen
+   * fastighet (3.127.4).
    *
    * Returnerar listan med tjänstenamn som saknar beteckning (tom = allt OK).
    */
@@ -922,7 +923,7 @@ export class CaseBillingService {
       .eq('case_id', caseId)
       .eq('case_type', caseType)
       .eq('item_type', 'service')
-      .not('rot_rut_type', 'is', null)
+      .eq('rot_rut_type', 'ROT')
 
     if (error) throw new Error(`Databasfel: ${error.message}`)
 

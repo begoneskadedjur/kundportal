@@ -27,6 +27,7 @@ export const INTRO_HJALP: { rubrik: string; punkter: string[] } = {
     'RUT: vissa saneringsarbeten. 50 % avdrag.',
     'Avdraget gäller bara arbetskostnaden, aldrig material, bil eller övrigt.',
     'Bara privatpersoner som äger eller bor i bostaden.',
+    'Fastighetsbeteckning behövs bara för ROT. RUT har ingen fastighet.',
     'Kunden ser priset för arbetet men aldrig antalet timmar.',
   ],
 }

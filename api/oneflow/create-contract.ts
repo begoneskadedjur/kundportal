@@ -9,7 +9,7 @@ import { identityNumberVariants } from '../../src/shared/contractSigning'
 import { delaArbetsrader, mallensAvdrag, rotRutFel, type MallAvdrag } from '../../src/shared/rotRutDokument'
 import { getTemplateById } from '../../src/constants/oneflowTemplates'
 import {
-  KOLUMN_BESKRIVNING, KOLUMN_PRIS, avserText, fastighetText, oneflowRader, prisText, rollForKod, rotRutBrister,
+  KOLUMN_BESKRIVNING, KOLUMN_PRIS, avserText, fastighetKravs, fastighetText, oneflowRader, prisText, rollForKod, rotRutBrister,
   sammanstallRotRut, timmarForArbete, type Avdrag, type KontrollArtikel, type OffertTjanstRad, type RotRutSammanstallning,
 } from '../../src/shared/rotRutOffert'
 // Node.js 18+ har inbyggd fetch
@@ -191,7 +191,7 @@ function buildDataFieldsForDocument(
       fields.push({ custom_id: 'kund', value: contractData['Kontaktperson'] })
     }
 
-    // Fastighetsbeteckning (ROT/RUT-raden) — förifylls så kunden slipper.
+    // Fastighetsbeteckning (ROT) — förifylls så kunden slipper. RUT skickar inget.
     // Fältet finns bara i offertmallarna, därför skickas det aldrig för avtal.
     if (fastighetsbeteckning) {
       fields.push({ custom_id: 'fastighetsbeteckning', value: fastighetsbeteckning })
@@ -533,11 +533,14 @@ export default async function handler(
       const forstaArbete = tjanster.find(t => t.roll === 'arbete')
       if (forstaArbete) forstaArbete.house_work_hours = timmar
 
+      // Fastighet (beteckning eller bostadsrätt) bara för ROT. RUT har ingen
+      // fastighet hos Skatteverket, allt som ändå skickas ignoreras (3.127.4).
+      const medFastighet = fastighetKravs(mallTyp)
       const fastighet = {
-        brf: !!rotRut?.brf,
-        fastighetsbeteckning: rotRut?.fastighetsbeteckning?.trim() || null,
-        brfOrgNr: rotRut?.brfOrgNr?.trim() || null,
-        lagenhetsnummer: rotRut?.lagenhetsnummer?.trim() || null,
+        brf: medFastighet && !!rotRut?.brf,
+        fastighetsbeteckning: medFastighet ? rotRut?.fastighetsbeteckning?.trim() || null : null,
+        brfOrgNr: medFastighet ? rotRut?.brfOrgNr?.trim() || null : null,
+        lagenhetsnummer: medFastighet ? rotRut?.lagenhetsnummer?.trim() || null : null,
       }
       const brister = rotRutBrister({
         mall: mallTyp,
@@ -666,7 +669,8 @@ export default async function handler(
     contractData,
     documentType,
     caseId,
-    rotRutPlan ? fastighetText(rotRutPlan.fastighet) : fastighetsbeteckning
+    // RUT: inget fastighetsfält (3.127.4)
+    rotRutPlan ? (fastighetKravs(rotRutPlan.typ) ? fastighetText(rotRutPlan.fastighet) : null) : fastighetsbeteckning
   )
   // ROT/RUT: datafältet "pris" (finns i båda mallarna) med avdrag och att betala
   if (rotRutPlan) {

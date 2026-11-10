@@ -411,3 +411,68 @@ describe('sendInvoiceToFortnox, ärendefaktura (merförsäljning)', () => {
     expect(m.findOrCreateCustomer.mock.calls[0][0]).toMatchObject({ customer_type: 'PRIVATE', terms_of_payment: '10', show_price_vat_included: true })
   })
 })
+
+describe('sendInvoiceToFortnox, ROT och RUT (3.127.4)', () => {
+  const rotRutInvoice = (typ: 'ROT' | 'RUT', fastighet: string | null) => ({
+    ...structuredClone(adhocInvoice),
+    invoice_type: 'private',
+    case_type: 'private',
+    organization_number: '19800523-1553',
+    customer_name: 'Test Testsson',
+    customer_address: 'Lagergatan 3, 171 50 Solna',
+    rot_rut_type: typ,
+    fastighetsbeteckning: fastighet,
+    brf_org_number: null,
+    apartment_number: null,
+    items: [item({ id: 'arb', article_code: '135', article_name: 'Arbetskostnad', unit_price: 6400, total_price: 6400, rot_rut_type: typ, house_work_hours: 8 })],
+  })
+  const privatArende = { case_number: 'P-2', completed_date: '2026-10-21T15:00:00+02:00', start_date: null, primary_assignee_name: 'Tekniker P', adress: 'Lagergatan 3, 171 50 Solna' }
+
+  it('RUT utan fastighet: husarbete, ingen fastighetsrad, taxreduction utan fastighet', async () => {
+    m.getInvoice.mockResolvedValue(rotRutInvoice('RUT', null))
+    m.resolveNumber.mockResolvedValue(10501)
+    db.single.private_cases = privatArende
+    m.createTaxReduction.mockResolvedValue(undefined)
+
+    const result = await sendInvoiceToFortnox('inv-adhoc')
+
+    expect(result.status).toBe('created')
+    const payload = m.createInvoice.mock.calls[0][0]
+    expect(payload.TaxReductionType).toBe('rut')
+    expect(payload.InvoiceRows[0]).toMatchObject({ HouseWork: true, HouseWorkType: 'CLEANING', HouseWorkHoursToReport: 8 })
+    expect(JSON.stringify(payload.InvoiceRows)).not.toContain('Fastighetsbeteckning')
+    expect(m.createTaxReduction).toHaveBeenCalledTimes(1)
+    expect(m.createTaxReduction.mock.calls[0][0]).toMatchObject({
+      property_designation: null,
+      residence_association_org_nr: null,
+      social_security_number: '19800523-1553',
+    })
+  })
+
+  it('ROT utan fastighet stoppas före Fortnox', async () => {
+    m.getInvoice.mockResolvedValue(rotRutInvoice('ROT', null))
+    m.resolveNumber.mockResolvedValue(10501)
+    db.single.private_cases = privatArende
+
+    const result = await sendInvoiceToFortnox('inv-adhoc')
+
+    expect(result.status).not.toBe('created')
+    expect(m.createInvoice).not.toHaveBeenCalled()
+    expect(m.createTaxReduction).not.toHaveBeenCalled()
+  })
+
+  it('ROT med fastighet: fastighetsrad och PropertyDesignation', async () => {
+    m.getInvoice.mockResolvedValue(rotRutInvoice('ROT', 'Exempelby 1:23'))
+    m.resolveNumber.mockResolvedValue(10501)
+    db.single.private_cases = privatArende
+    m.createTaxReduction.mockResolvedValue(undefined)
+
+    await sendInvoiceToFortnox('inv-adhoc')
+
+    const payload = m.createInvoice.mock.calls[0][0]
+    expect(payload.TaxReductionType).toBe('rot')
+    expect(payload.InvoiceRows[0]).toMatchObject({ HouseWork: true, HouseWorkType: 'CONSTRUCTION' })
+    expect(payload.InvoiceRows).toContainEqual({ Description: 'Fastighetsbeteckning: Exempelby 1:23' })
+    expect(m.createTaxReduction.mock.calls[0][0]).toMatchObject({ property_designation: 'Exempelby 1:23' })
+  })
+})

@@ -1456,8 +1456,9 @@ export default function OneflowContractCreator() {
       ? wizardData.prefillServices
       : wizardData.draftItems.filter(i => i.item_type === 'service')
     ).find(r => r.rot_rut_type)
-    // ROT/RUT-mall: fastigheten från fälten i Tjänster (servern skriver texten till Oneflow)
-    const rf = wizardData.rotFastighet
+    // ROT/RUT-mall: fastigheten från fälten i Tjänster (servern skriver texten till Oneflow).
+    // Bara ROT har fastighet, RUT skickar och sparar ingen (3.127.4).
+    const rf = rotMall === 'RUT' ? TOM_FASTIGHET : wizardData.rotFastighet
     const fastighetsbeteckning = rotMall
       ? fastighetText({ brf: rf.brf, fastighetsbeteckning: rf.fastighetsbeteckning, brfOrgNr: rf.brfOrgNr, lagenhetsnummer: rf.lagenhetsnummer })
       : rotRutRow?.fastighetsbeteckning || ''
@@ -1947,17 +1948,19 @@ export default function OneflowContractCreator() {
     const pnr = wizardData['org-nr']
     const pnrFel = !!pnr.replace(/\D/g, '') && !giltigtPersonnummer(pnr)
     const s = rotSammanstallning
-    const klara: Array<{ text: string; ok: boolean }> = [
-      { text: `Arbetstid med ${rotMall}`, ok: !rotTjansterBrister.some(b => b.kod === 'arbete' || b.kod === 'arbete_ej_avdrag') },
-      { text: 'Alla interna kostnader ligger på en rad', ok: !rotTjansterBrister.some(b => b.kod === 'mappning') },
-      { text: f.brf ? 'Föreningens org.nr och lägenhetsnummer' : 'Fastighetsbeteckning ifylld', ok: !rotTjansterBrister.some(b => b.kod === 'fastighet') },
-      { text: 'Personnummer ifyllt', ok: !rotTjansterBrister.some(b => b.kod === 'personnummer' || b.kod === 'privat') },
+    // Fastighet bara för ROT, RUT har ingen fastighet (3.127.4)
+    const medFastighet = rotMall === 'ROT'
+    const klara: Array<{ text: string; koder: BristKod[] }> = [
+      { text: `Arbetstid med ${rotMall}`, koder: ['arbete', 'arbete_ej_avdrag'] },
+      { text: 'Alla interna kostnader ligger på en rad', koder: ['mappning'] },
+      ...(medFastighet ? [{ text: f.brf ? 'Föreningens org.nr och lägenhetsnummer' : 'Fastighetsbeteckning ifylld', koder: ['fastighet'] as BristKod[] }] : []),
+      { text: 'Personnummer ifyllt', koder: ['personnummer', 'privat'] },
     ]
     const ovriga = rotTjansterBrister.filter(b => !['arbete', 'arbete_ej_avdrag', 'mappning', 'fastighet', 'personnummer', 'privat'].includes(b.kod))
     return (
       <div className={`${CARD_CLASS} p-4 sm:p-6 flex flex-col gap-5`}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
-          <div className="flex flex-col gap-[7px]">
+          {medFastighet && <div className="flex flex-col gap-[7px]">
             <span className="flex items-center gap-1.5 text-[13px] font-bold text-slate-300">
               <label htmlFor={f.brf ? 'rot-brf-org' : 'rot-fastighet'}>{f.brf ? 'Bostadsrätt' : 'Fastighetsbeteckning'}</label>
               <InfoKnapp rubrik={FASTIGHET_HJALP.rubrik} etikett="Om fastighetsbeteckning">{FASTIGHET_HJALP.text}</InfoKnapp>
@@ -2002,7 +2005,7 @@ export default function OneflowContractCreator() {
               />
               Bostadsrätt
             </label>
-          </div>
+          </div>}
           <div className="flex flex-col gap-[7px]">
             <span className="flex items-center gap-1.5 text-[13px] font-bold text-slate-300">
               <label htmlFor="rot-pnr">Personnummer</label>
@@ -2024,13 +2027,9 @@ export default function OneflowContractCreator() {
 
         <div className="grid gap-1.5 rounded-[10px] bg-slate-800/60 p-3">
           <span className="text-[11.5px] uppercase tracking-[0.08em] text-slate-400">{KVAR_RUBRIK}</span>
-          {klara.map((k, i) => {
-            const brist = k.ok ? null : rotTjansterBrister.find(b => {
-              if (i === 0) return b.kod === 'arbete' || b.kod === 'arbete_ej_avdrag'
-              if (i === 1) return b.kod === 'mappning'
-              if (i === 2) return b.kod === 'fastighet'
-              return b.kod === 'personnummer' || b.kod === 'privat'
-            })
+          {klara.map(kk => {
+            const brist = rotTjansterBrister.find(b => kk.koder.includes(b.kod)) ?? null
+            const k = { text: kk.text, ok: !brist }
             return (
               <div key={k.text} className="flex items-start gap-2 text-sm">
                 <Icon
@@ -2099,9 +2098,11 @@ export default function OneflowContractCreator() {
         <p className="text-[13px] text-slate-400">
           Totalt före avdrag {fmtSEK(s.totaltInkl)} inkl. moms, varav arbetskostnad {fmtSEK(s.arbetskostnadInkl)}.
         </p>
-        <p className="text-[13px] text-slate-400">
-          {f.brf ? 'Bostadsrätt' : 'Fastighetsbeteckning'}: <span className="text-slate-200">{fastighet || 'saknas'}</span>
-        </p>
+        {rotMall === 'ROT' && (
+          <p className="text-[13px] text-slate-400">
+            {f.brf ? 'Bostadsrätt' : 'Fastighetsbeteckning'}: <span className="text-slate-200">{fastighet || 'saknas'}</span>
+          </p>
+        )}
       </div>
     )
   }

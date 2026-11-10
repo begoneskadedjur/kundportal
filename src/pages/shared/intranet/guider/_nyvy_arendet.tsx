@@ -349,7 +349,7 @@ export function PrisInnehall({ l, markera, nr, tryck }: { l: PrisLage; markera?:
                   <p className="text-[10px] text-slate-500">Material och övrigt {kr(r.pris - l.delning.arbete)}</p>
                   <Inmatning varde={l.fastighet || 'Fastighetsbeteckning *'} tom={!l.fastighet} fel={l.fastighetFel && !l.fastighet}
                     onClick={() => tryck('fastighet')} markor={mk(markera, 'fastighet', nr)} />
-                  {l.fastighetFel && !l.fastighet && <p className="text-[9.5px] text-red-400">Fastighetsbeteckning krävs för ROT/RUT</p>}
+                  {l.fastighetFel && !l.fastighet && <p className="text-[9.5px] text-red-400">Fastighetsbeteckning krävs för ROT</p>}
                 </div>
               )}
               {i === 0 && l.delform && <DelaUppForm f={l.delform} totalInkl={r.pris * (r.antal ?? 1)} markera={markera} nr={nr} tryck={tryck} />}

@@ -138,6 +138,17 @@ describe('buildFortnoxInvoiceRows', () => {
     expect(buildFortnoxInvoiceRows(rot, { vatIncluded: false })[0]).not.toHaveProperty('HouseWorkHoursToReport')
   })
 
+  it('RUT är husarbete utan fastighetsbeteckning, ROT utan fastighet är det inte (3.127.4)', () => {
+    const rut: InvoiceItemLike[] = [
+      { id: 'a', article_code: '135', article_name: 'Arbetskostnad', quantity: 1, unit_price: 6400, total_price: 6400, vat_rate: 25, discount_percent: 0, rot_rut_type: 'RUT', house_work_hours: 8 },
+    ]
+    // Så som invoiceFortnoxSendService anropar: husarbete = avdraget kan registreras
+    expect(buildFortnoxInvoiceRows(rut, { vatIncluded: true, fastighetsbeteckning: null, husarbete: true })[0])
+      .toMatchObject({ HouseWork: true, HouseWorkType: 'CLEANING', HouseWorkHoursToReport: 8 })
+    const rot = rut.map(r => ({ ...r, rot_rut_type: 'ROT' as const }))
+    expect(buildFortnoxInvoiceRows(rot, { vatIncluded: true, fastighetsbeteckning: null, husarbete: false })[0]).not.toHaveProperty('HouseWork')
+  })
+
   it('ROT/RUT-timmar rapporteras som heltal, minst 1', () => {
     const rut: InvoiceItemLike[] = [
       { id: 'a', article_code: '135', article_name: 'Arbetskostnad, Vägglusbekämpning', quantity: 1.5, unit_price: 1066.67, total_price: 1600, vat_rate: 25, discount_percent: 0, rot_rut_type: 'RUT' },

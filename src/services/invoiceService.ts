@@ -19,7 +19,7 @@ import { calculateInvoiceTotals, calculateDueDate, deriveInvoiceCaseType } from 
 import { CaseBillingService } from './caseBillingService'
 import { PaymentTermsService } from './paymentTermsService'
 import { selectInvoiceableCaseRows, caseInvoiceSubtotal, isZeroAmount } from '../shared/caseInvoiceRows'
-import { arPrivatpersonsNummer, arRotRutRadmodell, fakturaAvdrag, fakturaRadIRadmodell, type Avdrag } from '../shared/rotRutOffert'
+import { arPrivatpersonsNummer, arRotRutRadmodell, fakturaAvdrag, fakturaRadIRadmodell, fastighetKravs, type Avdrag } from '../shared/rotRutOffert'
 
 // ─── ROT/RUT-arbetsrader ──────────────────────────────────────────────────
 // Privatärenden: arbetskostnaden för ROT/RUT ligger på en egen rad (tjänst
@@ -91,15 +91,16 @@ function assertRotRutInvoiceable(
   customPrice: number | null,
   ctx: { caseType?: string | null; idNummer?: string | null } = {}
 ): void {
-  // Fastighetsbeteckning krävs av Skatteverket, annars går avdraget inte att skicka till Fortnox.
+  // Fastighetsbeteckning krävs av Skatteverket för ROT, annars går avdraget inte att skicka till Fortnox.
   // Bostadsrätt (3.127.0): föreningens org.nr och lägenhetsnummer räcker i stället.
+  // RUT har ingen fastighet (3.127.4).
   const harBrf = (i: InvoiceSourceRow) => !!String(i.brf_org_number ?? '').trim() && !!String(i.apartment_number ?? '').trim()
   const missingFastighet = items
-    .filter(i => i.rot_rut_type && (!i.fastighetsbeteckning || String(i.fastighetsbeteckning).trim() === '') && !harBrf(i))
+    .filter(i => fastighetKravs(i.rot_rut_type) && (!i.fastighetsbeteckning || String(i.fastighetsbeteckning).trim() === '') && !harBrf(i))
     .map(i => i.service_name || i.article_name || 'Tjänst')
   if (missingFastighet.length > 0) {
     throw new Error(
-      `Fastighetsbeteckning saknas för ROT/RUT på: ${missingFastighet.join(', ')}. ` +
+      `Fastighetsbeteckning saknas för ROT på: ${missingFastighet.join(', ')}. ` +
       `Fyll i fastighetsbeteckning innan ärendet faktureras.`
     )
   }
