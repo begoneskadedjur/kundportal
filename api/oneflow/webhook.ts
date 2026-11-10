@@ -8,6 +8,7 @@ import { processSignedContract } from '../_lib/contractSigning'
 import { isLiveContract, LIVE_CONTRACT_STATUSES, type ContractLifecycleFields } from '../../src/utils/contractLifecycle'
 import { classifyOneflowBillingField } from '../../src/shared/invoiceDelivery'
 import { oneflowProductsValue, wizardProductsValue } from '../../src/shared/oneflowProductValue'
+import { jamforMedOneflow, type RotRutForvantat } from '../../src/shared/rotRutOffert'
 import {
   caseStatusForDocument,
   documentEventText,
@@ -652,7 +653,7 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
     // Kontrollera om kontraktet redan finns
     const { data: existingContract, error: checkError } = await supabase
       .from('contracts')
-      .select('id, type, status, source_id, source_type, created_by_email')
+      .select('id, type, status, source_id, source_type, created_by_email, rot_rut_expected')
       .eq('oneflow_contract_id', contractData.oneflow_contract_id)
       .single()
 
@@ -681,6 +682,15 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
       // Ett värde som inte går att räkna ut nollar aldrig det som redan finns.
       if (existingContract.created_by_email) webhookData.total_value = wizard_total_value ?? null
       if (webhookData.total_value == null) delete webhookData.total_value
+
+      // ROT/RUT-offert (3.127.0): Oneflows produkter ska stämma med raderna
+      // portalen skickade. Avvikelse sparas och visas i portalen.
+      const forvantat = (existingContract as { rot_rut_expected?: RotRutForvantat | null }).rot_rut_expected
+      if (forvantat && Array.isArray(webhookData.selected_products)) {
+        const synliga = oneflowProductsValue(webhookData.selected_products).rows.map(r => ({ name: r.name, total: r.total }))
+        webhookData.rot_rut_mismatch = jamforMedOneflow(forvantat, synliga)
+        if (webhookData.rot_rut_mismatch) console.warn('⚠️ ROT/RUT-offerten avviker från Oneflow:', webhookData.rot_rut_mismatch)
+      }
 
       // Kundkopplingen sätts av signeringen och wizarden, aldrig av Oneflow:
       // parsningen ger alltid null och får inte koppla loss avtalet från kunden

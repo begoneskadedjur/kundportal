@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.127.0',
+    date: '2026-11-10',
+    title: 'ROT och RUT hela vägen från offert till Fortnox',
+    items: [
+      { kind: 'nyhet', text: 'Väljer du ROT- eller RUT-mallen i Skapa offert skapas raderna Arbetskostnad, Material och utrustning, Servicebil och Övriga kostnader åt dig. Ärendets tjänst blir rubriken Avser på 0 kr, de interna kostnaderna läggs på rätt rad och prisguiden räknar priset. Kunden ser priserna inkl. moms, avdraget och att betala, men aldrig timmarna.' },
+      { kind: 'nyhet', text: 'Teknikern väljer ROT eller RUT direkt på arbetstiden under Interna kostnader. Fastighetsbeteckning (eller bostadsrättens org.nr och lägenhetsnummer) och personnummer fylls i samma steg, och listan Kvar innan du kan gå vidare visar exakt vad som stoppar offerten. De runda i-knapparna förklarar varje rad.' },
+      { kind: 'nyhet', text: 'Fakturan har en ROT/RUT-ruta med maskerat personnummer, fastighet, timmar, begärt avdrag jämfört med Fortnox och status för begäran hos Skatteverket, som du markerar själv. Timmarna går till Skatteverket via Fortnox.' },
+      { kind: 'andring', text: 'En ROT- eller RUT-faktura som saknar personnummer, fastighet, plats eller datum stoppas nu med ett tydligt besked i stället för att skickas utan avdrag. ROT/RUT-fakturor går inte heller att exportera som CSV, de skickas med Skapa utkast i Fortnox.' },
+    ],
+  },
+  {
     version: '3.126.3',
     date: '2026-11-10',
     title: 'Stationsfoton i kontrollrapporten',

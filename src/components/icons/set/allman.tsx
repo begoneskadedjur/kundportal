@@ -86,6 +86,23 @@ export const allmanIcons = {
   ),
   'allman.plus': <path d="M12 5v14M5 12h14" />,
   'allman.bock': <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  // Hjälp: litet i, för runda informationsknappar (ROT/RUT-hjälpen 3.127.0)
+  'allman.info': <path d="M12 11v6.5 M12 7v.2" />,
+  // Saknas: utropstecken i ring (listan över det som stoppar)
+  'allman.saknas': (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.8v5 M12 16v.2" />
+    </>
+  ),
+  // Hus med ROT: hus med verktyg (rubriken för ROT/RUT-rutan)
+  'allman.hus': (
+    <>
+      <path d="M4 11.2 12 4.5l8 6.7" />
+      <path d="M6 9.6v9.4h12V9.6" />
+      <path d="M10 19v-4.5h4V19" />
+    </>
+  ),
   'allman.stang': <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
   'allman.chevron': <path d="M9.5 6l6 6-6 6" />,
   // Föregående: chevron åt vänster (schemat i nya arbetsvyn)

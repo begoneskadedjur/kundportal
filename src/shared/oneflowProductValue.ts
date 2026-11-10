@@ -11,8 +11,10 @@
 // price_1 och price_2 (api/oneflow/create-contract.ts).
 //
 // Wizardens avtal räknas som förut med wizardProductsValue: price_1 gånger
-// antal. Wizardens offerter med ROT har avdraget i den dolda price_1, så den
-// synliga kolumnen får inte användas där. oneflowProductsValue gäller avtal
+// antal. Äldre ROT-offerter (före 3.127.0) kunde ha ett annat belopp i den
+// dolda price_1. Sedan 3.127.0 skickar ROT/RUT-mallarna samma pris inkl. moms
+// i båda kolumnerna (api/oneflow/create-contract.ts), så wizardProductsValue
+// blir den synliga summan inkl. moms för dem. oneflowProductsValue gäller avtal
 // som skapats direkt i Oneflow, och premien från dem ska bekräftas.
 
 type Amount = { amount?: string | number | null } | null | undefined

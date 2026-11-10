@@ -193,3 +193,26 @@ describe('A5: Fortnox-rader högst 50 tecken för nya tilläggsregler', () => {
     expect(splitFortnoxAddonText('Ljusfälla, ÅVC, 2 st')).toEqual({ main: 'Ljusfälla, ÅVC, 2 st', rest: [] })
   })
 })
+
+describe('buildFortnoxInvoiceRows ROT/RUT-offertens radmodell (3.127.0)', () => {
+  const rad = (p: Partial<InvoiceItemLike>): InvoiceItemLike => ({
+    id: p.id ?? 'x', article_code: p.article_code ?? null, article_name: p.article_name ?? 'Rad',
+    quantity: p.quantity ?? 1, unit_price: p.unit_price ?? 0, total_price: p.total_price ?? 0,
+    vat_rate: 25, discount_percent: 0, ...p,
+  })
+  const items = [
+    rad({ id: 'a', article_name: 'Avser: Tätning gnagare', line_kind: 'index_note' }),
+    rad({ id: 'b', article_code: '135', article_name: 'Arbetskostnad', unit_price: 9600, total_price: 9600, rot_rut_type: 'ROT', house_work_hours: 10 }),
+    rad({ id: 'c', article_code: '143', article_name: 'Servicebil' }),
+  ]
+  it('arbetsraden: 1 st, timmarna till Skatteverket, nollrader bort', () => {
+    const rows = buildFortnoxInvoiceRows(items, { vatIncluded: true, fastighetsbeteckning: 'Exempelby 1:23', hoppaOverNollrader: true })
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toEqual({ Description: 'Avser: Tätning gnagare' })
+    expect(rows[1]).toMatchObject({ DeliveredQuantity: 1, Price: 12000, HouseWork: true, HouseWorkType: 'CONSTRUCTION', HouseWorkHoursToReport: 10 })
+  })
+  it('bostadsrätt: husarbete utan fastighetsbeteckning', () => {
+    const rows = buildFortnoxInvoiceRows(items, { vatIncluded: true, fastighetsbeteckning: null, husarbete: true })
+    expect(rows[1]).toMatchObject({ HouseWork: true })
+  })
+})

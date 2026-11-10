@@ -68,6 +68,18 @@ export interface Invoice {
   // ROT/RUT (aggregerat från items)
   rot_rut_type: RotRutType | null
   fastighetsbeteckning: string | null
+  /** ROT/RUT i bostadsrätt (3.127.0) */
+  brf_org_number?: string | null
+  apartment_number?: string | null
+  /** Begärt avdrag i hela kronor (portalens uträkning, src/shared/rotRutOffert.ts) */
+  rot_rut_asked_amount?: number | null
+  /** Avdraget Fortnox räknade fram */
+  rot_rut_fortnox_amount?: number | null
+  /** Fel vid registreringen av avdraget i Fortnox */
+  rot_rut_error?: string | null
+  /** Begäran hos Skatteverket, manuell markering */
+  rot_rut_claim_status?: 'requested' | 'paid_out' | 'rejected' | null
+  rot_rut_claim_date?: string | null
 
   fortnox_document_number: string | null
   /** Leveransadressen som skickades till Fortnox (ärendets adress), null = ingen */
@@ -114,6 +126,8 @@ export interface InvoiceItem {
   vat_rate: number
   rot_rut_type: RotRutType | null
   fastighetsbeteckning: string | null
+  /** ROT/RUT: timmar till Fortnox. Saknas = radens antal (äldre rader). */
+  house_work_hours?: number | null
   created_at: string
 }
 

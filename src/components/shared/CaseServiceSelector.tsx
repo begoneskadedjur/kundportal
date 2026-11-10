@@ -58,6 +58,12 @@ import { ARTICLE_CATEGORY_CONFIG } from '../../types/articles'
 type CustomerArticlePrice = { custom_price: number; quantity_tiers: QuantityTier[] | null }
 import PriceCalculatorPanel, { type PriceGuideDiscount } from './PriceCalculatorPanel'
 import { tillatnaAvdrag, type MallAvdrag } from '../../shared/rotRutDokument'
+import {
+  KUNDNAMN, ROT_RUT_ROLLER, ROT_RUT_TJANSTKOD, exklFranInkl, inklMoms, rollForKategori, rollForKod,
+  sammanstallRotRut, type Avdrag, type RadRoll,
+} from '../../shared/rotRutOffert'
+import InfoKnapp from './rotRut/InfoKnapp'
+import { AVSER_HJALP, RAD_HJALP, RAD_UNDERTEXT, TIMMAR_UNDERTEXT, typAvArbeteText } from '../../constants/rotRutHjalp'
 
 interface CaseServiceSelectorProps {
   caseId?: string
@@ -179,6 +185,18 @@ export default function CaseServiceSelector({
   )
   const [priceRotRutSelections, setPriceRotRutSelections] = useState<Record<string, 'ROT' | 'RUT' | null>>({})
 
+  // ROT/RUT-mall (3.127.0): bara när wizarden skickar en ROT- eller RUT-mall och
+  // ärendet är privat. Alla andra vyer (kundkort, avtal, rondering, ärendet)
+  // skickar aldrig allowedDeduction ROT/RUT och påverkas inte.
+  const rotLage: Avdrag | null =
+    (allowedDeduction === 'ROT' || allowedDeduction === 'RUT') && caseType === 'private' ? allowedDeduction : null
+  /** Katalogens fyra tjänster för kundraderna (135, 120, 143, 145; 145 är inaktiv) */
+  const [rotTjanster, setRotTjanster] = useState<Partial<Record<RadRoll, ServiceWithGroup>>>({})
+  const [rotSynkFel, setRotSynkFel] = useState<string | null>(null)
+  const rotSynkPagar = useRef(false)
+  const rotSkapade = useRef<Set<RadRoll>>(new Set())
+  const rotMappade = useRef<Set<string>>(new Set())
+
 
   // "Dela upp för ROT/RUT": vilken tjänsterad formuläret är öppet för + inmatning
   const [splitItemId, setSplitItemId] = useState<string | null>(null)
@@ -229,6 +247,8 @@ export default function CaseServiceSelector({
     }
   }, [priceMarkups])
   useEffect(() => { allItemsRef.current = allItems }, [allItems])
+  // ROT/RUT-mall: interna kostnader visas direkt, där väljs avdrag och rad
+  useEffect(() => { if (rotLage) setShowArticleList(true) }, [rotLage])
 
   const loadData = useCallback(async () => {
     // Om en körning redan pågår: vänta på den innan en ny startas, så att
@@ -519,6 +539,283 @@ export default function CaseServiceSelector({
       priceAssignments: priceAssignmentsRef.current,
       priceMarkups: priceMarkupsRef.current,
     })
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // ROT/RUT-mall (3.127.0): fyra fasta kundrader, mappning efter kategori,
+  // priset från prisguiden och timmarna från arbetstiden. Allt nedan körs
+  // bara när rotLage är satt.
+  // ──────────────────────────────────────────────────────────────
+  const rollAv = (item: CaseBillingItemWithRelations): RadRoll | null =>
+    item.item_type === 'service' ? rollForKod(item.service_code ?? item.service?.code ?? null) : null
+  const rotRader: Partial<Record<RadRoll, CaseBillingItemWithRelations>> = {}
+  if (rotLage) {
+    for (const i of ownServiceItems) {
+      const r = rollAv(i)
+      if (r && !rotRader[r]) rotRader[r] = i
+    }
+  }
+  const rotRadIds = new Set(Object.values(rotRader).map(i => i!.id))
+  const mappningFor = (a: CaseBillingItemWithRelations) => priceAssignments[a.id] || a.mapped_service_id || null
+  /** Arbetstid med mallens avdrag mappad mot arbetsraden: timmarna till Skatteverket */
+  const rotTimmar = (() => {
+    const arb = rotRader.arbete
+    if (!rotLage || !arb) return 0
+    const t = articleItems
+      .filter(a => mappningFor(a) === arb.id && a.article?.category === 'Arbetstid' && a.rot_rut_type === rotLage)
+      .reduce((s, a) => s + Number(a.quantity || 0), 0)
+    return Math.round(t * 100) / 100
+  })()
+
+  useEffect(() => {
+    if (!rotLage) return
+    let aktiv = true
+    supabase
+      .from('services')
+      .select('*')
+      .in('code', Object.values(ROT_RUT_TJANSTKOD))
+      .then(({ data, error }) => {
+        if (!aktiv) return
+        if (error) { setRotSynkFel('Tjänsterna för ROT/RUT kunde inte läsas från katalogen.'); return }
+        const m: Partial<Record<RadRoll, ServiceWithGroup>> = {}
+        for (const s of (data ?? []) as ServiceWithGroup[]) {
+          const r = rollForKod(s.code)
+          if (r) m[r] = s
+        }
+        setRotTjanster(m)
+      })
+    return () => { aktiv = false }
+  }, [rotLage])
+
+  /** En kundrad på 0 kr för rollen (bara draft-läget, ärendet skrivs i databasen). */
+  const nyRotRad = (svc: ServiceWithGroup): CaseBillingItemWithRelations => {
+    const nu = new Date().toISOString()
+    return {
+      id: crypto.randomUUID(), case_id: '', case_type: caseType, customer_id: customerId ?? null,
+      article_id: null, article_code: null, article_name: svc.name,
+      service_id: svc.id, service_code: svc.code ?? null, service_name: svc.name, item_type: 'service',
+      quantity: 1, unit_price: 0, discount_percent: 0, discounted_price: 0, total_price: 0, vat_rate: 25,
+      price_source: 'standard', added_by_technician_id: technicianId ?? null, added_by_technician_name: technicianName ?? null,
+      status: 'pending', requires_approval: false, notes: null, rot_rut_type: null, fastighetsbeteckning: null,
+      min_quantity: null, mapped_service_id: null, created_at: nu, updated_at: nu, service: svc,
+    }
+  }
+
+  type RotSynk =
+    | { typ: 'skapa'; roller: RadRoll[] }
+    | { typ: 'mappa'; andringar: Array<{ id: string; till: string; avdrag?: Avdrag | null }> }
+    | { typ: 'pris'; patchar: Array<{ id: string; patch: Partial<CaseBillingItemWithRelations> }> }
+
+  const planeraRotSynk = (): RotSynk | null => {
+    if (!rotLage) return null
+    // 1. Kundraderna som saknas (varje roll försöks en gång per visning)
+    const saknas = ROT_RUT_ROLLER.filter(r => !rotRader[r] && !!rotTjanster[r] && !rotSkapade.current.has(r))
+    if (saknas.length > 0) return { typ: 'skapa', roller: saknas }
+    // 2. Interna kostnader utan rad mappas efter kategori (en gång per kostnad)
+    const andringar: Array<{ id: string; till: string; avdrag?: Avdrag | null }> = []
+    for (const a of articleItems) {
+      if (rotMappade.current.has(a.id)) continue
+      const nu = mappningFor(a)
+      if (nu && rotRadIds.has(nu)) { rotMappade.current.add(a.id); continue }
+      const roll = rollForKategori(a.article?.category ?? null)
+      const mal = rotRader[roll]
+      if (!mal) continue
+      const arArbetstid = roll === 'arbete' && a.article?.category === 'Arbetstid'
+      andringar.push({ id: a.id, till: mal.id, ...(arArbetstid && !a.rot_rut_type ? { avdrag: rotLage } : {}) })
+    }
+    if (andringar.length > 0) return { typ: 'mappa', andringar }
+    // 3. Priset per rad från prisguiden (inkl. moms i hela kronor), timmar och avdrag på arbetsraden
+    const patchar: Array<{ id: string; patch: Partial<CaseBillingItemWithRelations> }> = []
+    for (const roll of ['arbete', 'material', 'ovrigt'] as RadRoll[]) {
+      const rad = rotRader[roll]
+      if (!rad) continue
+      const mappade = articleItems.filter(a => mappningFor(a) === rad.id)
+      const lista = mappade.length > 0 ? (guideListTotal(rad) ?? 0) : 0
+      const unit = exklFranInkl(inklMoms(lista))
+      const patch: Partial<CaseBillingItemWithRelations> = {}
+      if (Math.abs(Number(rad.unit_price) - unit) > 0.005 || Number(rad.quantity) !== 1) {
+        const discounted = calculateDiscountedPrice(unit, rad.discount_percent)
+        patch.unit_price = unit
+        patch.quantity = 1
+        patch.discounted_price = discounted
+        patch.total_price = calculateTotalPrice(discounted, 1)
+      }
+      if (roll === 'arbete') {
+        const typ = rotTimmar > 0 ? rotLage : null
+        const timmar = rotTimmar > 0 ? rotTimmar : null
+        if ((rad.rot_rut_type ?? null) !== typ) patch.rot_rut_type = typ
+        if ((rad.house_work_hours != null ? Number(rad.house_work_hours) : null) !== timmar) patch.house_work_hours = timmar
+      }
+      if (Object.keys(patch).length > 0) patchar.push({ id: rad.id, patch })
+    }
+    return patchar.length > 0 ? { typ: 'pris', patchar } : null
+  }
+
+  const korRotSynk = async (plan: RotSynk) => {
+    const lokalt = draftMode && !caseId
+    if (plan.typ === 'skapa') {
+      plan.roller.forEach(r => rotSkapade.current.add(r))
+      if (lokalt) {
+        const updated = [...allItems, ...plan.roller.map(r => nyRotRad(rotTjanster[r]!))]
+        setAllItems(updated)
+        notifyChange(updated)
+        return
+      }
+      for (const r of plan.roller) {
+        const svc = rotTjanster[r]!
+        await CaseBillingService.addServiceToCase({
+          case_id: caseId!, case_type: caseType, customer_id: customerId, service_id: svc.id,
+          service_code: svc.code, service_name: svc.name, quantity: 1, unit_price: 0, vat_rate: 25,
+          added_by_technician_id: technicianId || undefined, added_by_technician_name: technicianName || undefined,
+        })
+      }
+      await reloadItems()
+      return
+    }
+    if (plan.typ === 'mappa') {
+      plan.andringar.forEach(a => rotMappade.current.add(a.id))
+      const nyaTilldelningar = { ...priceAssignmentsRef.current }
+      for (const a of plan.andringar) nyaTilldelningar[a.id] = a.till
+      if (lokalt) {
+        const updated = allItems.map(i => {
+          const a = plan.andringar.find(x => x.id === i.id)
+          if (!a) return i
+          return { ...i, mapped_service_id: a.till, ...(a.avdrag !== undefined ? { rot_rut_type: a.avdrag } : {}) }
+        })
+        priceAssignmentsRef.current = nyaTilldelningar
+        setPriceAssignments(nyaTilldelningar)
+        setAllItems(updated)
+        notifyChange(updated)
+        return
+      }
+      for (const a of plan.andringar) {
+        const { error } = await supabase
+          .from('case_billing_items')
+          .update({ mapped_service_id: a.till, ...(a.avdrag !== undefined ? { rot_rut_type: a.avdrag } : {}), updated_at: new Date().toISOString() })
+          .eq('id', a.id)
+        if (error) throw new Error(`Databasfel: ${error.message}`)
+      }
+      priceAssignmentsRef.current = nyaTilldelningar
+      setPriceAssignments(nyaTilldelningar)
+      await reloadItems()
+      return
+    }
+    if (lokalt) {
+      const updated = allItems.map(i => {
+        const p = plan.patchar.find(x => x.id === i.id)
+        return p ? { ...i, ...p.patch } : i
+      })
+      setAllItems(updated)
+      notifyChange(updated)
+      return
+    }
+    for (const p of plan.patchar) {
+      const { error } = await supabase
+        .from('case_billing_items')
+        .update({ ...p.patch, updated_at: new Date().toISOString() })
+        .eq('id', p.id)
+      if (error) throw new Error(`Databasfel: ${error.message}`)
+    }
+    await reloadItems()
+  }
+
+  // Körs efter varje rendering men gör bara något när något faktiskt skiljer
+  // sig, en ändring i taget. Ett fel stoppar synken och visas vid raderna.
+  useEffect(() => {
+    if (!rotLage || loading || saving || readOnly || rotSynkPagar.current || rotSynkFel) return
+    if (!caseId && !draftMode) return
+    if (ROT_RUT_ROLLER.some(r => !rotTjanster[r])) return
+    const plan = planeraRotSynk()
+    if (!plan) return
+    rotSynkPagar.current = true
+    korRotSynk(plan)
+      .catch(err => setRotSynkFel(err instanceof Error ? err.message : 'ROT/RUT-raderna kunde inte uppdateras.'))
+      .finally(() => { rotSynkPagar.current = false })
+  })
+
+  /** Användaren byter rad för en intern kostnad (ROT/RUT-mall). */
+  const handleRotMappning = async (artikelId: string, till: string) => {
+    if (saving) return
+    rotMappade.current.add(artikelId)
+    const artikel = allItems.find(i => i.id === artikelId)
+    // Flyttas arbetstiden från Arbetskostnad följer inte avdraget med
+    const nollaAvdrag = !!artikel?.rot_rut_type && till !== rotRader.arbete?.id
+    const nya = { ...priceAssignmentsRef.current, [artikelId]: till }
+    if (draftMode && !caseId) {
+      const updated = allItems.map(i => i.id === artikelId ? { ...i, mapped_service_id: till, ...(nollaAvdrag ? { rot_rut_type: null } : {}) } : i)
+      priceAssignmentsRef.current = nya
+      setPriceAssignments(nya)
+      setAllItems(updated)
+      notifyChange(updated)
+      return
+    }
+    if (!caseId) return
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('case_billing_items')
+        .update({ mapped_service_id: till, ...(nollaAvdrag ? { rot_rut_type: null } : {}), updated_at: new Date().toISOString() })
+        .eq('id', artikelId)
+      if (error) throw new Error(`Databasfel: ${error.message}`)
+      priceAssignmentsRef.current = nya
+      setPriceAssignments(nya)
+      await reloadItems()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte flytta kostnaden')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** ROT eller RUT på en intern kostnad i kategorin Arbetstid (ROT/RUT-mall). */
+  const handleArtikelAvdrag = async (artikelId: string, typ: Avdrag | null) => {
+    if (saving) return
+    if (draftMode && !caseId) {
+      const updated = allItems.map(i => i.id === artikelId ? { ...i, rot_rut_type: typ } : i)
+      setAllItems(updated)
+      notifyChange(updated)
+      return
+    }
+    if (!caseId) return
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('case_billing_items')
+        .update({ rot_rut_type: typ, updated_at: new Date().toISOString() })
+        .eq('id', artikelId)
+      if (error) throw new Error(`Databasfel: ${error.message}`)
+      await reloadItems()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara avdraget')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** Ärendets tjänst blir rubrik på 0 kr (ROT/RUT-mall). */
+  const handleGorTillRubrik = async (id: string) => {
+    if (saving) return
+    const patch = { unit_price: 0, discounted_price: 0, total_price: 0, discount_percent: 0, rot_rut_type: null }
+    if (draftMode && !caseId) {
+      const updated = allItems.map(i => i.id === id ? { ...i, ...patch } : i)
+      setAllItems(updated)
+      notifyChange(updated)
+      return
+    }
+    if (!caseId) return
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('case_billing_items')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw new Error(`Databasfel: ${error.message}`)
+      await reloadItems()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte ändra raden')
+    } finally {
+      setSaving(false)
+    }
   }
 
   // ──────────────────────────────────────────────────────────────
@@ -1555,6 +1852,217 @@ export default function CaseServiceSelector({
     )
   }
 
+
+  // ── ROT/RUT-mall (3.127.0): kundraderna och sammanställningen ──
+  const renderRotLage = () => {
+    if (!rotLage) return null
+    const avserRader = ownServiceItems.filter(i => !rollAv(i))
+    const s = sammanstallRotRut(
+      ownServiceItems.map(i => ({
+        id: i.id,
+        roll: rollAv(i),
+        service_name: i.service_name,
+        total_price: Number(i.total_price || 0),
+        vat_rate: i.vat_rate,
+        rot_rut_type: i.rot_rut_type,
+        house_work_hours: i.house_work_hours ?? null,
+      })),
+      rotLage
+    )
+    return (
+      <div className="space-y-2 mb-2">
+        {rotSynkFel && (
+          <p role="alert" className="flex items-start gap-1.5 text-xs text-red-400">
+            <Icon name="rapport.avvikelse" className="w-3.5 h-3.5 shrink-0 mt-px" />
+            <span>
+              {rotSynkFel}{' '}
+              <button type="button" onClick={() => setRotSynkFel(null)} className="underline underline-offset-2 hover:text-red-300">
+                Försök igen
+              </button>
+            </span>
+          </p>
+        )}
+        <p className="text-[11px] uppercase tracking-[0.08em] text-slate-400">Till kunden inkl. moms</p>
+
+        {avserRader.map(item => {
+          const harPris = Math.abs(Number(item.total_price || 0)) >= 0.005
+          return (
+            <div key={item.id} className="p-2 bg-slate-800/20 border border-slate-700/50 rounded-lg">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-slate-300">
+                  Avser: <span className="font-medium text-white">{item.service_name || item.article_name}</span>
+                </span>
+                <InfoKnapp rubrik={AVSER_HJALP.rubrik} etikett="Om raden Avser">{AVSER_HJALP.text}</InfoKnapp>
+                <span className={`ml-auto text-sm tabular-nums ${harPris ? 'text-amber-400' : 'text-slate-400'}`}>
+                  {formatPrice(inklMoms(Number(item.total_price || 0), item.vat_rate))}
+                </span>
+                {!readOnly && (
+                  <button type="button" onClick={() => handleRemove(item.id)} aria-label="Ta bort raden" className="text-slate-500 hover:text-red-400 transition-colors">
+                    <Icon name="allman.radera" className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">Rubrik i offerten och på fakturan</p>
+              {harPris && (
+                <p className="mt-1 flex items-start gap-1.5 text-xs text-amber-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-[5px] shrink-0" />
+                  <span>
+                    Ärendets tjänst ska ha 0 kr. Priset räknas på raderna nedan.{' '}
+                    {!readOnly && (
+                      <button type="button" onClick={() => handleGorTillRubrik(item.id)} disabled={saving} className="underline underline-offset-2 hover:text-amber-300 disabled:opacity-50">
+                        Gör till rubrik, 0 kr
+                      </button>
+                    )}
+                  </span>
+                </p>
+              )}
+            </div>
+          )
+        })}
+
+        {ROT_RUT_ROLLER.map(roll => {
+          const item = rotRader[roll]
+          if (!item) {
+            return (
+              <p key={roll} className="p-2 text-xs text-slate-500 border border-dashed border-slate-700 rounded-lg">
+                {rotTjanster[roll] ? `Raden ${KUNDNAMN[roll]} läggs till...` : `Tjänsten för ${KUNDNAMN[roll]} saknas i katalogen.`}
+              </p>
+            )
+          }
+          const mappade = articleItems.filter(a => mappningFor(a) === item.id)
+          const inkl = inklMoms(Number(item.total_price || 0), item.vat_rate)
+          const under = roll === 'servicebil' || roll === 'arbete'
+            ? RAD_UNDERTEXT[roll]
+            : mappade.length > 0
+              ? `${mappade.length} ${mappade.length === 1 ? 'intern kostnad' : 'interna kostnader'} · ${RAD_UNDERTEXT[roll]}`
+              : 'Inga kostnader · syns inte för kunden'
+          const isEditing = editingPrice[item.id] !== undefined
+          const unitInkl = Math.round(Number(item.unit_price || 0) * priceMultiplier)
+          return (
+            <div
+              key={item.id}
+              className={`p-2 border rounded-lg ${roll === 'arbete' ? 'bg-[#20c58f]/5 border-[#20c58f]/30' : 'bg-slate-800/40 border-slate-700/50'}`}
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium text-white">{KUNDNAMN[roll]}</span>
+                {roll === 'arbete' && <span className="text-[11px] font-semibold text-[#20c58f]">{rotLage}</span>}
+                <InfoKnapp rubrik={RAD_HJALP[roll].rubrik} etikett={`Om ${KUNDNAMN[roll]}`}>{RAD_HJALP[roll].text}</InfoKnapp>
+                {roll === 'servicebil' && !readOnly ? (
+                  <div className="flex items-center gap-1 ml-auto">
+                    <button type="button" onClick={() => handleQuantityChange(item.id, -1)} aria-label="Färre" className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                      <Icon name="allman.minus" className="w-3 h-3" />
+                    </button>
+                    <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
+                    <button type="button" onClick={() => handleQuantityChange(item.id, 1)} aria-label="Fler" className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
+                      <Icon name="allman.plus" className="w-3 h-3" />
+                    </button>
+                    <span className="text-xs text-slate-400">×</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      aria-label="Pris per gång inkl. moms"
+                      value={isEditing ? editingPrice[item.id] : String(unitInkl)}
+                      onChange={e => setEditingPrice(prev => ({ ...prev, [item.id]: e.target.value }))}
+                      onFocus={() => { if (!isEditing) setEditingPrice(prev => ({ ...prev, [item.id]: String(unitInkl) })) }}
+                      onBlur={() => handleServicePriceBlur(item.id)}
+                      className="w-20 px-2 py-0.5 text-sm text-right bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                    />
+                    <span className="text-xs text-slate-400">kr</span>
+                    <span className="text-sm font-semibold text-white tabular-nums w-20 text-right">{formatPrice(inkl)}</span>
+                  </div>
+                ) : (
+                  <span className="ml-auto text-sm font-semibold text-white tabular-nums">{formatPrice(inkl)}</span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">{under}</p>
+              {roll === 'arbete' && (
+                <p className="text-xs text-slate-300 mt-1">
+                  {rotTimmar > 0
+                    ? `${formatHoursSv(rotTimmar)} h arbetstid med ${rotLage}, bara internt. ${typAvArbeteText(rotLage)}.`
+                    : `Ingen arbetstid med ${rotLage} än. Lägg Arbetstid Privatperson under Interna kostnader och välj ${rotLage}.`}
+                </p>
+              )}
+              {item.discount_percent > 0 && (
+                <p className="text-xs text-slate-400 mt-1">Rabatt {Number(item.discount_percent).toLocaleString('sv-SE', { maximumFractionDigits: 2 })} % från prisguiden.</p>
+              )}
+            </div>
+          )
+        })}
+
+        <div className="border-t border-slate-700/50 mt-3 pt-2 space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Totalt inkl. moms</span>
+            <span className="font-semibold text-white tabular-nums">{formatPrice(s.totaltInkl)}</span>
+          </div>
+          <div className="flex justify-between text-sm text-[#20c58f]">
+            <span>{rotLage}-avdrag {s.procent} %</span>
+            <span className="tabular-nums">-{formatPrice(s.avdrag)}</span>
+          </div>
+          <div className="flex justify-between text-sm pt-1 border-t border-slate-700/30">
+            <span className="text-slate-300 font-medium">Att betala</span>
+            <span className="font-bold text-[#20c58f] tabular-nums">{formatPrice(s.attBetala)}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── ROT/RUT-mall: rad och avdrag för en intern kostnad ──
+  const renderRotArtikel = (item: CaseBillingItemWithRelations) => {
+    if (!rotLage) return null
+    const vald = mappningFor(item)
+    const arbetstid = item.article?.category === 'Arbetstid'
+    const paArbete = !!rotRader.arbete && vald === rotRader.arbete.id
+    const giltig = !!vald && rotRadIds.has(vald)
+    return (
+      <div className="mt-1.5 pt-1.5 border-t border-dashed border-slate-700/60 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+        <label className="flex items-center gap-1.5 text-slate-400">
+          Ligger på
+          <select
+            value={giltig ? vald! : ''}
+            disabled={readOnly || saving}
+            onChange={e => { if (e.target.value) void handleRotMappning(item.id, e.target.value) }}
+            className={`bg-slate-800 border rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f] ${giltig ? 'border-slate-600' : 'border-amber-500'}`}
+          >
+            {!giltig && <option value="">Välj rad</option>}
+            {ROT_RUT_ROLLER.filter(r => rotRader[r]).map(r => (
+              <option key={r} value={rotRader[r]!.id}>{KUNDNAMN[r]}</option>
+            ))}
+          </select>
+        </label>
+        {arbetstid && paArbete && (
+          <span className="inline-flex items-center gap-2">
+            <span className="inline-flex border border-slate-600 rounded-md overflow-hidden" role="group" aria-label="Avdrag">
+              <button
+                type="button"
+                aria-pressed={item.rot_rut_type === rotLage}
+                disabled={readOnly || saving}
+                onClick={() => void handleArtikelAvdrag(item.id, rotLage)}
+                className={`px-2.5 py-0.5 font-semibold ${item.rot_rut_type === rotLage ? 'bg-[#20c58f] text-[#06281c]' : 'text-slate-400 hover:text-white'}`}
+              >
+                {rotLage}
+              </button>
+              <button
+                type="button"
+                aria-pressed={!item.rot_rut_type}
+                disabled={readOnly || saving}
+                onClick={() => void handleArtikelAvdrag(item.id, null)}
+                className={`px-2.5 py-0.5 font-semibold ${!item.rot_rut_type ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Inget
+              </button>
+            </span>
+            <span className="text-slate-500">{item.rot_rut_type ? typAvArbeteText(rotLage) : 'Utan avdrag hör tiden inte hit'}</span>
+          </span>
+        )}
+        {item.rot_rut_type && item.rot_rut_type !== rotLage && (
+          <span className="text-amber-400">Raden har {item.rot_rut_type}, mallen gäller {rotLage}.</span>
+        )}
+        {arbetstid && paArbete && <span className="basis-full text-[11px] text-slate-500">{TIMMAR_UNDERTEXT}</span>}
+      </div>
+    )
+  }
+
   return (
     <div className={`space-y-3 ${className}`}>
       {/* ── A: TJÄNSTERADER (faktura) ── */}
@@ -1590,8 +2098,8 @@ export default function CaseServiceSelector({
           </div>
         </div>
 
-        {/* Befintliga tjänsterader */}
-        {ownServiceItems.length === 0 ? (
+        {/* Befintliga tjänsterader. ROT/RUT-mall: de fyra kundraderna (3.127.0) */}
+        {rotLage ? renderRotLage() : ownServiceItems.length === 0 ? (
           <p className="text-xs text-slate-500 py-2 text-center">Inga tjänster tillagda än</p>
         ) : (
           <div className="space-y-2 mb-2">
@@ -2206,8 +2714,8 @@ export default function CaseServiceSelector({
           </div>
         )}
 
-        {/* Summa tjänster */}
-        {ownServiceItems.length > 0 && (() => {
+        {/* Summa tjänster (ROT/RUT-mall: sammanställningen i renderRotLage) */}
+        {!rotLage && ownServiceItems.length > 0 && (() => {
           const rotRut = isPrivate ? calculateRotRutSummary(ownServiceItems) : null
           const totalInkl = serviceCost * priceMultiplier
           const showDeduction = isPrivate && rotRut && rotRut.totalDeduction > 0
@@ -2492,6 +3000,7 @@ export default function CaseServiceSelector({
                         </button>
                       )}
                     </div>
+                    {rotLage && renderRotArtikel(item)}
                   </div>
                   )
                 })}
@@ -2655,7 +3164,9 @@ export default function CaseServiceSelector({
           rut_eligible: !!i.article?.rut_eligible,
         }))}
         customerArticlePrices={customerArticlePrices}
-        serviceItems={listedServiceItems.map(i => {
+        serviceItems={(rotLage
+          ? listedServiceItems.filter(i => { const r = rollAv(i); return r === 'arbete' || r === 'material' || r === 'ovrigt' })
+          : listedServiceItems).map(i => {
           const svc = i.service ?? addonServices.find(s => s.id === i.service_id) ?? null
           // Uppdelad tjänst: prisguiden ser hela tjänstens à-pris (material + arbete)
           const laborChild = laborChildByParent.get(i.id)
@@ -2668,8 +3179,8 @@ export default function CaseServiceSelector({
               : i.unit_price,
             quantity: i.quantity,
             discount_percent: i.discount_percent,
-            rot_eligible: !!svc?.rot_eligible && tillat.rot,
-            rut_eligible: !!svc?.rut_eligible && tillat.rut,
+            rot_eligible: !rotLage && !!svc?.rot_eligible && tillat.rot,
+            rut_eligible: !rotLage && !!svc?.rut_eligible && tillat.rut,
             rot_rate_percent: svc?.rot_rate_percent ?? null,
             rut_rate_percent: svc?.rut_rate_percent ?? null,
             discountable: !readOnly && isDiscountableServiceRow(i),

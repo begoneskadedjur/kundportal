@@ -51,6 +51,8 @@ export interface InvoiceItemLike {
   contract_billing_item_id?: string | null
   rot_rut_type?: string | null
   line_kind?: string | null
+  /** ROT/RUT (3.127.0): timmar till Skatteverket. Saknas = radens antal. */
+  house_work_hours?: number | null
 }
 
 export type InvoiceAddonKind = 'station' | 'labour'
@@ -263,6 +265,13 @@ export function buildFortnoxInvoiceRows(
      * skickas som förut.
      */
     splitAddonRows?: boolean
+    /**
+     * ROT/RUT (3.127.0): husarbete även utan fastighetsbeteckning (bostadsrätt,
+     * föreningens org.nr och lägenhetsnummer registreras i taxreductions).
+     */
+    husarbete?: boolean
+    /** ROT/RUT-offertens radmodell: rader på 0 kr visas inte för kunden */
+    hoppaOverNollrader?: boolean
   }
 ): FortnoxInvoiceRow[] {
   const addonByItem = new Map((opts.addonLines ?? []).map((l) => [l.invoiceItemId, l]))
@@ -272,6 +281,7 @@ export function buildFortnoxInvoiceRows(
       rows.push({ Description: fortnoxText(item.article_name).slice(0, 200) })
       continue
     }
+    if (opts.hoppaOverNollrader && Math.abs(Number(item.total_price) || 0) < 0.005) continue
     const addon = addonByItem.get(item.id)
     const name = addon
       ? addon.kind === 'labour'
@@ -286,11 +296,12 @@ export function buildFortnoxInvoiceRows(
       Price: opts.vatIncluded ? toVatInclusivePrice(Number(item.unit_price), item.vat_rate) : Number(item.unit_price),
       VAT: item.vat_rate,
       ...(item.discount_percent > 0 ? { Discount: item.discount_percent, DiscountType: 'PERCENT' as const } : {}),
-      ...(item.rot_rut_type && opts.fastighetsbeteckning
+      ...(item.rot_rut_type && (opts.fastighetsbeteckning || opts.husarbete)
         ? {
             HouseWork: true,
             HouseWorkType: houseWorkTypeFor(item.rot_rut_type),
-            HouseWorkHoursToReport: houseWorkHoursFor(Number(item.quantity)),
+            // Timmarna (house_work_hours), äldre rader: antalet
+            HouseWorkHoursToReport: houseWorkHoursFor(item.house_work_hours != null ? Number(item.house_work_hours) : Number(item.quantity)),
           }
         : {}),
     })

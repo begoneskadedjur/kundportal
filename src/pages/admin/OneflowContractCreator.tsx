@@ -31,7 +31,17 @@ import { SelectedProduct, CustomerType, SelectedArticleItem } from '../../types/
 import { convertServicesToOneflowProducts } from '../../utils/articlePricingCalculator'
 import { mapBillingItemsToPrefillServices, mapBillingItemsToSelectedArticles } from '../../utils/billingPrefill'
 import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
-import { OFFER_TEMPLATES, CONTRACT_TEMPLATES, type OneflowTemplate } from '../../constants/oneflowTemplates'
+import { OFFER_TEMPLATES, CONTRACT_TEMPLATES, getTemplateById, type OneflowTemplate } from '../../constants/oneflowTemplates'
+import {
+  KUNDNAMN, ROT_RUT_ROLLER, avserText, fastighetText, giltigFastighetsbeteckning, giltigtOrgNr, giltigtPersonnummer,
+  mallensTyp, rollForKod, rotRutBrister, sammanstallRotRut, type Avdrag, type BristKod, type RotRutBrist,
+} from '../../shared/rotRutOffert'
+import {
+  FALT_UNDERTEXT, FASTIGHET_HJALP, INTRO_HJALP, KVAR_RUBRIK, PERSONNUMMER_HJALP, ROT_RUT_GUIDE_SLUG, ROT_RUT_GUIDE_SLUG_TEKNIKER,
+  ROT_RUT_GUIDE_TITEL, introText,
+} from '../../constants/rotRutHjalp'
+import InfoKnapp from '../../components/shared/rotRut/InfoKnapp'
+import { Icon } from '../../components/icons/Icon'
 import { OneflowTemplateService } from '../../services/oneflowTemplateService'
 import { OneflowDraftService } from '../../services/oneflowDraftService'
 import { DokumentRabattRuta } from '../../components/shared/DokumentRabatt'
@@ -136,6 +146,11 @@ interface WizardData {
     } | null
   }>
 
+  /** ROT/RUT-mall (3.127.0): fastigheten eller bostadsrätten. Skickas till Oneflow och sparas på arbetsraden. */
+  rotFastighet: RotFastighet
+  /** Ärendekopplat läge: ärendets alla rader (tjänster och interna kostnader) för ROT/RUT-kontrollen */
+  caseItems: CaseBillingItemWithRelations[]
+
   // Steg 7 - Avtalsobjekt
   agreementText: string
 
@@ -155,11 +170,39 @@ interface WizardData {
   lead_id?: string
 }
 
+interface RotFastighet {
+  brf: boolean
+  fastighetsbeteckning: string
+  brfOrgNr: string
+  lagenhetsnummer: string
+}
+
+const TOM_FASTIGHET: RotFastighet = { brf: false, fastighetsbeteckning: '', brfOrgNr: '', lagenhetsnummer: '' }
+
+/** ROT/RUT-mallens typ ur mall-id (hårdkodade listan, mallarna 8919012 och 8919059). */
+const rotTypForMall = (templateId: string | null | undefined): Avdrag | null =>
+  mallensTyp(getTemplateById(String(templateId ?? ''))?.deduction ?? null)
+
+/**
+ * ROT/RUT-mall: offertinnehållet nämner kundraderna, aldrig timmar, antal
+ * eller interna kostnader. Arbetsraden heter bara Arbetskostnad. Rubriken
+ * Avser står ovanför prisraderna i Oneflow (create-contract), inte här.
+ */
+function skrivRotRutForslag(tjanster: Array<{ service_code?: string | null; service_name?: string | null; total_price: number }>): string | null {
+  if (tjanster.length === 0) return null
+  const rader = ROT_RUT_ROLLER
+    .filter(r => tjanster.some(t => rollForKod(t.service_code) === r && Math.abs(Number(t.total_price) || 0) >= 0.005))
+    .map(r => `- ${KUNDNAMN[r]}`)
+  const delar: string[] = []
+  if (rader.length > 0) delar.push(`Offerten omfattar:\n\n${rader.join('\n')}`)
+  return delar.length > 0 ? delar.join('\n\n') : null
+}
+
 // Avtalets standardtext gäller bara avtal. En offert får aldrig den som
 // utgångsläge: offerten från ett ärende fylls med texten från tjänsterna.
 const DEFAULT_AGREEMENT_TEXT = AVTALETS_STANDARDTEXT
 
-type ForslagsKalla = Pick<WizardData, 'case_id' | 'prefillServices' | 'selectedArticles' | 'draftItems' | 'draftPriceAssignments'>
+type ForslagsKalla = Pick<WizardData, 'case_id' | 'prefillServices' | 'selectedArticles' | 'draftItems' | 'draftPriceAssignments'> & Partial<Pick<WizardData, 'selectedTemplate' | 'documentType'>>
 
 /**
  * Samma text som knappen "Skriv förslag från tjänsterna" skriver.
@@ -171,6 +214,10 @@ function skrivForslagFranTjanster(d: ForslagsKalla): string | null {
   const serviceDraftItems = d.draftItems.filter(i => i.item_type === 'service')
   const articleDraftItems = d.draftItems.filter(i => i.item_type === 'article')
   if (!hasPrefill && serviceDraftItems.length === 0) return null
+  // ROT/RUT-mall (3.127.0): bara rubriken och kundraderna
+  if (d.documentType === 'offer' && rotTypForMall(d.selectedTemplate)) {
+    return skrivRotRutForslag(hasPrefill ? d.prefillServices! : serviceDraftItems)
+  }
   const lines: string[] = []
   if (hasPrefill) {
     d.prefillServices!.forEach(s => {
@@ -457,6 +504,8 @@ function createInitialWizardData(
     draftItems: [],
     draftPriceAssignments: {},
     draftPriceMarkups: {},
+    rotFastighet: TOM_FASTIGHET,
+    caseItems: [],
     agreementText: DEFAULT_AGREEMENT_TEXT,
     customer_group_id: null
   }
@@ -651,6 +700,10 @@ export default function OneflowContractCreator() {
             noticePeriodMonths: customerData.noticePeriodMonths || prev.noticePeriodMonths,
             billingFrequency: customerData.billingFrequency || prev.billingFrequency,
             renewalOfContractId: customerData.renewalOfContractId || undefined,
+            // ROT/RUT-mall: ärendets fastighetsbeteckning förifylls
+            rotFastighet: typeof customerData.rotFastighetsbeteckning === 'string' && customerData.rotFastighetsbeteckning.trim()
+              ? { ...prev.rotFastighet, fastighetsbeteckning: customerData.rotFastighetsbeteckning.trim() }
+              : prev.rotFastighet,
             // Leads (Webb): offert från en webbförfrågan
             web_inquiry_id: customerData.webInquiryId || undefined,
             // Leads: offert eller avtal från en lead; triggern på contracts flyttar leaden
@@ -693,7 +746,8 @@ export default function OneflowContractCreator() {
                 customerData.prefillServices.some((s: { total_price?: number }) => (s?.total_price ?? 0) > 0)
               const productsStepNum = stegNr(docType === 'contract' ? 'contract' : 'offer', 'tjanster')
               const objectStepNum = stegNr(docType === 'contract' ? 'contract' : 'offer', 'innehall')
-              const targetStep = hasUsableProducts ? objectStepNum : productsStepNum
+              // ROT/RUT-mall: raderna och uppgifterna för avdraget görs i Tjänster
+              const targetStep = hasUsableProducts && !rotTypForMall(customerData.selectedTemplate) ? objectStepNum : productsStepNum
               console.log('Auto-selecting template and jumping to step:', targetStep, { hasUsableProducts })
               if (!hasUsableProducts) {
                 toast('Ärendet saknar prissatta tjänster – lägg till dem innan du går vidare', { icon: '🛒', duration: 5000 })
@@ -790,6 +844,12 @@ export default function OneflowContractCreator() {
         const template = offerTemplates.find(t => t.id === value)
         if (template && template.category) {
           updated.partyType = template.category as 'company' | 'individual'
+        }
+        // ROT/RUT-mallen har egen text: den automatiska texten skrivs om vid mallbyte
+        if (prev.agreementText.trim() === '' || prev.agreementText === autoOffertTextRef.current) {
+          const forslag = skrivForslagFranTjanster(updated) ?? ''
+          updated.agreementText = forslag
+          autoOffertTextRef.current = forslag
         }
       }
 
@@ -1115,6 +1175,8 @@ export default function OneflowContractCreator() {
     // Manuellt läge: kräv minst en tjänst (item_type='service') i draftItems
     if (currentStep === productsStep) {
       if (rabattUtanMotivering) return false
+      // ROT/RUT-mall: listan "Kvar innan du kan gå vidare" måste vara tom
+      if (rotMall && rotTjansterBrister.length > 0) return false
       // ROT/RUT: både ROT och RUT, avdrag på en tjänst som inte är arbetstid,
       // eller ett avdrag som mallen inte tillåter (src/shared/rotRutDokument.ts)
       if (rotRutFelText) return false
@@ -1123,8 +1185,11 @@ export default function OneflowContractCreator() {
       }
       return wizardData.draftItems.some(i => i.item_type === 'service')
     }
-    // Avtalsobjekt
-    if (currentStep === agreementStep) return wizardData.agreementText.length > 0
+    // Avtalsobjekt (ROT/RUT-mall: texten får inte nämna den andra avdragstypen)
+    if (currentStep === agreementStep) {
+      if (rotMall && rotBrister.some(b => b.kod === 'fritext')) return false
+      return wizardData.agreementText.length > 0
+    }
     // Granskning
     if (currentStep === reviewStep) return true
 
@@ -1150,8 +1215,12 @@ export default function OneflowContractCreator() {
       if (saknarOmfattning) return 'Välj vilka enheter avtalet omfattar'
       return ''
     }
+    if (currentStep === agreementStep && rotMall) {
+      return rotBrister.find(b => b.kod === 'fritext')?.text ?? ''
+    }
     if (currentStep === productsStep) {
       if (rabattUtanMotivering) return 'Skriv en motivering till rabatten i prisguiden'
+      if (rotMall && rotTjansterBrister.length > 0) return rotTjansterBrister[0].text
       if (wizardData.case_id) {
         if (!wizardData.prefillServices || wizardData.prefillServices.length === 0) return 'Lägg till minst en tjänst på ärendet'
         return rotRutFelText
@@ -1180,6 +1249,51 @@ export default function OneflowContractCreator() {
     rotRutRader,
     mallAvdrag ? { avdrag: mallAvdrag, namn: selectedTemplate?.name.replace(/\s*[\u2013\u2014]\s*/g, ', ') } : null
   )
+
+  // --- ROT/RUT-mall (3.127.0) --------------------------------------------------
+  // Mallen är ROT eller RUT: fyra kundrader, avdraget på arbetskostnaden inkl.
+  // moms, fastighet och personnummer. Samma regler och belopp som servern och
+  // fakturan (src/shared/rotRutOffert.ts). Övriga mallar påverkas inte.
+  const rotMall: Avdrag | null = wizardData.documentType === 'offer' ? mallensTyp(selectedTemplate?.deduction ?? null) : null
+  const rotKallRader: CaseBillingItemWithRelations[] = wizardData.case_id ? wizardData.caseItems : wizardData.draftItems
+  const rotTjanstRader = rotKallRader
+    .filter(i => i.item_type === 'service')
+    .map(i => ({
+      id: i.id,
+      roll: rollForKod(i.service_code ?? i.service?.code ?? null),
+      service_name: i.service_name,
+      total_price: Number(i.total_price || 0),
+      vat_rate: i.vat_rate,
+      rot_rut_type: i.rot_rut_type ?? null,
+      house_work_hours: i.house_work_hours ?? null,
+    }))
+  const rotArtikelRader = rotKallRader
+    .filter(i => i.item_type === 'article')
+    .map(a => ({
+      id: a.id,
+      article_id: a.article_id,
+      namn: a.article_name,
+      category: a.article?.category ?? null,
+      mappadMot: (wizardData.case_id ? null : wizardData.draftPriceAssignments[a.id]) || a.mapped_service_id || null,
+      rot_rut_type: a.rot_rut_type ?? null,
+      quantity: Number(a.quantity || 0),
+    }))
+  const rotBrister: RotRutBrist[] = rotMall
+    ? rotRutBrister({
+        mall: rotMall,
+        partTyp: wizardData.partyType,
+        personnummer: wizardData['org-nr'],
+        fastighet: wizardData.rotFastighet,
+        tjanster: rotTjanstRader,
+        artiklar: rotArtikelRader,
+        fritext: wizardData.agreementText,
+      })
+    : []
+  // Offertinnehållet kontrolleras i sitt eget steg och i granskningen
+  const rotTjansterBrister = rotBrister.filter(b => b.kod !== 'fritext')
+  const rotSammanstallning = rotMall ? sammanstallRotRut(rotTjanstRader, rotMall) : null
+  const uppdateraRotFastighet = (patch: Partial<RotFastighet>) =>
+    setWizardData(prev => ({ ...prev, rotFastighet: { ...prev.rotFastighet, ...patch } }))
 
   // Leads (Webb): kopplar en skickad offert till webbförfrågan som guiden öppnades från.
   // Anropas först när offerten publicerats; utkast och avtal kopplas aldrig.
@@ -1273,6 +1387,7 @@ export default function OneflowContractCreator() {
     ...avtalsKontroll,
     ...(saknarOmfattning ? [{ niva: 'rod' as const, text: 'Välj vilka enheter avtalet omfattar', avsnitt: 'motpart' as const }] : []),
     ...(rotRutFelText ? [{ niva: 'rod' as const, text: rotRutFelText, avsnitt: 'tjanster' as const }] : []),
+    ...rotBrister.map(b => ({ niva: 'rod' as const, text: b.text, avsnitt: (b.kod === 'fritext' ? 'avtalsobjekt' : 'tjanster') as KontrollAvsnitt })),
   ]
   const kontrollStoppar = harStopp(kontrollPunkter)
 
@@ -1290,6 +1405,14 @@ export default function OneflowContractCreator() {
   }
 
   const handleSubmit = async () => {
+    // ROT/RUT-mall: samma lista som i Tjänster stoppar (servern kontrollerar igen)
+    if (rotMall && rotBrister.length > 0) {
+      const text = rotBrister.map(b => b.text).join('. ')
+      setSubmitError(text)
+      setSubmitErrorStep(rotBrister.some(b => b.kod !== 'fritext') ? productsStep : agreementStep)
+      toast.error(text)
+      return
+    }
     // ROT/RUT-felet stoppar även här (servern kontrollerar igen innan Oneflow)
     if (rotRutFelText) {
       setSubmitError(rotRutFelText)
@@ -1333,7 +1456,29 @@ export default function OneflowContractCreator() {
       ? wizardData.prefillServices
       : wizardData.draftItems.filter(i => i.item_type === 'service')
     ).find(r => r.rot_rut_type)
-    const fastighetsbeteckning = rotRutRow?.fastighetsbeteckning || ''
+    // ROT/RUT-mall: fastigheten från fälten i Tjänster (servern skriver texten till Oneflow)
+    const rf = wizardData.rotFastighet
+    const fastighetsbeteckning = rotMall
+      ? fastighetText({ brf: rf.brf, fastighetsbeteckning: rf.fastighetsbeteckning, brfOrgNr: rf.brfOrgNr, lagenhetsnummer: rf.lagenhetsnummer })
+      : rotRutRow?.fastighetsbeteckning || ''
+
+    // ROT/RUT-mall från ett ärende: fastigheten sparas också på ärendets arbetsrad,
+    // så att fakturan har den även om ärendet faktureras utan Boka in
+    if (rotMall && wizardData.case_id) {
+      const arbetsrad = wizardData.caseItems.find(i => i.item_type === 'service' && rollForKod(i.service_code ?? i.service?.code ?? null) === 'arbete')
+      if (arbetsrad) {
+        const { error: fastighetFel } = await supabase
+          .from('case_billing_items')
+          .update({
+            fastighetsbeteckning: rf.brf ? null : rf.fastighetsbeteckning.trim() || null,
+            brf_org_number: rf.brf ? rf.brfOrgNr.trim() || null : null,
+            apartment_number: rf.brf ? rf.lagenhetsnummer.trim() || null : null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', arbetsrad.id)
+        if (fastighetFel) console.warn('[wizard] Fastigheten kunde inte sparas på ärendets arbetsrad:', fastighetFel.message)
+      }
+    }
 
     // Samma formatering som när fälten lämnas, ifall något förifyllts och aldrig fått fokus
     const kontakt = snyggaTillKontakt(wizardData)
@@ -1394,6 +1539,23 @@ export default function OneflowContractCreator() {
           partyType: wizardData.partyType,
           documentType: wizardData.documentType,
           fastighetsbeteckning, // Endast offerter använder fältet (hanteras i API:t)
+          // ROT/RUT-mall (3.127.0): fastigheten och de interna kostnaderna för serverns kontroll
+          ...(rotMall ? {
+            rotRut: {
+              brf: rf.brf,
+              fastighetsbeteckning: rf.brf ? null : rf.fastighetsbeteckning.trim(),
+              brfOrgNr: rf.brf ? rf.brfOrgNr.trim() : null,
+              lagenhetsnummer: rf.brf ? rf.lagenhetsnummer.trim() : null,
+            },
+            rotRutArtiklar: rotArtikelRader.map(a => ({
+              id: a.id,
+              article_id: a.article_id,
+              article_name: a.namn,
+              mapped_to: a.mappadMot,
+              rot_rut_type: a.rot_rut_type,
+              quantity: a.quantity,
+            })),
+          } : {}),
           caseId: wizardData.case_id, // Skicka case_id för webhook-koppling
           leadId: wizardData.lead_id || null,
           senderEmail: user?.email,
@@ -1437,6 +1599,7 @@ export default function OneflowContractCreator() {
                 notes: null,
                 rot_rut_type: s.rot_rut_type ?? null,
                 fastighetsbeteckning: s.fastighetsbeteckning ?? null,
+                house_work_hours: rotMall ? (wizardData.caseItems.find(c => c.id === s.id)?.house_work_hours ?? null) : null,
                 mapped_service_id: null,
                 // ROT/RUT-arbetsraden pekar på sin tjänsterad (draft_id); servern pekar om till de nya id:na
                 labor_for_item_id: s.labor_for_item_id ?? null,
@@ -1462,7 +1625,8 @@ export default function OneflowContractCreator() {
                 notes: i.notes,
                 rot_rut_type: i.rot_rut_type,
                 fastighetsbeteckning: i.fastighetsbeteckning ?? null,
-                mapped_service_id: i.mapped_service_id,
+                house_work_hours: i.house_work_hours ?? null,
+                mapped_service_id: (rotMall && i.item_type === 'article' ? wizardData.draftPriceAssignments[i.id] : null) || i.mapped_service_id,
                 // ROT/RUT-arbetsraden pekar på tjänsteradens lokala id (draft_id). Servern pekar
                 // om till de nya id:na, så att kopplingen följer med till Boka in och fakturan
                 labor_for_item_id: i.labor_for_item_id ?? null,
@@ -1726,6 +1890,218 @@ export default function OneflowContractCreator() {
         <Sparkles className="w-4 h-4" aria-hidden="true" />
         Skriv förslag från tjänsterna
       </button>
+    )
+  }
+
+  // --- ROT/RUT-mall: introt, fälten och listan över det som saknas (3.127.0) ---
+
+  const rotGuideLank = () => {
+    const role = profile?.role || 'admin'
+    const prefix = role === 'koordinator' ? '/koordinator' : role === 'technician' ? '/technician' : role === 'säljare' ? '/saljare' : '/admin'
+    const slug = role === 'technician' ? ROT_RUT_GUIDE_SLUG_TEKNIKER : ROT_RUT_GUIDE_SLUG
+    return `${prefix}/intranat/dokument/${slug}`
+  }
+
+  const renderRotIntro = () => {
+    if (!rotMall) return null
+    return (
+      <div className="flex gap-2.5 items-start rounded-[10px] border border-[#20c58f]/25 bg-[#20c58f]/[0.08] px-3.5 py-3 text-sm text-slate-200 leading-relaxed">
+        <Icon name="allman.hus" className="w-[18px] h-[18px] text-[#20c58f] shrink-0 mt-0.5" />
+        <span>
+          {introText(rotMall)}{' '}
+          <span className="inline-flex align-middle">
+            <InfoKnapp rubrik={INTRO_HJALP.rubrik} etikett="Hur fungerar det?">
+              <ul className="list-disc pl-4 grid gap-0.5">
+                {INTRO_HJALP.punkter.map(p => <li key={p}>{p}</li>)}
+              </ul>
+              <a href={rotGuideLank()} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-block font-semibold text-[#5fe0b4] underline underline-offset-2">
+                Hela guiden: {ROT_RUT_GUIDE_TITEL}
+              </a>
+            </InfoKnapp>
+          </span>
+          <span className="sr-only"> Hur fungerar det?</span>
+        </span>
+      </div>
+    )
+  }
+
+  /** Fältet eller raden som rättar bristen */
+  const rotBristMal = (kod: BristKod): string => {
+    if (kod === 'fastighet') return wizardData.rotFastighet.brf ? 'rot-brf-org' : 'rot-fastighet'
+    if (kod === 'personnummer' || kod === 'privat') return 'rot-pnr'
+    if (kod === 'fritext') return 'avtalsobjekt'
+    return 'rot-rader'
+  }
+  const gaTillBrist = (kod: BristKod) => {
+    const el = document.getElementById(rotBristMal(kod))
+    if (!el) return
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.focus()
+  }
+
+  const renderRotPanel = () => {
+    if (!rotMall || !rotSammanstallning) return null
+    const f = wizardData.rotFastighet
+    const fastighetFel = !f.brf && !!f.fastighetsbeteckning.trim() && !giltigFastighetsbeteckning(f.fastighetsbeteckning)
+    const brfFel = f.brf && !!f.brfOrgNr.trim() && !giltigtOrgNr(f.brfOrgNr)
+    const pnr = wizardData['org-nr']
+    const pnrFel = !!pnr.replace(/\D/g, '') && !giltigtPersonnummer(pnr)
+    const s = rotSammanstallning
+    const klara: Array<{ text: string; ok: boolean }> = [
+      { text: `Arbetstid med ${rotMall}`, ok: !rotTjansterBrister.some(b => b.kod === 'arbete' || b.kod === 'arbete_ej_avdrag') },
+      { text: 'Alla interna kostnader ligger på en rad', ok: !rotTjansterBrister.some(b => b.kod === 'mappning') },
+      { text: f.brf ? 'Föreningens org.nr och lägenhetsnummer' : 'Fastighetsbeteckning ifylld', ok: !rotTjansterBrister.some(b => b.kod === 'fastighet') },
+      { text: 'Personnummer ifyllt', ok: !rotTjansterBrister.some(b => b.kod === 'personnummer' || b.kod === 'privat') },
+    ]
+    const ovriga = rotTjansterBrister.filter(b => !['arbete', 'arbete_ej_avdrag', 'mappning', 'fastighet', 'personnummer', 'privat'].includes(b.kod))
+    return (
+      <div className={`${CARD_CLASS} p-4 sm:p-6 flex flex-col gap-5`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
+          <div className="flex flex-col gap-[7px]">
+            <span className="flex items-center gap-1.5 text-[13px] font-bold text-slate-300">
+              <label htmlFor={f.brf ? 'rot-brf-org' : 'rot-fastighet'}>{f.brf ? 'Bostadsrätt' : 'Fastighetsbeteckning'}</label>
+              <InfoKnapp rubrik={FASTIGHET_HJALP.rubrik} etikett="Om fastighetsbeteckning">{FASTIGHET_HJALP.text}</InfoKnapp>
+            </span>
+            {f.brf ? (
+              <div className="grid grid-cols-[1fr_120px] gap-2">
+                <input
+                  id="rot-brf-org"
+                  className={`${FIELD_CLASS} ${brfFel ? '!border-amber-500' : ''}`}
+                  value={f.brfOrgNr}
+                  onChange={e => uppdateraRotFastighet({ brfOrgNr: e.target.value })}
+                  placeholder="Föreningens org.nr"
+                  aria-label="Föreningens org.nr"
+                />
+                <input
+                  id="rot-lgh"
+                  className={FIELD_CLASS}
+                  value={f.lagenhetsnummer}
+                  onChange={e => uppdateraRotFastighet({ lagenhetsnummer: e.target.value })}
+                  placeholder="Lgh-nr"
+                  aria-label="Lägenhetsnummer"
+                />
+              </div>
+            ) : (
+              <input
+                id="rot-fastighet"
+                className={`${FIELD_CLASS} ${fastighetFel ? '!border-amber-500' : ''}`}
+                value={f.fastighetsbeteckning}
+                onChange={e => uppdateraRotFastighet({ fastighetsbeteckning: e.target.value })}
+                placeholder="Kommun område 1:23"
+              />
+            )}
+            <span className={`text-xs ${fastighetFel || brfFel ? 'text-amber-400' : 'text-slate-400'}`}>
+              {f.brf ? (brfFel ? 'Föreningens org.nr ska ha 10 siffror.' : FALT_UNDERTEXT.brf) : FALT_UNDERTEXT.fastighet}
+            </span>
+            <label className="flex items-center gap-2 text-sm text-slate-300 min-h-[32px]">
+              <input
+                type="checkbox"
+                checked={f.brf}
+                onChange={e => uppdateraRotFastighet({ brf: e.target.checked })}
+                className="w-4 h-4 rounded border-slate-500 text-[#20c58f] focus:ring-[#20c58f]"
+              />
+              Bostadsrätt
+            </label>
+          </div>
+          <div className="flex flex-col gap-[7px]">
+            <span className="flex items-center gap-1.5 text-[13px] font-bold text-slate-300">
+              <label htmlFor="rot-pnr">Personnummer</label>
+              <InfoKnapp rubrik={PERSONNUMMER_HJALP.rubrik} etikett="Om personnummer">{PERSONNUMMER_HJALP.text}</InfoKnapp>
+            </span>
+            <input
+              id="rot-pnr"
+              inputMode="numeric"
+              className={`${FIELD_CLASS} ${pnrFel ? '!border-amber-500' : ''}`}
+              value={pnr}
+              onChange={e => andraIdNummer(e.target.value)}
+              placeholder="ÅÅÅÅMMDD-XXXX"
+            />
+            <span className={`text-xs ${pnrFel ? 'text-amber-400' : 'text-slate-400'}`}>
+              {pnrFel ? 'Personnumret ska ha 12 siffror och inte vara ett org.nr.' : FALT_UNDERTEXT.personnummer}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid gap-1.5 rounded-[10px] bg-slate-800/60 p-3">
+          <span className="text-[11.5px] uppercase tracking-[0.08em] text-slate-400">{KVAR_RUBRIK}</span>
+          {klara.map((k, i) => {
+            const brist = k.ok ? null : rotTjansterBrister.find(b => {
+              if (i === 0) return b.kod === 'arbete' || b.kod === 'arbete_ej_avdrag'
+              if (i === 1) return b.kod === 'mappning'
+              if (i === 2) return b.kod === 'fastighet'
+              return b.kod === 'personnummer' || b.kod === 'privat'
+            })
+            return (
+              <div key={k.text} className="flex items-start gap-2 text-sm">
+                <Icon
+                  name={k.ok ? 'allman.bock' : 'allman.saknas'}
+                  className={`w-[18px] h-[18px] shrink-0 mt-px ${k.ok ? 'text-[#20c58f]' : 'text-amber-400'}`}
+                />
+                {k.ok || !brist ? (
+                  <span className={k.ok ? 'text-slate-300' : 'text-white'}>{k.text}</span>
+                ) : (
+                  <button type="button" onClick={() => gaTillBrist(brist.kod)} className="text-left text-white underline decoration-slate-500 underline-offset-2 hover:decoration-[#20c58f]">
+                    {brist.text}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+          {ovriga.map(b => (
+            <div key={b.kod} className="flex items-start gap-2 text-sm">
+              <Icon name="allman.saknas" className="w-[18px] h-[18px] shrink-0 mt-px text-amber-400" />
+              <button type="button" onClick={() => gaTillBrist(b.kod)} className="text-left text-white underline decoration-slate-500 underline-offset-2 hover:decoration-[#20c58f]">
+                {b.text}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-sm text-slate-300">
+          Att betala efter avdrag: <strong className="text-white tabular-nums">{fmtSEK(s.attBetala)}</strong>
+          <span className="text-slate-400"> (totalt {fmtSEK(s.totaltInkl)} inkl. moms, {rotMall}-avdrag {fmtSEK(s.avdrag)})</span>
+        </p>
+      </div>
+    )
+  }
+
+  /** Granskningen och sidokortet: samma rader och belopp som Oneflow-dokumentet */
+  const renderRotPrisrader = () => {
+    if (!rotMall || !rotSammanstallning) return null
+    const s = rotSammanstallning
+    const f = wizardData.rotFastighet
+    const fastighet = fastighetText({ brf: f.brf, fastighetsbeteckning: f.fastighetsbeteckning, brfOrgNr: f.brfOrgNr, lagenhetsnummer: f.lagenhetsnummer })
+    return (
+      <div className="flex flex-col gap-2">
+        {s.avser && <p className="text-[15px] text-slate-300">{avserText(s.avser)}</p>}
+        <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1.2fr)] text-[15px] border-t border-slate-700">
+          <span className="py-2.5 text-[13px] text-slate-400">Tjänst</span>
+          <span className="py-2.5 text-[13px] text-slate-400 text-right">Antal</span>
+          <span className="py-2.5 text-[13px] text-slate-400 text-right">Pris inkl. moms</span>
+          {s.rader.length === 0 && (
+            <span className="col-span-3 py-2.5 border-t border-slate-700/60 text-red-400">Inga rader med pris</span>
+          )}
+          {s.rader.map(r => (
+            <React.Fragment key={r.roll}>
+              <span className="py-2.5 border-t border-slate-700/60 text-white">{r.namn}</span>
+              <span className="py-2.5 border-t border-slate-700/60 text-right text-white tabular-nums">1</span>
+              <span className="py-2.5 border-t border-slate-700/60 text-right text-white tabular-nums">{fmtSEK(r.belopp)}</span>
+            </React.Fragment>
+          ))}
+          <span className="py-2.5 border-t border-slate-600 font-bold text-white">Totalt inkl. moms</span>
+          <span className="py-2.5 border-t border-slate-600" />
+          <span className="py-2.5 border-t border-slate-600 text-right font-bold text-white tabular-nums">{fmtSEK(s.totaltInkl)}</span>
+          <span className="py-2 text-[#20c58f]">{s.typ}-avdrag {s.procent} %</span>
+          <span />
+          <span className="py-2 text-right text-[#20c58f] tabular-nums">-{fmtSEK(s.avdrag)}</span>
+          <span className="py-2.5 border-t border-slate-600 font-bold text-white">Att betala</span>
+          <span className="py-2.5 border-t border-slate-600" />
+          <span className="py-2.5 border-t border-slate-600 text-right font-bold text-white tabular-nums">{fmtSEK(s.attBetala)}</span>
+        </div>
+        <p className="text-[13px] text-slate-400">
+          {f.brf ? 'Bostadsrätt' : 'Fastighetsbeteckning'}: <span className="text-slate-200">{fastighet || 'saknas'}</span>
+        </p>
+      </div>
     )
   }
 
@@ -2049,7 +2425,9 @@ export default function OneflowContractCreator() {
       case 'tjanster': {
         const hasCaseLink = !!wizardData.case_id
         return (
-          <div className={`${CARD_CLASS} p-4 sm:p-6`}>
+          <>
+          {rotMall && renderRotIntro()}
+          <div id="rot-rader" className={`${CARD_CLASS} p-4 sm:p-6`}>
             {hasCaseLink ? (
               <CaseServiceSelector
                 allowedDeduction={mallAvdrag}
@@ -2061,7 +2439,7 @@ export default function OneflowContractCreator() {
                   const services = mapBillingItemsToPrefillServices(items)
                   const articles = mapBillingItemsToSelectedArticles(items)
                   setWizardData(prev => {
-                    const next = { ...prev, prefillServices: services, selectedArticles: articles }
+                    const next = { ...prev, prefillServices: services, selectedArticles: articles, caseItems: items }
                     // Offertinnehållet följer tjänsterna så länge det är
                     // den automatiska texten (eller tomt). Egen text rörs inte.
                     if (
@@ -2097,6 +2475,8 @@ export default function OneflowContractCreator() {
               />
             )}
           </div>
+          {rotMall && renderRotPanel()}
+          </>
         )
       }
 
@@ -2288,6 +2668,7 @@ export default function OneflowContractCreator() {
               <span className="text-lg font-bold text-white">Produkter och pris</span>
               {andra(productsStep)}
             </div>
+            {rotMall ? renderRotPrisrader() : (
             <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1.2fr)] text-[15px] border-t border-slate-700">
               <span className="py-2.5 text-[13px] text-slate-400">Produkt</span>
               <span className="py-2.5 text-[13px] text-slate-400 text-right">Antal</span>
@@ -2306,6 +2687,7 @@ export default function OneflowContractCreator() {
               <span className="py-2.5 border-t border-slate-600" />
               <span className="py-2.5 border-t border-slate-600 text-right font-bold text-white tabular-nums">{fmtSEK(serviceTotal)}</span>
             </div>
+            )}
           </section>
 
           <p className="border-t border-slate-700 pt-4 text-[13px] text-slate-400">
@@ -2601,11 +2983,17 @@ export default function OneflowContractCreator() {
         klar: maxReachedStep > begoneStep && !!avtalslangdText,
       },
     ] : []),
-    {
-      namn: isContract ? 'Årspremie' : 'Pris',
-      text: `${fmtSEK(prisData.serviceTotal)} exkl. moms`,
-      klar: prisData.serviceTotal > 0,
-    },
+    rotSammanstallning
+      ? {
+          namn: 'Pris',
+          text: `${fmtSEK(rotSammanstallning.attBetala)} att betala efter ${rotSammanstallning.typ}-avdrag, totalt ${fmtSEK(rotSammanstallning.totaltInkl)} inkl. moms`,
+          klar: rotSammanstallning.totaltInkl > 0,
+        }
+      : {
+          namn: isContract ? 'Årspremie' : 'Pris',
+          text: `${fmtSEK(prisData.serviceTotal)} exkl. moms`,
+          klar: prisData.serviceTotal > 0,
+        },
     {
       namn: isContract ? 'Avtalsobjekt' : 'Offertinnehåll',
       text: `${wizardData.agreementText.length.toLocaleString('sv-SE')} tecken`,

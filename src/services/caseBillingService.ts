@@ -33,6 +33,7 @@ import {
 import { PriceListService } from './priceListService'
 import { DEFAULT_ROT_PERCENT, DEFAULT_RUT_PERCENT } from '../utils/rotRutConstants'
 import { selectInvoiceableCaseRows, caseInvoiceSubtotal } from '../shared/caseInvoiceRows'
+import { arRotRutRadmodell, fakturaAvdrag, type Avdrag } from '../shared/rotRutOffert'
 
 /** Ärendetabellen per fakturatyp (billing_status ligger på ärendet). */
 const CASE_TABLE_BY_TYPE: Record<BillableCaseType, 'private_cases' | 'business_cases' | 'cases'> = {
@@ -750,7 +751,14 @@ export class CaseBillingService {
       return sum + calculateVatAmount(item.total_price, item.vat_rate)
     }, 0)
     const requiresApproval = items.some(item => item.requires_approval)
-    const rotRutDeduction = items.reduce((sum, item) => {
+    // ROT/RUT-offertens radmodell (3.127.0): avdraget som i offerten och på
+    // fakturan, på arbetsraden inkl. moms i hela kronor. Interna kostnader med
+    // avdrag (arbetstiden) räknas inte en gång till. Övriga ärenden som förut.
+    const rotRad = items.find(i => i.item_type === 'service' && (i.rot_rut_type === 'ROT' || i.rot_rut_type === 'RUT'))
+    const radmodellAvdrag = rotRad && arRotRutRadmodell(items)
+      ? fakturaAvdrag(items.filter(i => i.item_type === 'service'), rotRad.rot_rut_type as Avdrag).avdrag
+      : null
+    const rotRutDeduction = radmodellAvdrag ?? items.reduce((sum, item) => {
       if (!item.rot_rut_type) return sum
       // För tjänsterader: använd servicens override om den finns
       if (item.item_type === 'service') {
@@ -910,7 +918,7 @@ export class CaseBillingService {
   ): Promise<string[]> {
     const { data, error } = await supabase
       .from('case_billing_items')
-      .select('service_name, article_name, rot_rut_type, fastighetsbeteckning')
+      .select('service_name, article_name, rot_rut_type, fastighetsbeteckning, brf_org_number, apartment_number')
       .eq('case_id', caseId)
       .eq('case_type', caseType)
       .eq('item_type', 'service')
@@ -918,8 +926,10 @@ export class CaseBillingService {
 
     if (error) throw new Error(`Databasfel: ${error.message}`)
 
+    // Bostadsrätt (3.127.0): föreningens org.nr och lägenhetsnummer räcker
     return (data || [])
       .filter(row => !row.fastighetsbeteckning || String(row.fastighetsbeteckning).trim() === '')
+      .filter(row => !(String(row.brf_org_number ?? '').trim() && String(row.apartment_number ?? '').trim()))
       .map(row => row.service_name || row.article_name || 'Tjänst')
   }
 

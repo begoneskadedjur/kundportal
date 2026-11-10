@@ -499,6 +499,12 @@ export const KontorDetalj = forwardRef<KontorDetaljRef, Props>(function KontorDe
       <span id="kontor-detalj-rubrik" className="sr-only">{namn}</span>
 
       {huvud}
+      {o.rot_rut_mismatch && (
+        <p role="alert" className="mx-4 lg:mx-5 mt-4 flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3.5 py-3 text-sm text-red-300">
+          <Icon name="rapport.avvikelse" size={16} className="shrink-0 mt-0.5" />
+          <span>{o.rot_rut_mismatch} Rätta i Oneflow eller skapa offerten igen innan den bokas in.</span>
+        </p>
+      )}
       {nastaRuta}
 
       <div className="px-4 lg:px-5 pt-5 pb-4">

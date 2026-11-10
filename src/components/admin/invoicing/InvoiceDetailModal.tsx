@@ -49,6 +49,8 @@ import type { InvoiceWithItems, InvoiceStatus, InvoiceItem } from '../../../type
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
 import { ROT_RUT_PERCENT } from '../../../types/caseBilling'
 import { calculateRotRutSummary } from '../../../utils/rotRutConstants'
+import { fakturaArRadmodell, fakturaAvdrag } from '../../../shared/rotRutOffert'
+import RotRutFakturaRuta from './RotRutFakturaRuta'
 import type { CaseBillingItem } from '../../../types/caseBilling'
 import { useCaseContext } from '../../../hooks/useCaseContext'
 import DateField from '../../ui/DateField'
@@ -834,7 +836,7 @@ export default function InvoiceDetailModal({
       toast.success('Faktura exporterad')
     } catch (error) {
       console.error('Kunde inte exportera:', error)
-      toast.error('Kunde inte exportera faktura')
+      toast.error(invoice.rot_rut_type && error instanceof Error ? error.message : 'Kunde inte exportera faktura')
     }
   }
 
@@ -966,7 +968,7 @@ export default function InvoiceDetailModal({
     if ((pulse.overdueTotal ?? 0) > 0) {
       blockers.push({ label: `${formatInvoiceAmount(pulse.overdueTotal ?? 0)} förfallet hos kunden`, severe: true })
     }
-    if (invoice.rot_rut_type && !invoice.fastighetsbeteckning) {
+    if (invoice.rot_rut_type && !invoice.fastighetsbeteckning && !(invoice.brf_org_number && invoice.apartment_number)) {
       blockers.push({ label: 'fastighetsbeteckning saknas för ROT/RUT' })
     }
     // Förfallodatum är preliminärt före sändning (sätts om vid sändningen till
@@ -1486,7 +1488,10 @@ export default function InvoiceDetailModal({
                 {/* Summering */}
                 <div className="bg-slate-800/50 rounded-lg p-3">
                   {(() => {
-                    const rotRutDeduction = calculateRotRutSummary(invoice.items).totalDeduction
+                    // ROT/RUT-offertens radmodell (3.127.0): samma avdrag som offerten
+                    const rotRutDeduction = invoice.rot_rut_type && fakturaArRadmodell(invoice.items)
+                      ? (invoice.rot_rut_asked_amount ?? fakturaAvdrag(invoice.items, invoice.rot_rut_type).avdrag)
+                      : calculateRotRutSummary(invoice.items).totalDeduction
                     return (
                       <div className="space-y-1.5">
                         {!isPrivate && (
@@ -1526,10 +1531,12 @@ export default function InvoiceDetailModal({
                   })()}
                 </div>
 
-                {/* ROT/RUT att ansöka om — framträdande ruta */}
+                {/* ROT/RUT (3.127.0): typ, personnummer maskerat, fastighet, timmar,
+                    avdrag mot Fortnox, kontroller och begäran hos Skatteverket */}
+                {invoice.rot_rut_type && <RotRutFakturaRuta invoice={invoice} onChanged={loadInvoice} />}
                 {(() => {
                   const rotRutDeduction = calculateRotRutSummary(invoice.items).totalDeduction
-                  if (rotRutDeduction <= 0) return null
+                  if (invoice.rot_rut_type || rotRutDeduction <= 0) return null
                   return (
                     <div className="bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">

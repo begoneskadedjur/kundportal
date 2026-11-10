@@ -792,7 +792,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       prefillArticles,
       prefillServices,
       deductionType,
-      customTotalPrice
+      customTotalPrice,
+      // ROT/RUT-mallen (3.127.0) förifyller fastighetsbeteckningen från ärendet
+      rotFastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning
+        || (currentCase as unknown as { r_fastighetsbeteckning?: string | null }).r_fastighetsbeteckning
+        || ''
     }));
 
     // Navigera till avtalskaparen med rollbaserad route

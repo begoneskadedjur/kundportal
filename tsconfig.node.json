@@ -74,6 +74,7 @@
     "src/utils/contractLifecycle.ts",
     // ROT/RUT-spärren och arbetsradernas koppling (create-contract), mallens avdrag
     "src/shared/rotRutDokument.ts",
+    "src/shared/rotRutOffert.ts",
     "src/constants/oneflowTemplates.ts",
 
     // Upphandlingsportalen: radtyper och rena regler (matchning, dedup,

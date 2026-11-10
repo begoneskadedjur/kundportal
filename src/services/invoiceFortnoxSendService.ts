@@ -38,6 +38,8 @@ import { invoiceWorkAddress } from '../shared/invoiceWorkAddress'
 import { InvoiceDeliveryService } from './invoiceDeliveryService'
 import { toFortnoxDeliveryType, isInvoiceDeliveryMethod } from '../shared/invoiceDelivery'
 import { buildFortnoxInvoiceRows, fortnoxText, type InvoiceAddonLine, type InvoiceItemLike } from '../shared/invoiceAddonLines'
+import { fakturaArRadmodell, fakturaAvdrag, fakturaBrister, fastighetText, type Avdrag } from '../shared/rotRutOffert'
+import { workAddressText } from '../shared/invoiceWorkAddress'
 import { createSystemComment } from './communicationService'
 import { fetchInvoiceVisit, type VisitSnapshot } from '../hooks/useInvoiceVisit'
 import { fetchInvoiceAddonLines } from '../hooks/useInvoiceAddons'
@@ -453,6 +455,12 @@ export async function sendInvoiceToFortnox(invoiceId: string, opts: FortnoxSendO
     // 1 000 kr inkl. moms (utkast 890, 2026-09-03). Privatpersoner får
     // därför inkl-priser + VATIncluded=true, företag exkl-priser + false.
     const vatIncluded = isPrivatePerson
+    // ROT/RUT (3.127.0): bostadsrätt (föreningens org.nr + lägenhetsnummer) i
+    // stället för fastighetsbeteckning, och ROT/RUT-offertens radmodell där
+    // arbetsraden heter Arbetskostnad och bär timmarna
+    const rotTyp: Avdrag | null = invoice.rot_rut_type === 'ROT' || invoice.rot_rut_type === 'RUT' ? invoice.rot_rut_type : null
+    const rotBrf = !!String(invoice.brf_org_number ?? '').trim() && !!String(invoice.apartment_number ?? '').trim()
+    const rotRadmodell = !!rotTyp && fakturaArRadmodell(itemsForSend)
     // Raderna byggs i src/shared/invoiceAddonLines.ts (enhetstestad):
     // textrader (index_note) som ren Description, ROT/RUT per rad.
     // Tilläggsrader får perioden som textrad under raden, arbetstiden
@@ -462,6 +470,8 @@ export async function sendInvoiceToFortnox(invoiceId: string, opts: FortnoxSendO
       fastighetsbeteckning: invoice.fastighetsbeteckning,
       addonLines,
       splitAddonRows,
+      husarbete: !!rotTyp && rotBrf,
+      hoppaOverNollrader: rotRadmodell,
     })
 
     // 4. Skapa faktura i Fortnox
@@ -490,6 +500,37 @@ export async function sendInvoiceToFortnox(invoiceId: string, opts: FortnoxSendO
       deliveryDateObj && !Number.isNaN(deliveryDateObj.getTime())
         ? toLocalISOStringWithOffset(deliveryDateObj).slice(0, 10)
         : undefined
+
+    // ROT/RUT: saknas något som Skatteverket kräver stoppas fakturan här, före
+    // Fortnox. Avdraget tas aldrig bort i tysthet (3.127.0).
+    const rotPlats = workAddressText(caseMetaEarly?.address)
+    if (rotTyp) {
+      const brister = fakturaBrister({
+        typ: rotTyp,
+        privat: isPrivatePerson,
+        personnummer: invoice.organization_number,
+        fastighet: {
+          brf: rotBrf,
+          fastighetsbeteckning: invoice.fastighetsbeteckning,
+          brfOrgNr: invoice.brf_org_number ?? null,
+          lagenhetsnummer: invoice.apartment_number ?? null,
+        },
+        utforandeAdress: rotPlats,
+        utforandeDatum: deliveryDate ?? null,
+        harArbetsrad: itemsForSend.some(i => i.rot_rut_type === rotTyp && Number(i.total_price) > 0),
+      })
+      if (brister.length > 0) {
+        return fail(`${rotTyp}-fakturan kan inte skickas: ${brister.join('. ')}. Rätta det på ärendet eller fakturan och försök igen.`)
+      }
+      // Plats, datum och fastighet som textrader, så att kunden och Skatteverket ser dem
+      const fastighetRad = rotBrf
+        ? fastighetText({ brf: true, brfOrgNr: invoice.brf_org_number, lagenhetsnummer: invoice.apartment_number })
+        : `Fastighetsbeteckning: ${String(invoice.fastighetsbeteckning ?? '').trim()}`
+      invoiceRows.push(
+        { Description: fortnoxText(`Utfört ${deliveryDate} på ${rotPlats}`).slice(0, 200) },
+        { Description: fortnoxText(fastighetRad).slice(0, 200) },
+      )
+    }
 
     const fortnoxPayload: Record<string, unknown> = {
       CustomerNumber: fortnoxCustomerNumber,
@@ -573,7 +614,7 @@ export async function sendInvoiceToFortnox(invoiceId: string, opts: FortnoxSendO
     // ROT/RUT: fakturanivån bär bara typen ('rot'/'rut'); raderna är
     // flaggade i steg 3, och fastighetsbeteckning + avdragsbelopp
     // registreras via taxreductions-resursen efter att fakturan skapats.
-    if (invoice.rot_rut_type && invoice.fastighetsbeteckning) {
+    if (invoice.rot_rut_type && (invoice.fastighetsbeteckning || rotBrf)) {
       fortnoxPayload.TaxReductionType = invoice.rot_rut_type.toLowerCase()
     }
 
@@ -589,20 +630,45 @@ export async function sendInvoiceToFortnox(invoiceId: string, opts: FortnoxSendO
     // 4b. Registrera ROT/RUT-avdraget (fastighetsbeteckning) mot fakturan.
     // Fel här får inte stoppa flödet — fakturan finns redan i Fortnox;
     // admin kompletterar avdraget manuellt om registreringen misslyckas.
-    if (invoice.rot_rut_type && invoice.fastighetsbeteckning) {
+    if (invoice.rot_rut_type && (invoice.fastighetsbeteckning || rotBrf)) {
+      // Begärt avdrag: radmodellen räknar som offerten (hela kronor, nedåt),
+      // äldre fakturor som förut. Belopp, Fortnox egen uträkning och ev. fel
+      // sparas på fakturan och visas i fakturamodalen.
+      const begart = rotRadmodell && rotTyp
+        ? fakturaAvdrag(itemsForSend, rotTyp).avdrag
+        : Math.round(calculateRotRutSummary(invoice.items).totalDeduction)
+      const fortnoxAvdrag = Number((fortnoxInvoice as unknown as { TaxReduction?: number | string | null }).TaxReduction)
       try {
-        const rotRutSummary = calculateRotRutSummary(invoice.items)
         await FortnoxService.createTaxReduction({
-          asked_amount: rotRutSummary.totalDeduction,
+          asked_amount: begart,
           customer_name: invoice.customer_name,
-          property_designation: invoice.fastighetsbeteckning,
+          // Bostadsrätt: lägenhetsnumret är beteckningen, föreningens org.nr skickas separat
+          property_designation: rotBrf ? String(invoice.apartment_number) : String(invoice.fastighetsbeteckning),
           document_number: fortnoxInvoice.DocumentNumber,
           social_security_number: isPrivatePerson ? invoice.organization_number : null,
+          residence_association_org_nr: rotBrf ? invoice.brf_org_number : null,
         })
+        await supabase
+          .from('invoices')
+          .update({
+            rot_rut_asked_amount: begart,
+            rot_rut_fortnox_amount: Number.isFinite(fortnoxAvdrag) ? fortnoxAvdrag : null,
+            rot_rut_error: null,
+          })
+          .eq('id', invoice.id)
       } catch (trErr: any) {
         console.error('TaxReduction-registrering misslyckades:', trErr)
+        const felText = String(trErr?.message ?? 'okänt fel').slice(0, 500)
+        await supabase
+          .from('invoices')
+          .update({
+            rot_rut_asked_amount: begart,
+            rot_rut_fortnox_amount: Number.isFinite(fortnoxAvdrag) ? fortnoxAvdrag : null,
+            rot_rut_error: felText,
+          })
+          .eq('id', invoice.id)
         notify.error(
-          `Fakturan skapades (nr ${fortnoxInvoice.DocumentNumber}) men ROT/RUT-avdraget kunde inte registreras automatiskt — komplettera fastighetsbeteckningen i Fortnox. (${trErr?.message ?? 'okänt fel'})`
+          `Fakturan skapades (nr ${fortnoxInvoice.DocumentNumber}) men ROT/RUT-avdraget kunde inte registreras automatiskt. Felet syns i fakturan. Komplettera avdraget i Fortnox. (${felText})`
         )
       }
     }

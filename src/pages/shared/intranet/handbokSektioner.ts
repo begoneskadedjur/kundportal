@@ -69,8 +69,8 @@ export const HANDBOK_SEKTIONER: HandbokSektion[] = [
     text: 'Offerter, avtal för signering och leads, från tipset till vunnen affär.',
     ikon: 'dok.offert',
     slugs: [
-      'guide-skapa-avtal-offert', 'guide-skapa-avtalsforslag', 'guide-dokumentsignering-tekniker', 'guide-min-kundresa', 'guide-leads-tekniker',
-      'guide-dokumentsignering-saljare', 'guide-skapa-avtalsforslag-kontor', 'guide-leads-saljare',
+      'guide-skapa-avtal-offert', 'guide-rot-rut-offert-tekniker', 'guide-skapa-avtalsforslag', 'guide-dokumentsignering-tekniker', 'guide-min-kundresa', 'guide-leads-tekniker',
+      'guide-dokumentsignering-saljare', 'guide-skapa-avtalsforslag-kontor', 'guide-rot-rut-offert-kontor', 'guide-leads-saljare',
       'guide-dokumentsignering', 'guide-boka-in', 'guide-leads-kontor',
     ],
   },

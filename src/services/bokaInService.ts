@@ -506,7 +506,13 @@ export function formularFalt(u: BokaInUnderlag, typ: BokaInArendetyp): Record<st
     ...(u.ansvarigTeknikerId ? { primary_assignee_id: u.ansvarigTeknikerId } : {}),
   }
   if (typ === 'private') {
-    const fastighet = u.rader.find((x) => x.fastighetsbeteckning)?.fastighetsbeteckning ?? str(r.r_fastighetsbeteckning)
+    // ROT/RUT-offert (3.127.0): bostadsrätt har föreningens org.nr och lägenhetsnummer i
+    // stället för fastighetsbeteckning. Raderna (house_work_hours, rot_rut_type,
+    // brf_org_number, apartment_number, mapped_service_id) följer med i flyttaOffertRader.
+    const brfRad = u.rader.find((x) => str(x.rad.brf_org_number))
+    const fastighet = u.rader.find((x) => x.fastighetsbeteckning)?.fastighetsbeteckning
+      ?? (brfRad ? `Bostadsrätt, föreningens org.nr ${str(brfRad.rad.brf_org_number)}, lägenhet ${str(brfRad.rad.apartment_number) ?? ''}` : null)
+      ?? str(r.r_fastighetsbeteckning)
     return {
       ...bas,
       ...(urTabell === 'private_cases' && str(r.personnummer) ? { personnummer: str(r.personnummer) } : {}),

@@ -19,6 +19,7 @@ import { calculateInvoiceTotals, calculateDueDate, deriveInvoiceCaseType } from 
 import { CaseBillingService } from './caseBillingService'
 import { PaymentTermsService } from './paymentTermsService'
 import { selectInvoiceableCaseRows, caseInvoiceSubtotal, isZeroAmount } from '../shared/caseInvoiceRows'
+import { arPrivatpersonsNummer, arRotRutRadmodell, fakturaAvdrag, fakturaRadIRadmodell, type Avdrag } from '../shared/rotRutOffert'
 
 // ─── ROT/RUT-arbetsrader ──────────────────────────────────────────────────
 // Privatärenden: arbetskostnaden för ROT/RUT ligger på en egen rad (tjänst
@@ -32,6 +33,12 @@ type InvoiceSourceRow = {
   article_name: string
   rot_rut_type?: string | null
   fastighetsbeteckning?: string | null
+  /** ROT/RUT i bostadsrätt (3.127.0) */
+  brf_org_number?: string | null
+  apartment_number?: string | null
+  service_code?: string | null
+  house_work_hours?: number | null
+  vat_rate?: number | null
   total_price: number
   labor_for_item_id?: string | null
   service?: { rot_eligible?: boolean | null; rut_eligible?: boolean | null } | null
@@ -79,10 +86,16 @@ function rotRutRowsTotal(items: InvoiceSourceRow[]): number {
  * EditCaseModal.handleCreateOffer). Kastar ett fel med begriplig text,
  * anroparen visar det som toast ("Faktura: ...").
  */
-function assertRotRutInvoiceable(items: InvoiceSourceRow[], customPrice: number | null): void {
-  // Fastighetsbeteckning krävs av Skatteverket, annars går avdraget inte att skicka till Fortnox
+function assertRotRutInvoiceable(
+  items: InvoiceSourceRow[],
+  customPrice: number | null,
+  ctx: { caseType?: string | null; idNummer?: string | null } = {}
+): void {
+  // Fastighetsbeteckning krävs av Skatteverket, annars går avdraget inte att skicka till Fortnox.
+  // Bostadsrätt (3.127.0): föreningens org.nr och lägenhetsnummer räcker i stället.
+  const harBrf = (i: InvoiceSourceRow) => !!String(i.brf_org_number ?? '').trim() && !!String(i.apartment_number ?? '').trim()
   const missingFastighet = items
-    .filter(i => i.rot_rut_type && (!i.fastighetsbeteckning || String(i.fastighetsbeteckning).trim() === ''))
+    .filter(i => i.rot_rut_type && (!i.fastighetsbeteckning || String(i.fastighetsbeteckning).trim() === '') && !harBrf(i))
     .map(i => i.service_name || i.article_name || 'Tjänst')
   if (missingFastighet.length > 0) {
     throw new Error(
@@ -94,6 +107,20 @@ function assertRotRutInvoiceable(items: InvoiceSourceRow[], customPrice: number 
   const hasRut = items.some(i => i.rot_rut_type === 'RUT')
   if (hasRot && hasRut) {
     throw new Error('Ärendet har både ROT och RUT. Dela upp i separata ärenden innan fakturan skapas.')
+  }
+  // Bara privatpersoner kan få ROT eller RUT (3.127.0). Ett saknat personnummer
+  // stoppar först när fakturan skickas till Fortnox; ett org.nr stoppar här.
+  if (hasRot || hasRut) {
+    if (ctx.caseType && ctx.caseType !== 'private') {
+      throw new Error('ROT och RUT gäller bara privatpersoner. Ta bort avdraget eller fakturera ärendet som privat.')
+    }
+    const nr = String(ctx.idNummer ?? '').trim()
+    if (nr && !arPrivatpersonsNummer(nr)) {
+      throw new Error(`ROT och RUT gäller bara privatpersoner, men fakturan har numret ${nr}, som inte är ett personnummer.`)
+    }
+    if (customPrice && arRotRutRadmodell(items)) {
+      throw new Error('Ärendet har ROT/RUT-offertens rader och kan inte ha ett anpassat pris. Ta bort det anpassade priset, priset står på raderna.')
+    }
   }
   const misplaced = items.filter(i =>
     (!i.item_type || i.item_type === 'service') &&
@@ -244,7 +271,14 @@ export class InvoiceService {
     // ROT/RUT-spärrar: fastighetsbeteckning, inte både ROT och RUT, avdrag bara
     // på arbetstidstjänster, anpassat pris inte lägre än arbetskostnaden.
     // Före alla skrivningar så att ingen halv faktura skapas.
-    assertRotRutInvoiceable(billingItems, customPrice)
+    assertRotRutInvoiceable(billingItems, customPrice, { caseType, idNummer: customerInfo.organization_number ?? null })
+
+    // ROT/RUT-offertens radmodell (3.127.0): arbetsraden bär avdrag och timmar,
+    // ärendets tjänst är rubrik (textrad), kundraderna heter som i offerten
+    const radmodell = !customPrice && arRotRutRadmodell(billingItems)
+    const rotRad = billingItems.find(i => i.rot_rut_type)
+    const rotTyp = (rotRad?.rot_rut_type === 'ROT' || rotRad?.rot_rut_type === 'RUT' ? rotRad.rot_rut_type : null) as Avdrag | null
+    const brfRad = billingItems.find(i => i.rot_rut_type && i.brf_org_number)
 
     // Beräkna summor — anpassat pris eller standard
     let subtotal: number
@@ -313,6 +347,10 @@ export class InvoiceService {
         due_date: calculateDueDate(paymentTermsDays),
         rot_rut_type: billingItems.find(i => i.rot_rut_type)?.rot_rut_type || null,
         fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null,
+        // ROT/RUT (3.127.0): bostadsrätt och begärt avdrag. Bara när värdet finns,
+        // så att fakturor utan ROT/RUT skrivs som förut.
+        ...(brfRad ? { brf_org_number: brfRad.brf_org_number, apartment_number: brfRad.apartment_number ?? null } : {}),
+        ...(radmodell && rotTyp ? { rot_rut_asked_amount: fakturaAvdrag(billingItems, rotTyp).avdrag } : {}),
         invoice_marking: customerInfo.invoice_marking || null,
         invoice_type: invoiceType,
         visit_id: invoiceVisitId
@@ -398,6 +436,7 @@ export class InvoiceService {
           ? (item.service_code || item.article_code)
           : item.article_code
 
+        const rm = radmodell && item.item_type === 'service' ? fakturaRadIRadmodell(item) : null
         const { data: invoiceItem, error: itemError } = await supabase
           .from('invoice_items')
           .insert({
@@ -405,14 +444,17 @@ export class InvoiceService {
             case_billing_item_id: item.id,
             article_id: item.item_type === 'service' ? null : item.article_id,
             article_code: displayCode,
-            article_name: displayName,
+            article_name: rm ? rm.namn : displayName,
             quantity: item.quantity,
             unit_price: item.unit_price,
             discount_percent: item.discount_percent,
             total_price: item.total_price,
             vat_rate: item.vat_rate,
             rot_rut_type: item.rot_rut_type || null,
-            fastighetsbeteckning: item.fastighetsbeteckning || null
+            fastighetsbeteckning: item.fastighetsbeteckning || null,
+            // ROT/RUT: timmarna till Fortnox, och rubriken Avser som textrad
+            ...(item.rot_rut_type && item.house_work_hours != null ? { house_work_hours: item.house_work_hours } : {}),
+            ...(rm?.textrad ? { line_kind: 'index_note' } : {}),
           })
           .select()
           .single()
@@ -928,6 +970,10 @@ export class InvoiceService {
     for (const id of invoiceIds) {
       const invoice = await this.getInvoiceWithItems(id)
       if (!invoice) continue
+      // ROT/RUT (3.127.0): husarbete, timmar och avdrag följer inte med i CSV
+      if (invoice.rot_rut_type) {
+        throw new Error(`${invoice.invoice_number || 'Fakturan'} har ${invoice.rot_rut_type} och kan inte exporteras som CSV. Tryck Skapa utkast i Fortnox i fakturan.`)
+      }
 
       for (const item of invoice.items) {
         rows.push([
@@ -1072,7 +1118,11 @@ export class InvoiceService {
       : null
 
     // ROT/RUT-spärrar innan raderna raderas (samma som createInvoiceFromCase)
-    assertRotRutInvoiceable(billingItems, customPrice)
+    assertRotRutInvoiceable(billingItems, customPrice, { caseType: invoice.case_type, idNummer: invoice.organization_number })
+    const radmodell = !customPrice && arRotRutRadmodell(billingItems)
+    const rotRad = billingItems.find(i => i.rot_rut_type)
+    const rotTyp = (rotRad?.rot_rut_type === 'ROT' || rotRad?.rot_rut_type === 'RUT' ? rotRad.rot_rut_type : null) as Avdrag | null
+    const brfRad = billingItems.find(i => i.rot_rut_type && i.brf_org_number)
 
     // Radera befintliga invoice_items
     const { error: deleteError } = await supabase
@@ -1142,7 +1192,8 @@ export class InvoiceService {
             case_billing_item_id: item.id,
             article_id: item.article_id,
             article_code: item.article_code,
-            article_name: laborRowName(item, billingItems) ?? (item.item_type === 'service'
+            article_name: (radmodell && item.item_type === 'service' ? fakturaRadIRadmodell(item).namn : null)
+              ?? laborRowName(item, billingItems) ?? (item.item_type === 'service'
               ? appendCustomerArticleSpec(item.service_name || item.article_name, buildCustomerArticleSpec(item.id, specArticles))
               : item.article_name),
             quantity: item.quantity,
@@ -1151,7 +1202,9 @@ export class InvoiceService {
             total_price: item.total_price,
             vat_rate: item.vat_rate,
             rot_rut_type: item.rot_rut_type || null,
-            fastighetsbeteckning: item.fastighetsbeteckning || null
+            fastighetsbeteckning: item.fastighetsbeteckning || null,
+            ...(item.rot_rut_type && item.house_work_hours != null ? { house_work_hours: item.house_work_hours } : {}),
+            ...(radmodell && item.item_type === 'service' && fakturaRadIRadmodell(item).textrad ? { line_kind: 'index_note' } : {}),
           })
           .select()
           .single()
@@ -1182,7 +1235,9 @@ export class InvoiceService {
         total_amount,
         requires_approval: billingItems.some(item => item.requires_approval),
         rot_rut_type: billingItems.find(i => i.rot_rut_type)?.rot_rut_type || null,
-        fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null
+        fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null,
+        ...(brfRad ? { brf_org_number: brfRad.brf_org_number, apartment_number: brfRad.apartment_number ?? null } : {}),
+        ...(radmodell && rotTyp ? { rot_rut_asked_amount: fakturaAvdrag(billingItems, rotTyp).avdrag } : {}),
       })
       .eq('id', invoiceId)
     if (updateError) throw new Error(`Databasfel: ${updateError.message}`)

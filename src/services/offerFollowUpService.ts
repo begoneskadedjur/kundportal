@@ -127,6 +127,8 @@ export interface FollowUpOffer {
   contact_email: string | null
   contact_phone: string | null
   total_value: number | null
+  /** ROT/RUT-offert (3.127.0): Oneflows produkter stämmer inte med portalens rader (webhooken) */
+  rot_rut_mismatch?: string | null
   begone_employee_name: string | null
   begone_employee_email: string | null
   created_at: string
@@ -238,7 +240,7 @@ const OFFER_COLUMNS = `
   begone_employee_email, created_at, updated_at, hidden_by, source_id, source_type,
   customer_id, status_updated_at, signing_deadline, customer_first_viewed_at,
   email_delivery_failed_at, quote_reference_number, template_id,
-  created_by_name, created_by_email, booked_case_id, signed_at
+  created_by_name, created_by_email, booked_case_id, signed_at, rot_rut_mismatch
 `
 
 const EMPTY_KPIS: FollowUpKPIs = {

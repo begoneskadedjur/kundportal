@@ -97,6 +97,12 @@ export interface CaseBillingItem {
   notes: string | null
   rot_rut_type: RotRutType | null
   fastighetsbeteckning: string | null
+  /** ROT/RUT (3.127.0): timmar till Skatteverket via Fortnox. Visas aldrig för kunden. */
+  house_work_hours?: number | null
+  /** ROT/RUT i bostadsrätt: föreningens org.nr */
+  brf_org_number?: string | null
+  /** ROT/RUT i bostadsrätt: lägenhetsnummer */
+  apartment_number?: string | null
   min_quantity: number | null
   /** För artikel-rader: case_billing_items.id för tjänsteraden som artikeln är mappad mot via Prisguiden. */
   mapped_service_id: string | null
@@ -203,6 +209,10 @@ export interface AddCaseServiceInput {
   labor_for_item_id?: string | null
   rot_rut_type?: RotRutType | null
   fastighetsbeteckning?: string | null
+  /** ROT/RUT-offert (3.127.0): timmar och bostadsrätt */
+  house_work_hours?: number | null
+  brf_org_number?: string | null
+  apartment_number?: string | null
   /** Motivering till rabatten (krävs när discount_percent > 0) */
   discount_motivation?: string | null
 }
@@ -216,6 +226,9 @@ export interface UpdateCaseArticleInput {
   notes?: string
   rot_rut_type?: RotRutType | null
   fastighetsbeteckning?: string | null
+  house_work_hours?: number | null
+  brf_org_number?: string | null
+  apartment_number?: string | null
   min_quantity?: number | null
   mapped_service_id?: string | null
   /** Kundpris per enhet (t.ex. omräknat efter mängdrabatt vid nytt antal) */

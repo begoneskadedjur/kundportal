@@ -8,6 +8,10 @@ import {
 import { identityNumberVariants } from '../../src/shared/contractSigning'
 import { delaArbetsrader, mallensAvdrag, rotRutFel, type MallAvdrag } from '../../src/shared/rotRutDokument'
 import { getTemplateById } from '../../src/constants/oneflowTemplates'
+import {
+  avserText, fastighetText, prisText, rollForKod, rotRutBrister, sammanstallRotRut, timmarForArbete,
+  type Avdrag, type KontrollArtikel, type OffertTjanstRad, type RotRutSammanstallning,
+} from '../../src/shared/rotRutOffert'
 // Node.js 18+ har inbyggd fetch
 
 interface ContractRequestBody {
@@ -100,7 +104,28 @@ interface ContractRequestBody {
     discount_motivation?: string | null
     /** Ärendets rad rabatten kommer från: godkännandet ärvs om den är godkänd med samma procent */
     discount_source_item_id?: string | null
+    /** ROT/RUT-offert (3.127.0): servern räknar om timmarna själv, värdet ignoreras */
+    house_work_hours?: number | null
   }>
+  /** ROT/RUT-mall (3.127.0): fastigheten eller bostadsrätten */
+  rotRut?: {
+    brf?: boolean
+    fastighetsbeteckning?: string | null
+    brfOrgNr?: string | null
+    lagenhetsnummer?: string | null
+  } | null
+  /**
+   * ROT/RUT-mall: de interna kostnaderna och vilken rad de är mappade mot
+   * (draft_id). Bara för kontrollen här, sparas inte härifrån.
+   */
+  rotRutArtiklar?: Array<{
+    id: string
+    article_id?: string | null
+    article_name?: string | null
+    mapped_to?: string | null
+    rot_rut_type?: 'ROT' | 'RUT' | null
+    quantity: number
+  }> | null
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -356,7 +381,9 @@ export default async function handler(
     draftItems,
     customerId: valdKundId,
     siteIds,
-    coversAllSites
+    coversAllSites,
+    rotRut,
+    rotRutArtiklar,
   } = req.body as ContractRequestBody
 
   // Validera användaren
@@ -443,6 +470,101 @@ export default async function handler(
       if (fel) {
         return res.status(400).json({ message: fel, detail: fel, code: 'rot_rut' })
       }
+    }
+  }
+
+  // ROT/RUT-mall (3.127.0): offerten byggs av fyra fasta kundrader (Arbetskostnad,
+  // Material och utrustning, Servicebil, Övriga kostnader) inkl. moms, ärendets
+  // tjänst är rubrik på 0 kr. Samma regler som wizarden (src/shared/rotRutOffert.ts).
+  // Servern slår upp tjänsternas koder och artiklarnas kategorier själv och
+  // räknar om belopp, avdrag och timmar; klientens produkter används inte.
+  let rotRutPlan: {
+    typ: Avdrag
+    sammanstallning: RotRutSammanstallning
+    fastighet: { brf: boolean; fastighetsbeteckning: string | null; brfOrgNr: string | null; lagenhetsnummer: string | null }
+    /** draft_id → kolumner som servern sätter på raden */
+    radFalt: Map<string, { rot_rut_type: Avdrag | null; house_work_hours: number | null; fastighetsbeteckning: string | null; brf_org_number: string | null; apartment_number: string | null }>
+  } | null = null
+  {
+    const mallDb = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!)
+    const { data: mallRad } = await mallDb
+      .from('oneflow_templates')
+      .select('deduction_type')
+      .eq('oneflow_template_id', String(templateId ?? ''))
+      .maybeSingle()
+    const dbTyp = (mallRad as { deduction_type?: string | null } | null)?.deduction_type
+    const mallTyp: Avdrag | null = dbTyp === 'ROT' || dbTyp === 'RUT'
+      ? dbTyp
+      : mallRad ? null : (getTemplateById(String(templateId ?? ''))?.deduction ?? null)
+    if (mallTyp) {
+      const tjanstRader = (Array.isArray(draftItems) ? draftItems : []).filter(i => i && i.item_type === 'service')
+      const tjanstIds = Array.from(new Set(tjanstRader.map(r => r.service_id).filter((id): id is string => typeof id === 'string' && UUID_RE.test(id))))
+      const artiklarIn = Array.isArray(rotRutArtiklar) ? rotRutArtiklar : []
+      const artikelIds = Array.from(new Set(artiklarIn.map(a => a.article_id).filter((id): id is string => typeof id === 'string' && UUID_RE.test(id))))
+      const [{ data: katalog }, { data: artikelKatalog }] = await Promise.all([
+        tjanstIds.length > 0
+          ? mallDb.from('services').select('id, code').in('id', tjanstIds)
+          : Promise.resolve({ data: [] as Array<{ id: string; code: string }> }),
+        artikelIds.length > 0
+          ? mallDb.from('articles').select('id, category').in('id', artikelIds)
+          : Promise.resolve({ data: [] as Array<{ id: string; category: string }> }),
+      ])
+      const kodFor = new Map(((katalog ?? []) as Array<{ id: string; code: string }>).map(s => [s.id, s.code]))
+      const kategoriFor = new Map(((artikelKatalog ?? []) as Array<{ id: string; category: string }>).map(a => [a.id, a.category]))
+
+      const artiklar: KontrollArtikel[] = artiklarIn.map(a => ({
+        id: String(a.id),
+        namn: a.article_name || 'Intern kostnad',
+        category: a.article_id ? kategoriFor.get(a.article_id) ?? null : null,
+        mappadMot: a.mapped_to || null,
+        rot_rut_type: a.rot_rut_type === 'ROT' || a.rot_rut_type === 'RUT' ? a.rot_rut_type : null,
+        quantity: Number(a.quantity) || 0,
+      }))
+      const tjanster: OffertTjanstRad[] = tjanstRader.map((r, idx) => ({
+        id: r.draft_id || `rad-${idx}`,
+        roll: r.service_id ? rollForKod(kodFor.get(r.service_id)) : null,
+        service_name: r.service_name ?? null,
+        total_price: Number(r.total_price) || 0,
+        vat_rate: r.vat_rate ?? 25,
+        rot_rut_type: r.rot_rut_type ?? null,
+      }))
+      const arbetsIds = new Set(tjanster.filter(t => t.roll === 'arbete').map(t => t.id))
+      const timmar = timmarForArbete(artiklar, arbetsIds, mallTyp)
+      const forstaArbete = tjanster.find(t => t.roll === 'arbete')
+      if (forstaArbete) forstaArbete.house_work_hours = timmar
+
+      const fastighet = {
+        brf: !!rotRut?.brf,
+        fastighetsbeteckning: rotRut?.fastighetsbeteckning?.trim() || null,
+        brfOrgNr: rotRut?.brfOrgNr?.trim() || null,
+        lagenhetsnummer: rotRut?.lagenhetsnummer?.trim() || null,
+      }
+      const brister = rotRutBrister({
+        mall: mallTyp,
+        partTyp: partyType,
+        personnummer: recipient?.organization_number || contractData?.['org-nr'] || '',
+        fastighet,
+        tjanster,
+        artiklar,
+        fritext: `${contractData?.['stycke-1'] ?? ''}${contractData?.['stycke-2'] ?? ''}`,
+      })
+      if (brister.length > 0) {
+        const fel = `Offerten kan inte skapas: ${brister.map(b => b.text).join('. ')}.`
+        return res.status(400).json({ message: fel, detail: fel, code: 'rot_rut', brister })
+      }
+
+      const radFalt = new Map<string, { rot_rut_type: Avdrag | null; house_work_hours: number | null; fastighetsbeteckning: string | null; brf_org_number: string | null; apartment_number: string | null }>()
+      for (const t of tjanster) {
+        const arArbete = t === forstaArbete
+        radFalt.set(t.id, {
+          rot_rut_type: t.roll === 'arbete' ? mallTyp : null,
+          house_work_hours: arArbete ? timmar : null,
+          fastighetsbeteckning: t.roll === 'arbete' ? (fastighet.brf ? null : fastighet.fastighetsbeteckning) : null,
+          brf_org_number: t.roll === 'arbete' && fastighet.brf ? fastighet.brfOrgNr : null,
+          apartment_number: t.roll === 'arbete' && fastighet.brf ? fastighet.lagenhetsnummer : null,
+        })
+      }
+      rotRutPlan = { typ: mallTyp, sammanstallning: sammanstallRotRut(tjanster, mallTyp), fastighet, radFalt }
     }
   }
 
@@ -540,7 +662,16 @@ export default async function handler(
     caseNumber
   ].filter(Boolean).join(' – ').slice(0, 130)
 
-  const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId, fastighetsbeteckning)
+  const data_fields = buildDataFieldsForDocument(
+    contractData,
+    documentType,
+    caseId,
+    rotRutPlan ? fastighetText(rotRutPlan.fastighet) : fastighetsbeteckning
+  )
+  // ROT/RUT: datafältet "pris" (finns i båda mallarna) med avdrag och att betala
+  if (rotRutPlan) {
+    data_fields.push({ custom_id: 'pris', value: prisText(rotRutPlan.sammanstallning) })
+  }
 
   // Bygg participant-objekt.
   // Kunden är ALLTID signerande part med rätt att fylla i fält, även när
@@ -574,7 +705,35 @@ export default async function handler(
 
   // Förbered produktgrupper om produkter finns
   let productGroups: any[] = []
-  if (selectedProducts && selectedProducts.length > 0) {
+  // ROT/RUT: rubriken "Avser" som produktgruppens namn. Avvisar Oneflow det
+  // försöker vi igen utan, med rubriken först i arbetsbeskrivningen (se nedan).
+  const avserRubrik = rotRutPlan ? avserText(rotRutPlan.sammanstallning.avser) : null
+  if (rotRutPlan) {
+    // Kundraderna inkl. moms, hela kronor, 1 st, låsta för kunden. Samma pris i
+    // båda kolumnerna (bara price_2 visas), så avtalets värde (wizardProductsValue,
+    // price_1 x antal) blir den synliga summan inkl. moms.
+    const s = rotRutPlan.sammanstallning
+    const pris = (belopp: number) => ({ base_amount: { amount: String(belopp) }, discount_amount: { amount: '0' } })
+    productGroups = [{
+      products: s.rader.map(r => ({
+        name: r.namn,
+        description: r.avdrag ? `${s.typ}-avdrag ${s.procent} %` : 'Inget avdrag',
+        price_1: pris(r.belopp),
+        price_2: pris(r.belopp),
+        quantity: { type: 'quantity', amount: 1 },
+        counterparty_lock: true,
+      })),
+      configuration: {
+        hide_price_summation: false,
+        counterpart_edit: false,
+        ...(avserRubrik ? { name: { enabled: true, label: avserRubrik } } : {}),
+        columns: [
+          { key: 'price_1', enabled: false, label: 'Pris' },
+          { key: 'price_2', enabled: true, label: 'Pris inkl. moms' },
+        ],
+      },
+    }]
+  } else if (selectedProducts && selectedProducts.length > 0) {
     const oneflowProducts = convertProductsToOneflow(selectedProducts, partyType)
     if (oneflowProducts.length > 0) {
       // Kolumnerna sätts här och gäller före mallens inställning (3.103.0).
@@ -627,6 +786,27 @@ export default async function handler(
 
     let createResponse = await doCreate(createPayload)
     let createdContract = await createResponse.json()
+
+    // ROT/RUT: avvisar Oneflow produktgruppens namn eller låsningen försöker vi
+    // en gång till utan dem. Rubriken "Avser" hamnar då först i arbetsbeskrivningen.
+    if (!createResponse.ok && rotRutPlan && createPayload.product_groups?.[0]?.configuration) {
+      const problem = JSON.stringify(createdContract.parameter_problems || createdContract.detail || '').toLowerCase()
+      if (problem.includes('configuration') || problem.includes('name') || problem.includes('counterpart')) {
+        console.warn('Oneflow avvisade produktgruppens rubrik eller låsning, försöker igen utan')
+        const restConfig = { ...createPayload.product_groups[0].configuration }
+        delete restConfig.name
+        delete restConfig.counterpart_edit
+        createPayload.product_groups = [{ ...createPayload.product_groups[0], configuration: restConfig }]
+        if (avserRubrik) {
+          const falt = (createPayload.data_fields as Array<{ custom_id: string; value: string }>)
+          const arb = falt.find(f => f.custom_id === 'arbetsbeskrivning')
+          if (arb) arb.value = `${avserRubrik}\n\n${arb.value}`
+          else falt.push({ custom_id: 'arbetsbeskrivning', value: avserRubrik })
+        }
+        createResponse = await doCreate(createPayload)
+        createdContract = await createResponse.json()
+      }
+    }
 
     // Fallback: om Oneflow avvisar just fastighetsbeteckning-fältet (t.ex. mall
     // utan fältet), försök en gång till utan det istället för att blockera offerten.
@@ -734,6 +914,22 @@ export default async function handler(
       // Numret vi skickade: jämförs med kundens värde vid signering (kunden kan
       // ändra fältet i Oneflow). Webhooken skriver aldrig kolumnen.
       sent_organization_number: recipient.organization_number || contractData?.['org-nr'] || null,
+    }
+
+    // ROT/RUT: raderna och beloppen som skickades, för webhookens kontroll mot
+    // Oneflow (contracts.rot_rut_mismatch). Inga personuppgifter och inga timmar.
+    if (rotRutPlan) {
+      const s = rotRutPlan.sammanstallning
+      upsertData.rot_rut_expected = {
+        typ: s.typ,
+        procent: s.procent,
+        avser: s.avser,
+        rader: s.rader.map(r => ({ namn: r.namn, belopp: r.belopp })),
+        totalt_inkl: s.totaltInkl,
+        avdrag: s.avdrag,
+        att_betala: s.attBetala,
+      }
+      upsertData.rot_rut_mismatch = null
     }
 
     // Vald kund: kopplingen och urvalet sparas direkt. Webhooken skriver aldrig
@@ -862,7 +1058,14 @@ export default async function handler(
         )
 
         // Hjälp-funktion för att bygga en insert-rad, med override på mapped_service_id
+        // ROT/RUT-mall: servern sätter avdrag, timmar och fastighet på tjänsteraderna
+        const rotRadFalt = (item: typeof validItems[number]) =>
+          rotRutPlan && item.item_type === 'service' && item.draft_id ? rotRutPlan.radFalt.get(item.draft_id) ?? null : null
         const buildRow = (item: typeof validItems[number], mappedServiceIdOverride: string | null) => ({
+          ...buildRowBase(item, mappedServiceIdOverride),
+          ...(rotRadFalt(item) ?? {}),
+        })
+        const buildRowBase = (item: typeof validItems[number], mappedServiceIdOverride: string | null) => ({
           case_id: contractRow.id,
           case_type: 'contract',
           customer_id: customerId || null,

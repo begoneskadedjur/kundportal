@@ -1,6 +1,10 @@
 // src/components/ui/TooltipWrapper.tsx - Återanvändbar tooltip-komponent
 // showOnFocus (tillval): tooltipen öppnas också när något i triggern får
 // tangentbordsfokus och stängs när fokus lämnar. Escape stänger alltid en öppen tooltip.
+// openOnClick (tillval, 3.127.0): rutan öppnas och stängs med tryck eller klick
+// på triggern, stängs vid tryck utanför och med Esc (fokus tillbaka till
+// triggern), och är klickbar så länge den är öppen. Hovring öppnar då inte.
+// Utan tillvalet fungerar komponenten exakt som förut.
 
 import React, { useState, useRef, useEffect } from 'react'
 import ReactDOM from 'react-dom'
@@ -16,6 +20,8 @@ interface TooltipWrapperProps {
   showOnFocus?: boolean
   /** Ersätter standardrutans klasser (bakgrund, padding, bredd) */
   panelClassName?: string
+  /** Öppna och stäng med tryck eller klick i stället för hovring; rutan är klickbar */
+  openOnClick?: boolean
 }
 
 export default function TooltipWrapper({
@@ -27,10 +33,12 @@ export default function TooltipWrapper({
   disabled = false,
   showOnFocus = false,
   panelClassName,
+  openOnClick = false,
 }: TooltipWrapperProps) {
   const [isVisible, setIsVisible] = useState(false)
   const [coords, setCoords] = useState({ x: 0, y: 0 })
   const triggerRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const timeoutRef = useRef<NodeJS.Timeout>()
 
   useEffect(() => {
@@ -45,11 +53,32 @@ export default function TooltipWrapper({
   useEffect(() => {
     if (!isVisible) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsVisible(false)
+      if (e.key === 'Escape') {
+        setIsVisible(false)
+        // Klickläget: fokus tillbaka till knappen som öppnade rutan
+        if (openOnClick) triggerRef.current?.querySelector<HTMLElement>('button, [tabindex]')?.focus()
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [isVisible])
+  }, [isVisible, openOnClick])
+
+  // Klickläget: tryck utanför triggern och rutan stänger
+  useEffect(() => {
+    if (!openOnClick || !isVisible) return
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      const t = e.target as Node | null
+      if (!t) return
+      if (triggerRef.current?.contains(t) || panelRef.current?.contains(t)) return
+      setIsVisible(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('touchstart', onDown)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('touchstart', onDown)
+    }
+  }, [openOnClick, isVisible])
 
   const show = (wait: number) => {
     if (disabled) return
@@ -109,7 +138,21 @@ export default function TooltipWrapper({
     zIndex: 99999,
   }
 
-  const focusProps = showOnFocus
+  const clickProps = openOnClick
+    ? {
+        onClick: (e: React.MouseEvent<HTMLDivElement>) => {
+          // Klick i rutan bubblar hit genom portalen: rutan ska vara klickbar, inte stängas
+          if (panelRef.current?.contains(e.target as Node)) return
+          if (isVisible) hide()
+          else show(0)
+        },
+      }
+    : {
+        onMouseEnter: handleMouseEnter,
+        onMouseLeave: hide,
+      }
+
+  const focusProps = showOnFocus && !openOnClick
     ? {
         onFocus: (e: React.FocusEvent<HTMLDivElement>) => {
           if ((e.target as HTMLElement).matches?.(':focus-visible')) show(0)
@@ -122,8 +165,7 @@ export default function TooltipWrapper({
     <>
       <div
         ref={triggerRef}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={hide}
+        {...clickProps}
         {...focusProps}
         className={`inline-block ${className}`}
       >
@@ -132,9 +174,10 @@ export default function TooltipWrapper({
 
       {isVisible && content && ReactDOM.createPortal(
         <div
+          ref={panelRef}
           style={tooltipStyle}
-          className="pointer-events-none"
-          role="tooltip"
+          className={openOnClick ? 'pointer-events-auto' : 'pointer-events-none'}
+          role={openOnClick ? 'dialog' : 'tooltip'}
         >
           <div className={panelClassName ?? 'bg-slate-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl border border-slate-700 max-w-sm whitespace-pre-line'}>
             {content}

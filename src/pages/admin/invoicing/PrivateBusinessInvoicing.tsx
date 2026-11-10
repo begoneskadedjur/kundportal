@@ -333,7 +333,13 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
     const source = selectedIds.length > 0
       ? invoices.filter(i => selectedIds.includes(i.id))
       : invoices
-    const idsToExport = source.filter(i => i.status === 'ready').map(i => i.id)
+    // ROT/RUT-fakturor (3.127.0) går inte via CSV: husarbetet, timmarna och
+    // avdraget kommer bara med när fakturan skickas från fakturan till Fortnox
+    const rotRut = source.filter(i => i.status === 'ready' && i.rot_rut_type)
+    const idsToExport = source.filter(i => i.status === 'ready' && !i.rot_rut_type).map(i => i.id)
+    if (rotRut.length > 0) {
+      toast.error(`${rotRut.length} ${rotRut.length === 1 ? 'faktura har' : 'fakturor har'} ROT eller RUT och exporteras inte. Öppna fakturan och tryck Skapa utkast i Fortnox.`, { duration: 8000 })
+    }
 
     if (idsToExport.length === 0) {
       toast.error('Inga fakturor med status Redo för Fortnox att exportera')
