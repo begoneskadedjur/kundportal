@@ -10,6 +10,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../../../lib/supabase'
 import { fetchAllRows } from '../../../../lib/fetchAllRows'
 import { addDaysIso, daysBetween, swedishDay } from '../../../../shared/invoiceSchedule'
+import { isRotRutAwaitingTaxAgency } from '../../../../shared/fortnoxInvoiceSync'
 import { Icon } from '../../../icons/Icon'
 import InvoiceDetailModal from '../InvoiceDetailModal'
 import { KpiRow, StatusText, type Kpi } from './QueueParts'
@@ -38,6 +39,9 @@ interface ArchiveInvoice {
   created_at: string
   is_historical: boolean | null
   contract_invoice_kind?: string | null
+  balance_due?: number | null
+  rot_rut_fortnox_amount?: number | null
+  rot_rut_claim_status?: string | null
 }
 
 type ArchiveState = 'paid' | 'overdue' | 'unpaid' | 'draft' | 'credited' | 'cancelled'
@@ -70,7 +74,7 @@ const KIND_LABEL: Record<string, string> = {
 }
 
 const SELECT =
-  'id, invoice_number, fortnox_document_number, customer_name, case_id, case_type, billing_period_start, billing_period_end, invoice_marking, subtotal, vat_amount, total_amount, due_date, status, paid_at, sent_at, booked_at, created_at, is_historical'
+  'id, invoice_number, fortnox_document_number, customer_name, case_id, case_type, billing_period_start, billing_period_end, invoice_marking, subtotal, vat_amount, total_amount, due_date, status, paid_at, sent_at, booked_at, created_at, is_historical, balance_due, rot_rut_fortnox_amount, rot_rut_claim_status'
 
 const chunks = <T,>(list: T[], size = 100): T[][] => {
   const out: T[][] = []
@@ -89,6 +93,8 @@ function stateOf(inv: ArchiveInvoice, today: string): { state: ArchiveState; ove
   if (inv.status === 'paid') return { state: 'paid', overdueDays: 0 }
   if (inv.status === 'draft') return { state: 'draft', overdueDays: 0 }
   const due = inv.due_date?.slice(0, 10)
+  // ROT/RUT där kunden betalat sin del: bara Skatteverkets del återstår
+  if (isRotRutAwaitingTaxAgency(inv)) return { state: 'unpaid', overdueDays: 0 }
   if (inv.status === 'overdue' || (due && due < today)) {
     return { state: 'overdue', overdueDays: due ? Math.max(0, daysBetween(due, today)) : 0 }
   }

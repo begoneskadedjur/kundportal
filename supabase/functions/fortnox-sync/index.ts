@@ -5,12 +5,23 @@
 //   - Cron-läge (POST utan body): pollar alla draft/sent-fakturor som inte uppdaterats senaste 30 min
 //   - Manuellt läge (POST med {invoice_number}): synkar bara den fakturan
 //
+// Speglar alltid saldo (balance_due), förfallodag och ROT/RUT-avdrag, och
+// makulerade fakturor blir cancelled (3.128.0). Efter en cron-körning
+// utvärderas betalningsspärren (evaluate_payment_blocks).
+//
 // Triggas av:
 //   - pg_cron varje minut via net.http_post
 //   - Manuellt från InvoiceDetailModal "Synka från Fortnox"-knapp
 
 // @ts-ignore Deno-import
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
+import {
+  decideFortnoxInvoiceSync,
+  fortnoxMirrorFields,
+  toPostgrestInList,
+  type FortnoxInvoiceSnapshot,
+  type FortnoxSyncTarget,
+} from './fortnoxInvoiceSync.ts'
 
 declare const Deno: {
   env: { get(key: string): string | undefined }
@@ -83,44 +94,13 @@ async function getValidAccessToken(): Promise<string> {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Sync-logik — porterad från api/fortnox/webhook.ts
+// Sync-logik — regeln ligger i fortnoxInvoiceSync.ts (kopia av
+// src/shared/fortnoxInvoiceSync.ts, samma regel som api/fortnox/webhook.ts)
 // ─────────────────────────────────────────────────────────────────────
-
-type TargetStatus = 'paid' | 'overdue' | 'sent' | 'booked'
-
-interface FortnoxInvoice {
-  Sent?: boolean
-  Booked?: boolean
-  Balance?: number
-  FinalPayDate?: string | null
-  DueDate?: string | null
-}
-
-function mapFortnoxStatus(invoice: FortnoxInvoice): { status: TargetStatus | null; timestamp: string } {
-  const now = new Date().toISOString()
-  const isPaid = invoice.Balance === 0 && invoice.FinalPayDate != null
-  const isSent = invoice.Sent === true
-  const isBooked = invoice.Booked === true
-  const dueDate = invoice.DueDate ? new Date(invoice.DueDate) : null
-  const isOverdue = isSent && !isPaid && dueDate != null && dueDate < new Date()
-
-  if (isPaid) return { status: 'paid', timestamp: new Date(invoice.FinalPayDate as string).toISOString() }
-  if (isOverdue) return { status: 'overdue', timestamp: now }
-  if (isSent) return { status: 'sent', timestamp: now }
-  if (isBooked) return { status: 'booked', timestamp: now }
-  return { status: null, timestamp: now }
-}
-
-const PROTECTED_BY_TARGET: Record<TargetStatus, string[]> = {
-  paid: ['paid', 'cancelled'],
-  overdue: ['paid', 'cancelled', 'overdue'],
-  sent: ['paid', 'cancelled', 'overdue', 'sent'],
-  booked: ['paid', 'cancelled', 'overdue', 'sent', 'booked', 'invoiced'],
-}
 
 interface SyncResult {
   documentNumber: string
-  fortnoxStatus: TargetStatus | null
+  fortnoxStatus: FortnoxSyncTarget | null
   invoicesUpdated: number
   contractItemsUpdated: number
   skipped?: string
@@ -139,47 +119,69 @@ async function syncFortnoxInvoice(documentNumber: string, accessToken: string): 
   }
 
   const data = await res.json()
-  const invoice = data.Invoice as FortnoxInvoice | undefined
+  const invoice = data.Invoice as FortnoxInvoiceSnapshot | undefined
   if (!invoice) {
     return { documentNumber, fortnoxStatus: null, invoicesUpdated: 0, contractItemsUpdated: 0, skipped: 'Inget Invoice-objekt' }
   }
 
-  const { status: targetStatus, timestamp } = mapFortnoxStatus(invoice)
+  // Avslagen ROT/RUT-begäran gör hela saldot till kundens skuld igen
+  const { data: claimRows } = await supabase
+    .from('invoices')
+    .select('rot_rut_claim_status')
+    .eq('fortnox_document_number', documentNumber)
+  const rotRutClaimStatus = ((claimRows ?? []) as { rot_rut_claim_status: string | null }[])
+    .map((r) => r.rot_rut_claim_status)
+    .find((s) => !!s) ?? null
+
+  const decision = decideFortnoxInvoiceSync(invoice, { rotRutClaimStatus })
+  const { status: targetStatus, timestamp } = decision
+
+  // Saldo, förfallodag och skattereduktion speglas alltid, oavsett statusskydd:
+  // en delbetalning ändrar saldot utan att ändra status, och betalningsspärren
+  // räknar på återstående skuld.
+  const mirror = fortnoxMirrorFields(decision)
+  if (Object.keys(mirror).length > 0) {
+    await supabase.from('invoices').update(mirror).eq('fortnox_document_number', documentNumber)
+  }
+
   if (!targetStatus) {
     return { documentNumber, fortnoxStatus: null, invoicesUpdated: 0, contractItemsUpdated: 0, skipped: 'draft i Fortnox' }
   }
 
-  const protectedStatuses = PROTECTED_BY_TARGET[targetStatus]
-  const protectedList = `(${protectedStatuses.map((s) => `"${s}"`).join(',')})`
+  const protectedList = toPostgrestInList(decision.protectedStatuses)
 
-  // contract_billing_items
-  const contractUpdate: Record<string, unknown> = { status: targetStatus, updated_at: new Date().toISOString() }
-  if (targetStatus === 'paid') contractUpdate.paid_at = timestamp
-  else if (targetStatus === 'overdue') contractUpdate.overdue_at = timestamp
-  else if (targetStatus === 'sent') contractUpdate.fortnox_sent_at = timestamp
-  else if (targetStatus === 'booked') contractUpdate.booked_at = timestamp
-
-  const { data: contractItems } = await supabase
-    .from('contract_billing_items')
-    .select('id')
-    .eq('fortnox_document_number', documentNumber)
-    .not('status', 'in', protectedList)
-
+  // contract_billing_items (makulering rör bara invoices-raden)
   let contractItemsUpdated = 0
-  if (contractItems && contractItems.length > 0) {
-    const ids = contractItems.map((i: { id: string }) => i.id)
-    await supabase.from('contract_billing_items').update(contractUpdate).in('id', ids)
-    contractItemsUpdated = ids.length
+  if (targetStatus !== 'cancelled') {
+    const contractUpdate: Record<string, unknown> = { status: targetStatus, updated_at: new Date().toISOString() }
+    if (targetStatus === 'paid') contractUpdate.paid_at = timestamp
+    else if (targetStatus === 'overdue') contractUpdate.overdue_at = timestamp
+    else if (targetStatus === 'sent') contractUpdate.fortnox_sent_at = timestamp
+    else if (targetStatus === 'booked') contractUpdate.booked_at = timestamp
+
+    const { data: contractItems } = await supabase
+      .from('contract_billing_items')
+      .select('id')
+      .eq('fortnox_document_number', documentNumber)
+      .not('status', 'in', protectedList)
+
+    if (contractItems && contractItems.length > 0) {
+      const ids = contractItems.map((i: { id: string }) => i.id)
+      await supabase.from('contract_billing_items').update(contractUpdate).in('id', ids)
+      contractItemsUpdated = ids.length
+    }
   }
 
-  // invoices (privat/företag) — stödjer alla statusar inkl. overdue
+  // invoices (privat/företag/avtal) — stödjer alla statusar inkl. overdue och cancelled
   let invoicesUpdated = 0
   {
     const invoiceUpdate: Record<string, unknown> = { status: targetStatus }
     if (targetStatus === 'paid') invoiceUpdate.paid_at = timestamp
-    else if (targetStatus === 'sent') invoiceUpdate.sent_at = timestamp
+    else if (targetStatus === 'sent' && !decision.rotRutCustomerPaid) invoiceUpdate.sent_at = timestamp
     else if (targetStatus === 'booked') invoiceUpdate.booked_at = timestamp
     else if (targetStatus === 'overdue') invoiceUpdate.overdue_at = timestamp
+    // ROT/RUT där kunden betalat sin del: inte längre förfallen för kunden
+    if (decision.rotRutCustomerPaid) invoiceUpdate.overdue_at = null
 
     const { data: invoiceRows } = await supabase
       .from('invoices')
@@ -198,7 +200,7 @@ async function syncFortnoxInvoice(documentNumber: string, accessToken: string): 
   // både bokförd och skickad mellan två synkar landar status direkt på
   // sent/overdue/paid och booked_at sattes aldrig — fyll i den i efterhand
   // (bara där den saknas, så en tidigare stämpel inte skrivs över).
-  if (invoice.Booked === true && targetStatus !== 'booked') {
+  if (invoice.Booked === true && targetStatus !== 'booked' && targetStatus !== 'cancelled') {
     await supabase.from('invoices')
       .update({ booked_at: timestamp })
       .eq('fortnox_document_number', documentNumber)
@@ -248,6 +250,19 @@ async function findStaleInvoices(): Promise<string[]> {
 
   for (const r of (contractRows ?? []) as PendingInvoice[]) {
     if (r.fortnox_document_number) docs.add(r.fortnox_document_number)
+  }
+
+  // Makulerade fakturor (cancelled i invoices) hämtas inte igen, även om en
+  // avtalsrad fortfarande pekar på samma Fortnox-nummer.
+  if (docs.size > 0) {
+    const { data: cancelledRows } = await supabase
+      .from('invoices')
+      .select('fortnox_document_number')
+      .eq('status', 'cancelled')
+      .in('fortnox_document_number', Array.from(docs))
+    for (const r of (cancelledRows ?? []) as PendingInvoice[]) {
+      docs.delete(r.fortnox_document_number)
+    }
   }
 
   return Array.from(docs)
@@ -366,6 +381,13 @@ Deno.serve(async (req: Request) => {
       checked: results.length,
       updated: results.filter((r) => r.invoicesUpdated + r.contractItemsUpdated > 0).length,
       results,
+    }
+
+    // Betalningsspärren räknar på saldot som just speglats. Fel här får aldrig
+    // fälla synken (pg_cron kör samma funktion var 15:e minut ändå).
+    if (!specificInvoice) {
+      const { error: blockErr } = await supabase.rpc('evaluate_payment_blocks')
+      if (blockErr) console.error('evaluate_payment_blocks:', blockErr.message)
     }
 
     console.log(`fortnox-sync: ${summary.mode} (${summary.auth}), checked ${summary.checked}, updated ${summary.updated}`)

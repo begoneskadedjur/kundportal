@@ -82,6 +82,10 @@ export interface Invoice {
   rot_rut_claim_date?: string | null
 
   fortnox_document_number: string | null
+  /** Kvar att betala enligt Fortnox (Balance), inklusive Skatteverkets del vid ROT/RUT */
+  balance_due?: number | null
+  /** Undantagen från betalningsspärren (3.128.0) */
+  payment_block_exempt?: boolean | null
   /** Leveransadressen som skickades till Fortnox (ärendets adress), null = ingen */
   delivery_address?: string | null
   /** Märkningen en tilläggsfaktura avser, en faktura per avtal, period, typ och märkning (steg 5, läses inte ännu) */

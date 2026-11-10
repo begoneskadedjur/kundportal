@@ -6,6 +6,12 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { getValidAccessToken } from './refresh'
 import { markMirrorMissing, upsertMirrorFromFortnoxCustomer } from '../_lib/fortnoxCustomerMirror'
+import {
+  decideFortnoxInvoiceSync,
+  fortnoxMirrorFields,
+  toPostgrestInList,
+  type FortnoxInvoiceSnapshot,
+} from '../../src/shared/fortnoxInvoiceSync'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL!,
@@ -88,7 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const data = await fortnoxRes.json()
-    const invoice = data.Invoice
+    const invoice = data.Invoice as FortnoxInvoiceSnapshot | undefined
 
     if (!invoice) {
       return res.status(200).json({ ok: true, skipped: true })
@@ -97,35 +103,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const documentNumber = String(EntityId)
     const now = new Date().toISOString()
 
-    // Bestäm ny status baserat på Fortnox-fakturans tillstånd
-    // Fortnox-livscykel: draft (Booked=false) → booked (Booked=true) → sent (Sent=true) → paid (Balance=0)
-    const isPaid = invoice.Balance === 0 && invoice.FinalPayDate != null
-    const isSent = invoice.Sent === true
-    const isBooked = invoice.Booked === true
-    const dueDate = invoice.DueDate ? new Date(invoice.DueDate) : null
-    const isOverdue = isSent && !isPaid && dueDate != null && dueDate < new Date()
+    // Avslagen ROT/RUT-begäran gör hela saldot till kundens skuld igen
+    const { data: claimRows } = await supabase
+      .from('invoices')
+      .select('rot_rut_claim_status')
+      .eq('fortnox_document_number', documentNumber)
+    const rotRutClaimStatus = ((claimRows ?? []) as { rot_rut_claim_status: string | null }[])
+      .map((r) => r.rot_rut_claim_status)
+      .find((s) => !!s) ?? null
 
-    // Bestäm målstatus + tidsstämpelfält i prioritetsordning (paid vinner över overdue vinner över sent vinner över booked)
-    let targetStatus: 'paid' | 'overdue' | 'sent' | 'booked' | null = null
-    let timestamp: string = now
-    if (isPaid) {
-      targetStatus = 'paid'
-      timestamp = new Date(invoice.FinalPayDate).toISOString()
-    } else if (isOverdue) {
-      targetStatus = 'overdue'
-    } else if (isSent) {
-      targetStatus = 'sent'
-    } else if (isBooked) {
-      targetStatus = 'booked'
-    }
+    // Samma regel som edge-funktionen fortnox-sync (src/shared/fortnoxInvoiceSync.ts):
+    // paid vinner över overdue vinner över sent vinner över booked, makulerad blir cancelled
+    const decision = decideFortnoxInvoiceSync(invoice, { rotRutClaimStatus })
+    const { status: targetStatus, timestamp } = decision
 
-    // Kvar att betala speglas alltid, oavsett statusskydd: en delbetalning
-    // ändrar saldot utan att ändra status, och fliken ska visa resten,
-    // inte hela fakturan som obetald.
-    if (typeof invoice.Balance === 'number') {
+    // Saldo, förfallodag och skattereduktion speglas alltid, oavsett
+    // statusskydd: en delbetalning ändrar saldot utan att ändra status, och
+    // betalningsspärren räknar på återstående skuld.
+    const mirror = fortnoxMirrorFields(decision)
+    if (Object.keys(mirror).length > 0) {
       await supabase
         .from('invoices')
-        .update({ balance_due: Math.round(invoice.Balance * 100) / 100 })
+        .update(mirror)
         .eq('fortnox_document_number', documentNumber)
     }
 
@@ -134,60 +133,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, skipped: 'draft-only' })
     }
 
-    // Statusar som INTE ska skrivas över (terminala eller längre gångna i flödet)
-    // Ex: om faktura redan är 'paid' vill vi inte skriva tillbaka till 'sent'
-    const protectedByTarget: Record<typeof targetStatus & string, string[]> = {
-      paid:    ['paid', 'cancelled'],
-      overdue: ['paid', 'cancelled', 'overdue'],
-      sent:    ['paid', 'cancelled', 'overdue', 'sent'],
-      booked:  ['paid', 'cancelled', 'overdue', 'sent', 'booked', 'invoiced'],
-    }
-    const protectedStatuses = protectedByTarget[targetStatus]
+    const protectedList = toPostgrestInList(decision.protectedStatuses)
 
-    // --- contract_billing_items ---
-    const contractUpdateData: Record<string, unknown> = { status: targetStatus, updated_at: now }
-    if (targetStatus === 'paid') contractUpdateData.paid_at = timestamp
-    else if (targetStatus === 'overdue') contractUpdateData.overdue_at = timestamp
-    else if (targetStatus === 'sent') contractUpdateData.fortnox_sent_at = timestamp
-    else if (targetStatus === 'booked') contractUpdateData.booked_at = timestamp
+    // --- contract_billing_items (makulering rör bara invoices-raden) ---
+    if (targetStatus !== 'cancelled') {
+      const contractUpdateData: Record<string, unknown> = { status: targetStatus, updated_at: now }
+      if (targetStatus === 'paid') contractUpdateData.paid_at = timestamp
+      else if (targetStatus === 'overdue') contractUpdateData.overdue_at = timestamp
+      else if (targetStatus === 'sent') contractUpdateData.fortnox_sent_at = timestamp
+      else if (targetStatus === 'booked') contractUpdateData.booked_at = timestamp
 
-    const protectedList = `(${protectedStatuses.map(s => `"${s}"`).join(',')})`
-    const { data: contractItems } = await supabase
-      .from('contract_billing_items')
-      .select('id')
-      .eq('fortnox_document_number', documentNumber)
-      .not('status', 'in', protectedList)
-
-    if (contractItems && contractItems.length > 0) {
-      const ids = contractItems.map((i: { id: string }) => i.id)
-      await supabase
+      const { data: contractItems } = await supabase
         .from('contract_billing_items')
-        .update(contractUpdateData)
-        .in('id', ids)
-      console.log(`Webhook: ${ids.length} contract_billing_items → ${targetStatus} (Fortnox nr ${documentNumber})`)
-    }
-
-    // --- invoices (privat/företag) ---
-    const invoiceUpdateData: Record<string, unknown> = { status: targetStatus }
-    if (targetStatus === 'paid') invoiceUpdateData.paid_at = timestamp
-    else if (targetStatus === 'sent') invoiceUpdateData.sent_at = timestamp
-    else if (targetStatus === 'booked') invoiceUpdateData.booked_at = timestamp
-    // obs: 'overdue' finns inte som status i invoices-tabellen — skippa den uppdateringen där
-    if (targetStatus !== 'overdue') {
-      const { data: invoiceRows } = await supabase
-        .from('invoices')
         .select('id')
         .eq('fortnox_document_number', documentNumber)
         .not('status', 'in', protectedList)
 
-      if (invoiceRows && invoiceRows.length > 0) {
-        const ids = invoiceRows.map((i: { id: string }) => i.id)
+      if (contractItems && contractItems.length > 0) {
+        const ids = contractItems.map((i: { id: string }) => i.id)
         await supabase
-          .from('invoices')
-          .update(invoiceUpdateData)
+          .from('contract_billing_items')
+          .update(contractUpdateData)
           .in('id', ids)
-        console.log(`Webhook: ${ids.length} invoices → ${targetStatus} (Fortnox nr ${documentNumber})`)
+        console.log(`Webhook: ${ids.length} contract_billing_items → ${targetStatus} (Fortnox nr ${documentNumber})`)
       }
+    }
+
+    // --- invoices (privat/företag/avtal) ---
+    const invoiceUpdateData: Record<string, unknown> = { status: targetStatus }
+    if (targetStatus === 'paid') invoiceUpdateData.paid_at = timestamp
+    else if (targetStatus === 'sent' && !decision.rotRutCustomerPaid) invoiceUpdateData.sent_at = timestamp
+    else if (targetStatus === 'booked') invoiceUpdateData.booked_at = timestamp
+    else if (targetStatus === 'overdue') invoiceUpdateData.overdue_at = timestamp
+    // ROT/RUT där kunden betalat sin del: inte längre förfallen för kunden
+    if (decision.rotRutCustomerPaid) invoiceUpdateData.overdue_at = null
+
+    const { data: invoiceRows } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('fortnox_document_number', documentNumber)
+      .not('status', 'in', protectedList)
+
+    if (invoiceRows && invoiceRows.length > 0) {
+      const ids = invoiceRows.map((i: { id: string }) => i.id)
+      await supabase
+        .from('invoices')
+        .update(invoiceUpdateData)
+        .in('id', ids)
+      console.log(`Webhook: ${ids.length} invoices → ${targetStatus} (Fortnox nr ${documentNumber})`)
     }
 
     return res.status(200).json({ ok: true, status: targetStatus })

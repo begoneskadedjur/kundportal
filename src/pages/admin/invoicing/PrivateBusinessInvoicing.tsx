@@ -22,6 +22,7 @@ import { InvoiceDeliveryError } from '../../../services/invoiceDeliveryService'
 import type { Invoice, InvoiceStatus, InvoiceFilters } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
 import InvoiceDetailModal from '../../../components/admin/invoicing/InvoiceDetailModal'
+import { isRotRutAwaitingTaxAgency } from '../../../shared/fortnoxInvoiceSync'
 import { ContractReviewMark } from '../../../components/admin/invoicing/ContractReviewMark'
 import { ContractReviewService, type InvoiceReviewInfo } from '../../../services/contractReviewService'
 
@@ -107,8 +108,9 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
   })()
 
   // Förfallen oavsett status-kolumn (t.ex. skickad med passerat förfallodatum)
+  // ROT/RUT där kunden betalat sin del räknas inte som förfallen (3.128.0)
   const isRowOverdue = (inv: Invoice) =>
-    inv.status === 'overdue' || isInvoiceOverdue(inv.due_date, inv.status)
+    !isRotRutAwaitingTaxAgency(inv) && (inv.status === 'overdue' || isInvoiceOverdue(inv.due_date, inv.status))
 
   // Arbetsläge = kräver handling; visas i defaultvyn
   const isWorkInvoice = (inv: Invoice) =>
