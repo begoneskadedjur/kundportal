@@ -728,6 +728,9 @@ export default async function handler(
         counterpart_edit: false,
         ...(avserRubrik ? { name: { enabled: true, label: avserRubrik } } : {}),
         columns: [
+          // Mallarnas beskrivningskolumn heter "Avser", som krockar med rubriken
+          // "Avser: <tjänst>" (utkast 16806487 visade "Avser: Inget avdrag")
+          { key: 'description', enabled: true, label: 'Avdrag' },
           { key: 'price_1', enabled: false, label: 'Pris' },
           { key: 'price_2', enabled: true, label: 'Pris inkl. moms' },
         ],

@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.127.1',
+    date: '2026-11-10',
+    title: 'ROT- och RUT-avdraget registreras i Fortnox',
+    items: [
+      { kind: 'buggfix', text: 'ROT- och RUT-avdraget registreras nu i Fortnox när fakturan skickas. Förut nekades registreringen, så avdraget fick läggas in för hand i Fortnox.' },
+      { kind: 'buggfix', text: 'I ROT- och RUT-offerten heter kolumnen bredvid raderna nu Avdrag. Förut hette den Avser, samma ord som rubriken, och visade till exempel "Avser: Inget avdrag".' },
+    ],
+  },
+  {
     version: '3.127.0',
     date: '2026-11-10',
     title: 'ROT och RUT hela vägen från offert till Fortnox',

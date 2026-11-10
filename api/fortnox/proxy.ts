@@ -8,7 +8,9 @@ const FORTNOX_API = 'https://api.fortnox.se/3'
 
 // Bara de resurser frontendens FortnoxService faktiskt använder får proxas.
 // Ny Fortnox-resurs? Lägg till här OCH kontrollera att OAuth-scopet täcker den (api/fortnox/auth.ts).
-const ALLOWED_RESOURCES = new Set(['customers', 'invoices', 'articles', 'companyinformation'])
+// taxreductions: ROT/RUT-avdraget registreras efter fakturan (FortnoxService.createTaxReduction).
+// Saknades fram till 3.127.1, så registreringen nekades alltid med 403.
+const ALLOWED_RESOURCES = new Set(['customers', 'invoices', 'articles', 'companyinformation', 'taxreductions'])
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const auth = await requireAuth(req, res, ['admin', 'koordinator'])
