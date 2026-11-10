@@ -49,7 +49,7 @@ export function rotRutFel(rader: RotRutRad[], mall?: MallInfo | null): string {
   // Tjänsten saknas på raden (okänd) räknas inte som fel här; servern slår upp katalogen
   const felPlacerade = avdragsRader.filter(r => r.service && !r.service.rot_eligible && !r.service.rut_eligible)
   if (felPlacerade.length > 0) {
-    return `ROT/RUT ligger på ${namnLista(felPlacerade)}, som inte är arbetstid. Välj Inget avdrag på raden och tryck Dela upp för ROT/RUT, så hamnar avdraget på arbetskostnaden.`
+    return `ROT/RUT ligger på ${namnLista(felPlacerade)}, som inte är arbetstid. Välj Inget avdrag på raden och välj i stället avdraget på arbetstiden (Arbetstid Privatperson) under Interna kostnader, så hamnar det på arbetskostnaden.`
   }
 
   const harRot = avdragsRader.some(r => r.rot_rut_type === 'ROT')

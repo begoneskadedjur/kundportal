@@ -52,6 +52,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'buggfix', text: 'Sidokortet Din offert skrev "att betala efter rot" med små bokstäver. Nu står det som i Oneflow, och granskningen visar mallens pristext ordagrant. Offertinnehållet listar samma rader som offerten även när tjänstekoden bara finns i katalogen.' },
       { kind: 'andring', text: 'Personnummer kan skrivas med 10 eller 12 siffror, det står nu under fältet.' },
       { kind: 'andring', text: 'Guiderna för offerter beskriver ROT- och RUT-offerten som den är: två priskolumner, avdraget i beskrivningen på Arbetskostnad och ingen fastighet för RUT. Guiden Skapa och skicka en offert övar nu en offert utan avdrag, ROT och RUT har en egen guide.' },
+      { kind: 'buggfix', text: 'Ligger ROT eller RUT på en rad som inte är arbetstid hänvisar offerten nu till arbetstiden under Interna kostnader, inte till knappen Dela upp för ROT/RUT som inte finns där.' },
     ],
   },
   {
