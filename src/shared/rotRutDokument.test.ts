@@ -27,7 +27,7 @@ describe('rotRutFel', () => {
   it('avdrag på en tjänst som inte är arbetstid spärrar', () => {
     const fel = rotRutFel([{ rot_rut_type: 'ROT', service_name: 'Sanering Fågel', service: PAKET }], { avdrag: 'ROT' })
     expect(fel).toMatch(/"Sanering Fågel", som inte är arbetstid/)
-    expect(fel).toMatch(/Dela upp för ROT\/RUT/)
+    expect(fel).toMatch(/Arbetstid Privatperson/)
   })
 
   it('okänd tjänst räknas inte som felplacerad', () => {
