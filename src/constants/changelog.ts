@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.128.1',
+    date: '2026-11-10',
+    title: 'Betalningsspärren går inte att kringgå',
+    items: [
+      { kind: 'buggfix', text: 'Undantaget för följeärenden och ärenden som skapas med varning gäller nu bara personal. En spärrad kund kan inte längre boka förbi spärren.' },
+      { kind: 'andring', text: 'Alla kunder omfattas av den automatiska spärren, även de som har konkurs angiven som orsak när avtalet sades upp.' },
+    ],
+  },
+  {
     version: '3.128.0',
     date: '2026-11-10',
     title: 'Betalningsspärr för kunder med obetalda fakturor',
