@@ -276,6 +276,32 @@ async function fetchImageAsBase64(url: string): Promise<string | null> {
 }
 
 /**
+ * Foton som teknikern tagit på enskilda stationer (photo_url från
+ * inspektionsraden), som rutnät under stationstabellen. Bildtexten bär samma
+ * nummer och typ som tabellraden.
+ */
+async function stationPhotosHtml(items: Array<{ no: number; typeName: string; url?: string | null }>): Promise<string> {
+  const withUrl = items.filter(it => it.url)
+  if (withUrl.length === 0) return ''
+  const photos = await Promise.all(withUrl.map(async it => ({ ...it, base64: await fetchImageAsBase64(it.url!) })))
+  const valid = photos.filter(p => p.base64)
+  if (valid.length === 0) return ''
+  return `
+    <div class="notes-section" style="margin-top:12px;">
+      <div class="notes-label">Bilder från stationerna</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px;">
+        ${valid.map(p => `
+          <div style="break-inside:avoid;">
+            <img src="${p.base64}" style="width:100%;height:170px;object-fit:cover;border-radius:6px;border:1px solid ${beGoneColors.border};display:block;" alt="Station ${p.no}" />
+            <p style="font-size:9px;color:${beGoneColors.mediumGray};margin-top:3px;text-align:center;">Nr ${p.no} · ${p.typeName}</p>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `
+}
+
+/**
  * Stationsnummer som i kundportalen: kundens alla aktiva utomhusstationer i en
  * serie, varje planritning i en egen serie (src/shared/stationNumbering.ts).
  * Så stämmer numret även när en station inte kontrollerades i rundan.
@@ -417,6 +443,12 @@ async function generateInspectionReportHTML(data: {
     `
   }).join('')
 
+  const outdoorPhotosHtml = await stationPhotosHtml(sortedOutdoor.map((insp, index) => ({
+    no: outdoorNo(insp, index),
+    typeName: resolveReportStation(insp, 0, stationTypes).typeName,
+    url: insp.photo_url
+  })))
+
   // Group indoor inspections by floor plan
   const indoorByFloorPlan = new Map<string, { name: string; building: string | null; imagePath: string | null; inspections: any[] }>()
   for (const insp of indoorInspections) {
@@ -494,6 +526,12 @@ async function generateInspectionReportHTML(data: {
       `
     }).join('')
 
+    const groupPhotosHtml = await stationPhotosHtml(sortedInGroup.map((insp, index) => ({
+      no: indoorNo(insp, index),
+      typeName: resolveReportStation(insp, 0, stationTypes).typeName,
+      url: insp.photo_url
+    })))
+
     indoorSectionsArr.push(`
       <div class="floor-plan-block">
         <div class="section-header">
@@ -522,6 +560,7 @@ async function generateInspectionReportHTML(data: {
             ${rows}
           </tbody>
         </table>
+        ${groupPhotosHtml}
       </div>
     `)
   }
@@ -883,6 +922,7 @@ async function generateInspectionReportHTML(data: {
           ${outdoorTableRows}
         </tbody>
       </table>
+      ${outdoorPhotosHtml}
     </div>
     ` : ''}
 
