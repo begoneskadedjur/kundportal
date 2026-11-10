@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.128.2',
+    date: '2026-11-10',
+    title: 'Guide för betalningsspärren',
+    items: [
+      { kind: 'nyhet', text: 'Ny guide i handboken under Pris och fakturering: Häva en betalningsspärr. Den visar vägen från den röda rutan i Skapa ärende till kundkortet, när spärren stoppar och när den bara varnar, och har en övning.' },
+    ],
+  },
+  {
     version: '3.128.1',
     date: '2026-11-10',
     title: 'Betalningsspärren går inte att kringgå',

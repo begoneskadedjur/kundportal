@@ -60,7 +60,7 @@ export const HANDBOK_SEKTIONER: HandbokSektion[] = [
     ikon: 'sok.faktura',
     slugs: [
       'guide-prissattning', 'guide-delfakturering', 'guide-provision',
-      'guide-fakturering-kontor', 'guide-avtalsfakturor-kontor', 'guide-merforsaljning-avtal-kontor', 'guide-fakturaarkiv-kontor', 'guide-prissattning-kontor', 'guide-tillaggsstationer-fakturering',
+      'guide-fakturering-kontor', 'guide-avtalsfakturor-kontor', 'guide-merforsaljning-avtal-kontor', 'guide-fakturaarkiv-kontor', 'guide-betalningssparr-kontor','guide-prissattning-kontor', 'guide-tillaggsstationer-fakturering',
     ],
   },
   {
