@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  arAvdragsradNamn, arRotRutRadmodell, avdragKr, avdragsradNamn, jamforMedOneflow, KUNDBESKRIVNING, oneflowRader, exklFranInkl, fakturaAvdrag, fakturaBrister, fakturaRadIRadmodell,
+  arAvdragsradNamn, arKolumnEfterAvdrag, arRotRutRadmodell, avdragKr, avdragsradNamn, jamforMedOneflow, KOLUMN_PRIS, kolumnEfterAvdrag, KUNDBESKRIVNING, oneflowRader, exklFranInkl, fakturaAvdrag, fakturaBrister, fakturaRadIRadmodell,
   fastighetKlar, fastighetKravs, fastighetText, giltigFastighetsbeteckning, giltigtPersonnummer, inklMoms, kr, personnummer12,
   maskeratPersonnummer, namnerAndraTypen, prisText, rollForKategori, rollForKod, rotRutBrister,
   sammanstallRotRut, timmarTillFortnox, type RotRutKontrollIndata,
@@ -235,43 +235,57 @@ describe('jamforMedOneflow', () => {
   })
 })
 
-describe('raderna i Oneflow (variant B)', () => {
-  it('kundraderna med beskrivning och sist avdraget som minusbelopp', () => {
+describe('raderna i Oneflow (variant D)', () => {
+  it('två priskolumner, ingen avdragsrad, avdraget i arbetsradens beskrivning', () => {
     const r = oneflowRader(sammanstallRotRut(rader, 'ROT'))
-    expect(r.map(x => [x.namn, x.belopp, x.avdragsrad])).toEqual([
-      ['Arbetskostnad', 12000, false], ['Material och utrustning', 2000, false], ['Servicebil', 500, false],
-      ['ROT-avdrag 30 %', -3600, true],
+    expect(r.map(x => [x.namn, x.belopp, x.efterAvdrag])).toEqual([
+      ['Arbetskostnad', 12000, 8400], ['Material och utrustning', 2000, 2000], ['Servicebil', 500, 500],
     ])
-    expect(r[0].beskrivning).toBe(KUNDBESKRIVNING.arbete)
-    expect(r[3].beskrivning).toBe('30 % av arbetskostnaden inkl. moms')
-    // Summan i Oneflow blir att betala
-    expect(r.reduce((s, x) => s + x.belopp, 0)).toBe(10900)
+    expect(r[0].beskrivning).toBe('Kostnad för arbetstid, inklusive planering, utförande och avslutande moment. ROT-avdrag 30 %: 3 600 kr.')
+    expect(r[1].beskrivning).toBe(KUNDBESKRIVNING.material)
+    // Oneflow summerar båda kolumnerna
+    expect(r.reduce((s, x) => s + x.belopp, 0)).toBe(14500)
+    expect(r.reduce((s, x) => s + x.efterAvdrag, 0)).toBe(10900)
   })
-  it('RUT: 50 % och eget namn', () => {
+  it('RUT: 50 % i beskrivningen och kolumnrubriken', () => {
     const s = sammanstallRotRut(rader.map(r => r.roll === 'arbete' ? { ...r, rot_rut_type: 'RUT' as const } : r), 'RUT')
-    const alla = oneflowRader(s)
-    const sista = alla[alla.length - 1]
-    expect(sista).toMatchObject({ namn: 'RUT-avdrag 50 %', belopp: -6000, beskrivning: '50 % av arbetskostnaden inkl. moms' })
+    const r = oneflowRader(s)
+    expect(r[0]).toMatchObject({ belopp: 12000, efterAvdrag: 6000 })
+    expect(r[0].beskrivning).toContain('RUT-avdrag 50 %: 6 000 kr.')
+    expect(kolumnEfterAvdrag('RUT')).toBe('Att betala efter RUT')
+    expect(KOLUMN_PRIS).toBe('Pris inkl. moms')
+    expect(arKolumnEfterAvdrag('Att betala efter ROT')).toBe(true)
+    expect(arKolumnEfterAvdrag('Pris')).toBe(false)
   })
-  it('ingen avdragsrad utan avdrag', () => {
+  it('utan avdrag samma pris i båda kolumnerna', () => {
     const s = sammanstallRotRut(rader.filter(r => r.roll !== 'arbete'), 'ROT')
-    expect(oneflowRader(s).some(r => r.avdragsrad)).toBe(false)
+    expect(oneflowRader(s).every(r => r.efterAvdrag === r.belopp)).toBe(true)
   })
-  it('känner igen avdragsradens namn', () => {
+  it('känner igen variant B:s avdragsrad', () => {
     expect(avdragsradNamn('ROT')).toBe('ROT-avdrag 30 %')
     expect(arAvdragsradNamn('RUT-avdrag 50 %')).toBe(true)
     expect(arAvdragsradNamn('Arbetskostnad')).toBe(false)
     expect(arAvdragsradNamn('ROT-avdrag')).toBe(false)
   })
-  it('jämförelsen larmar om avdraget ändras eller tas bort, men inte när det stämmer', () => {
-    const forv = { rader: oneflowRader(sammanstallRotRut(rader, 'ROT')).map(r => ({ namn: r.namn, belopp: r.belopp })) }
+  it('jämförelsen kontrollerar båda kolumnerna per rad', () => {
+    const forv = { rader: oneflowRader(sammanstallRotRut(rader, 'ROT')).map(r => ({ namn: r.namn, belopp: r.belopp, efter_avdrag: r.efterAvdrag })) }
     const oneflow = [
-      { name: 'Arbetskostnad', total: 12000 }, { name: 'Material och utrustning', total: 2000 },
-      { name: 'Servicebil', total: 500 }, { name: 'ROT-avdrag 30 %', total: -3600 },
+      { name: 'Arbetskostnad', total: 12000, pris1: 12000, pris2: 8400 },
+      { name: 'Material och utrustning', total: 2000, pris1: 2000, pris2: 2000 },
+      { name: 'Servicebil', total: 500, pris1: 500, pris2: 500 },
     ]
     expect(jamforMedOneflow(forv, oneflow)).toBeNull()
-    expect(jamforMedOneflow(forv, oneflow.slice(0, 3))).toContain('ROT-avdrag 30 % är borttaget i Oneflow')
-    const andrat = jamforMedOneflow(forv, [...oneflow.slice(0, 3), { name: 'ROT-avdrag 30 %', total: -5000 }])
-    expect(andrat).toContain('ROT-avdrag 30 % är ändrat i Oneflow: -5 000 kr, portalen -3 600 kr')
+    const avdrag = jamforMedOneflow(forv, [{ ...oneflow[0], pris2: 12000 }, ...oneflow.slice(1)])
+    expect(avdrag).toContain('Arbetskostnad är 12 000 kr efter avdrag i Oneflow, portalen 8 400 kr')
+    const fullt = jamforMedOneflow(forv, [{ ...oneflow[0], pris1: 15000 }, ...oneflow.slice(1)])
+    expect(fullt).toContain('Arbetskostnad är 15 000 kr inkl. moms i Oneflow, portalen 12 000 kr')
+    expect(jamforMedOneflow(forv, oneflow.slice(0, 2))).toContain('Servicebil saknas i Oneflow')
+  })
+  it('variant B:s förväntade rader jämförs som förut', () => {
+    const forv = { rader: [{ namn: 'Arbetskostnad', belopp: 12000 }, { namn: 'ROT-avdrag 30 %', belopp: -3600 }] }
+    const oneflow = [{ name: 'Arbetskostnad', total: 12000 }, { name: 'ROT-avdrag 30 %', total: -3600 }]
+    expect(jamforMedOneflow(forv, oneflow)).toBeNull()
+    expect(jamforMedOneflow(forv, oneflow.slice(0, 1))).toContain('ROT-avdrag 30 % är borttaget i Oneflow')
+    expect(jamforMedOneflow(forv, [oneflow[0], { name: 'ROT-avdrag 30 %', total: -5000 }])).toContain('ROT-avdrag 30 % är ändrat i Oneflow: -5 000 kr, portalen -3 600 kr')
   })
 })

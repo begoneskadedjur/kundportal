@@ -508,8 +508,8 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
   // Avtal gjorda direkt i Oneflow: den priskolumn som syns, efter rabatt,
   // gånger antal. Wizardens avtal räknas som förut (wizard_total_value),
   // eftersom äldre ROT-offerter har avdraget i den dolda kolumnen. ROT/RUT-
-  // offerternas avdragsrad (3.127.3) räknas inte i någon av dem: värdet är
-  // totalen före avdrag.
+  // offerterna räknas på price_1 (3.127.5, "Pris inkl. moms") och variant B:s
+  // avdragsrad (3.127.3) räknas inte: värdet är totalen före avdrag.
   const productValue = oneflowProductsValue(details.product_groups)
   const totalValue = productValue.total
   const wizardTotalValue = wizardProductsValue(details.product_groups)
@@ -689,7 +689,9 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
       // portalen skickade. Avvikelse sparas och visas i portalen.
       const forvantat = (existingContract as { rot_rut_expected?: RotRutForvantat | null }).rot_rut_expected
       if (forvantat && Array.isArray(webhookData.selected_products)) {
-        const synliga = oneflowProductsValue(webhookData.selected_products).rows.map(r => ({ name: r.name, total: r.total }))
+        // Båda priskolumnerna per rad (3.127.5): fullt pris och att betala efter avdrag
+        const synliga = oneflowProductsValue(webhookData.selected_products).rows
+          .map(r => ({ name: r.name, total: r.total, pris1: r.total1, pris2: r.total2 }))
         webhookData.rot_rut_mismatch = jamforMedOneflow(forvantat, synliga)
         if (webhookData.rot_rut_mismatch) console.warn('⚠️ ROT/RUT-offerten avviker från Oneflow:', webhookData.rot_rut_mismatch)
       }

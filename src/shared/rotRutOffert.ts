@@ -184,12 +184,15 @@ export function prisText(s: RotRutSammanstallning): string {
     `Att betala: ${kr(s.attBetala)}.`
 }
 
-// ─── Raderna i Oneflow (variant B, 3.127.3) ─────────────────────────────────
-// Efter kundraderna står avdraget som en egen rad med listpris 0 och rabatt
-// lika med avdraget (Oneflow godtar inte negativa belopp eller negativt antal,
-// bara discount_amount; provat i utkast 16807724). Summan i Oneflow blir då
-// att betala. Raden finns bara i Oneflow: den blir aldrig en fakturarad, och
-// avtalets värde (contracts.total_value) är totalen före avdrag.
+// ─── Raderna i Oneflow (variant D, 3.127.5) ─────────────────────────────────
+// Två priskolumner, ingen avdragsrad och ingen rabatt: "Pris inkl. moms"
+// (price_1, radens fulla pris) och "Att betala efter ROT/RUT" (price_2, radens
+// pris efter avdraget). Bara arbetsraden skiljer sig mellan kolumnerna, och
+// avdraget står i dess beskrivning. Oneflow summerar båda kolumnerna (utkast
+// 16810395/16810396). Avtalets värde (contracts.total_value) är summan av
+// price_1, totalen före avdrag. Variant B (3.127.3) hade en avdragsrad med
+// listpris 0 och rabatt. Sådana utkast känns fortfarande igen så att raden
+// aldrig räknas in i värdet (arAvdragsradNamn, oneflowProductValue.ts).
 
 /** Beskrivningskolumnen i Oneflow och granskningen */
 export const KUNDBESKRIVNING: Record<RadRoll, string> = {
@@ -199,36 +202,57 @@ export const KUNDBESKRIVNING: Record<RadRoll, string> = {
   ovrigt: 'Kostnad för underentreprenörer och hyrd utrustning.',
 }
 
-/** Kolumnrubrikerna i Oneflow. Prisets rubrik blir även summeringens etikett. */
-export const KOLUMN_PRIS = 'Att betala (inkl moms)'
+/** Kolumnrubrikerna i Oneflow. Varje prisrubrik blir även sin summas etikett. */
+export const KOLUMN_PRIS = 'Pris inkl. moms'
 export const KOLUMN_BESKRIVNING = 'Beskrivning'
+/** "Att betala efter ROT" eller "Att betala efter RUT" */
+export const kolumnEfterAvdrag = (typ: Avdrag): string => `Att betala efter ${typ}`
+
+/** Rubriken på kolumnen efter avdrag, oavsett typ (känner igen ROT/RUT-offertens produktgrupp). */
+export function arKolumnEfterAvdrag(label: string | null | undefined): boolean {
+  return /^Att betala efter (ROT|RUT)$/.test(String(label ?? '').trim())
+}
 
 /** "ROT-avdrag 30 %" */
 export const avdragsradNamn = (typ: Avdrag): string => `${typ}-avdrag ${ROT_RUT_PROCENT[typ]} %`
 
-/** "30 % av arbetskostnaden inkl. moms" */
-export const avdragsradBeskrivning = (typ: Avdrag): string => `${ROT_RUT_PROCENT[typ]} % av arbetskostnaden inkl. moms`
-
-/** Produktnamnet är en avdragsrad (ROT-avdrag 30 % eller RUT-avdrag 50 %) */
+/** Variant B:s avdragsrad (3.127.3), "ROT-avdrag 30 %" eller "RUT-avdrag 50 %". Finns bara i äldre utkast. */
 export function arAvdragsradNamn(name: string | null | undefined): boolean {
   return /^(ROT|RUT)-avdrag \d+ %$/.test(String(name ?? '').trim())
 }
 
 export interface OneflowRad {
+  roll: RadRoll
   namn: string
   beskrivning: string
-  /** Belopp inkl. moms, hela kronor. Avdragsraden är negativ. */
+  /** Pris inkl. moms, hela kronor (price_1) */
   belopp: number
-  avdragsrad: boolean
+  /** Att betala efter avdraget, hela kronor (price_2). Samma som belopp utom på arbetsraden. */
+  efterAvdrag: number
 }
 
-/** Raderna som de står i Oneflow: kundraderna och sist avdraget (om det är större än 0). */
+/** Arbetsradens beskrivning med avdraget, t.ex. "... ROT-avdrag 30 %: 3 600 kr." */
+export function arbetsBeskrivning(s: RotRutSammanstallning): string {
+  return s.avdrag > 0
+    ? `${KUNDBESKRIVNING.arbete} ${avdragsradNamn(s.typ)}: ${kr(s.avdrag)}.`
+    : KUNDBESKRIVNING.arbete
+}
+
+/** Raderna som de står i Oneflow: kundraderna med båda priskolumnerna. */
 export function oneflowRader(s: RotRutSammanstallning): OneflowRad[] {
-  const ut: OneflowRad[] = s.rader.map(r => ({ namn: r.namn, beskrivning: KUNDBESKRIVNING[r.roll], belopp: r.belopp, avdragsrad: false }))
-  if (s.avdrag > 0) {
-    ut.push({ namn: avdragsradNamn(s.typ), beskrivning: avdragsradBeskrivning(s.typ), belopp: -s.avdrag, avdragsrad: true })
-  }
-  return ut
+  let kvar = s.avdrag
+  return s.rader.map(r => {
+    // Avdraget dras på arbetsraden
+    const dra = r.roll === 'arbete' ? Math.min(kvar, r.belopp) : 0
+    kvar -= dra
+    return {
+      roll: r.roll,
+      namn: r.namn,
+      beskrivning: r.roll === 'arbete' ? arbetsBeskrivning(s) : KUNDBESKRIVNING[r.roll],
+      belopp: r.belopp,
+      efterAvdrag: r.belopp - dra,
+    }
+  })
 }
 
 export const avserText = (avser: string | null): string | null => (avser ? `Avser: ${avser}` : null)
@@ -547,19 +571,31 @@ export function fakturaBrister(d: {
 // ─── Kontroll mot Oneflow (webhooken) ───────────────────────────────────────
 
 export interface RotRutForvantat {
-  rader: Array<{ namn: string; belopp: number }>
+  /** efter_avdrag finns sedan 3.127.5 (variant D, kolumnen "Att betala efter ROT/RUT") */
+  rader: Array<{ namn: string; belopp: number; efter_avdrag?: number | null }>
   totalt_inkl?: number
 }
 
+export interface OneflowJamforRad {
+  name: string
+  /** Synlig kolumn efter rabatt gånger antal */
+  total: number
+  /** price_1 efter rabatt gånger antal */
+  pris1?: number | null
+  /** price_2 efter rabatt gånger antal */
+  pris2?: number | null
+}
+
 /**
- * Jämför Oneflows produkter (namn och synligt belopp efter rabatt gånger antal)
- * med raderna portalen skickade. null = stämmer, annars en text för portalen.
- * Sedan 3.127.3 finns avdragsraden med (belopp = minus avdraget), så ett ändrat
- * eller borttaget avdrag larmar. Äldre offerter saknar raden på båda sidor.
+ * Jämför Oneflows produkter med raderna portalen skickade. null = stämmer,
+ * annars en text för portalen. Sedan 3.127.5 jämförs båda priskolumnerna per
+ * rad: price_1 med det fulla priset och price_2 med att betala efter avdraget.
+ * Äldre offerter (utan efter_avdrag) jämförs på den synliga kolumnen, och
+ * variant B:s avdragsrad (3.127.3) larmar om den ändras eller tas bort.
  */
 export function jamforMedOneflow(
   forvantat: RotRutForvantat | null | undefined,
-  oneflowRader: Array<{ name: string; total: number }>
+  oneflowRader: OneflowJamforRad[]
 ): string | null {
   if (!forvantat || !Array.isArray(forvantat.rader)) return null
   const fel: string[] = []
@@ -572,6 +608,17 @@ export function jamforMedOneflow(
       continue
     }
     const o = kvar.splice(idx, 1)[0]
+    if (r.efter_avdrag != null) {
+      const p1 = o.pris1 ?? o.total
+      const p2 = o.pris2 ?? o.total
+      if (Math.abs(Math.round(p1) - r.belopp) >= 1) {
+        fel.push(`${r.namn} är ${kr(p1)} inkl. moms i Oneflow, portalen ${kr(r.belopp)}`)
+      }
+      if (Math.abs(Math.round(p2) - r.efter_avdrag) >= 1) {
+        fel.push(`${r.namn} är ${kr(p2)} efter avdrag i Oneflow, portalen ${kr(r.efter_avdrag)}`)
+      }
+      continue
+    }
     if (Math.abs(Math.round(o.total) - r.belopp) >= 1) {
       fel.push(avdragsrad
         ? `${r.namn} är ändrat i Oneflow: ${kr(o.total)}, portalen ${kr(r.belopp)}`

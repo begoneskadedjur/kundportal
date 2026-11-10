@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.127.5',
+    date: '2026-11-10',
+    title: 'ROT- och RUT-offerten visar två priskolumner',
+    items: [
+      { kind: 'andring', text: 'ROT- och RUT-offerten i Oneflow har nu två priskolumner, "Pris inkl. moms" och "Att betala efter ROT" (eller RUT), med en summa för var och en. Rabattraden med avdraget är borta.' },
+      { kind: 'andring', text: 'Avdraget står i beskrivningen på raden Arbetskostnad, till exempel "ROT-avdrag 30 %: 3 600 kr". Granskningen och sidokortet i Skapa offert visar samma två kolumner och summor som Oneflow.' },
+      { kind: 'andring', text: 'Offertens värde i portalen är fortfarande totalen före avdrag, och portalen varnar om något av de två priserna ändras i Oneflow. Fakturan och Fortnox fungerar som förut.' },
+    ],
+  },
+  {
     version: '3.127.4',
     date: '2026-11-10',
     title: 'RUT behöver ingen fastighetsbeteckning',

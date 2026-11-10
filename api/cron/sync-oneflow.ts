@@ -15,7 +15,7 @@ import { withCronLog } from '../_lib/cronLogger'
 import { fetchTemplatesStrict, getKnownTemplateIds, getOfferTemplateIds } from '../_lib/oneflowTemplates'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
-import { arAvdragsrad } from '../../src/shared/oneflowProductValue'
+import { arAvdragsrad, arRotRutGrupp } from '../../src/shared/oneflowProductValue'
 import {
   ONEFLOW_STATE_TO_STATUS,
   PRE_SIGNING_STATUSES,
@@ -274,13 +274,16 @@ function mapToInsertData(detail: OneFlowContractDetail, listItem: OneFlowContrac
   let totalValue = 0
   if (detail.product_groups) {
     for (const group of detail.product_groups) {
+      // ROT/RUT-offert (3.127.5): price_2 är att betala efter avdraget, värdet är price_1
+      const rotRut = arRotRutGrupp(group)
       for (const product of group.products || []) {
         // ROT/RUT-offertens avdragsrad räknas aldrig in i värdet (3.127.3)
         if (arAvdragsrad(product)) continue
-        const price =
-          parseFloat(product.price_2?.amount?.amount || '0') ||
-          parseFloat(product.price_1?.amount?.amount || '0') ||
-          parseFloat(product.total_amount?.amount || '0')
+        const price = rotRut
+          ? parseFloat(product.price_1?.amount?.amount || '0')
+          : parseFloat(product.price_2?.amount?.amount || '0') ||
+            parseFloat(product.price_1?.amount?.amount || '0') ||
+            parseFloat(product.total_amount?.amount || '0')
         totalValue += price
       }
     }

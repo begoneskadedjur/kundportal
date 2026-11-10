@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arAvdragsrad, netUnitPrice, oneflowProductsValue, visiblePriceKey, wizardProductsValue, type OneflowProductGroup } from './oneflowProductValue'
+import { arAvdragsrad, arRotRutGrupp, netUnitPrice, oneflowProductsValue, visiblePriceKey, wizardProductsValue, type OneflowProductGroup } from './oneflowProductValue'
 
 const cols = (p1: boolean, p2: boolean) => ({
   columns: [
@@ -124,5 +124,34 @@ describe('ROT/RUT-offertens avdragsrad (3.127.3)', () => {
     expect(arAvdragsrad({ name: 'ROT-avdrag 30 %', price_1: p('-3600', '0', '3600') })).toBe(true)
     expect(arAvdragsrad({ name: 'ROT-avdrag 30 %', price_1: p('500') })).toBe(false)
     expect(arAvdragsrad({ name: 'Arbetskostnad', price_1: p('0') })).toBe(false)
+  })
+})
+
+describe('ROT/RUT-offertens två priskolumner (3.127.5)', () => {
+  // Som Oneflow returnerar utkast 16810395
+  const p = (a: string) => ({ amount: { amount: a }, base_amount: { amount: a }, discount_amount: { amount: '0' } })
+  const rot: OneflowProductGroup = {
+    configuration: { columns: [
+      { key: 'name', enabled: true, label: 'Tjänst' },
+      { key: 'description', enabled: true, label: 'Beskrivning' },
+      { key: 'price_1', enabled: true, label: 'Pris inkl. moms' },
+      { key: 'price_2', enabled: true, label: 'Att betala efter ROT' },
+    ] },
+    products: [
+      { name: 'Arbetskostnad', price_1: p('12000'), price_2: p('8400'), quantity: { amount: 1 } },
+      { name: 'Material och utrustning', price_1: p('2000'), price_2: p('2000'), quantity: { amount: 1 } },
+      { name: 'Servicebil', price_1: p('500'), price_2: p('500'), quantity: { amount: 1 } },
+    ],
+  }
+  it('värdet är totalen före avdrag (price_1)', () => {
+    expect(wizardProductsValue([rot])).toBe(14500)
+    expect(oneflowProductsValue([rot]).total).toBe(14500)
+  })
+  it('rows bär båda kolumnerna för kontrollen', () => {
+    expect(oneflowProductsValue([rot]).rows[0]).toMatchObject({ name: 'Arbetskostnad', total: 12000, total1: 12000, total2: 8400 })
+  })
+  it('känner igen gruppen på kolumnrubriken', () => {
+    expect(arRotRutGrupp(rot)).toBe(true)
+    expect(arRotRutGrupp(anlos)).toBe(false)
   })
 })
