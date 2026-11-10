@@ -2017,7 +2017,7 @@ export default function OneflowContractCreator() {
               placeholder="ÅÅÅÅMMDD-XXXX"
             />
             <span className={`text-xs ${pnrFel ? 'text-amber-400' : 'text-slate-400'}`}>
-              {pnrFel ? 'Personnumret ska ha 12 siffror och inte vara ett org.nr.' : FALT_UNDERTEXT.personnummer}
+              {pnrFel ? 'Personnumret ser fel ut eller är ett org.nr.' : FALT_UNDERTEXT.personnummer}
             </span>
           </div>
         </div>

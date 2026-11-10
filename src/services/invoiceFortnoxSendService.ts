@@ -38,7 +38,7 @@ import { invoiceWorkAddress } from '../shared/invoiceWorkAddress'
 import { InvoiceDeliveryService } from './invoiceDeliveryService'
 import { toFortnoxDeliveryType, isInvoiceDeliveryMethod } from '../shared/invoiceDelivery'
 import { buildFortnoxInvoiceRows, fortnoxText, type InvoiceAddonLine, type InvoiceItemLike } from '../shared/invoiceAddonLines'
-import { fakturaArRadmodell, fakturaAvdrag, fakturaBrister, fastighetText, type Avdrag } from '../shared/rotRutOffert'
+import { fakturaArRadmodell, fakturaAvdrag, fakturaBrister, fastighetText, personnummer12, type Avdrag } from '../shared/rotRutOffert'
 import { workAddressText } from '../shared/invoiceWorkAddress'
 import { createSystemComment } from './communicationService'
 import { fetchInvoiceVisit, type VisitSnapshot } from '../hooks/useInvoiceVisit'
@@ -645,7 +645,8 @@ export async function sendInvoiceToFortnox(invoiceId: string, opts: FortnoxSendO
           // Bostadsrätt: lägenhetsnumret är beteckningen, föreningens org.nr skickas separat
           property_designation: rotBrf ? String(invoice.apartment_number) : String(invoice.fastighetsbeteckning),
           document_number: fortnoxInvoice.DocumentNumber,
-          social_security_number: isPrivatePerson ? invoice.organization_number : null,
+          // Tio siffror (ÅÅMMDD-XXXX) skickas med sekel, ÅÅÅÅMMDD-XXXX (3.127.2)
+          social_security_number: isPrivatePerson ? (personnummer12(invoice.organization_number) ?? invoice.organization_number) : null,
           residence_association_org_nr: rotBrf ? invoice.brf_org_number : null,
         })
         await supabase

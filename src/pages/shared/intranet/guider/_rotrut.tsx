@@ -185,7 +185,7 @@ export function rotOvningTryck(l: RotLage, id: string): { lage?: RotLage; svar: 
       if (id === 'rot') return { lage: { ...l, rot: true }, svar: { typ: 'tips', titel: 'ROT på arbetstiden', text: `Arbetskostnad fick priset från de ${ROT_TIMMAR} timmarna. Timmarna syns aldrig för kunden. Fyll i fastighetsbeteckningen.` } }
       if (id === 'inget') return fel('Utan avdrag hör arbetstiden inte till Arbetskostnad. Tryck ROT.')
       if (id === 'fastighet') return { lage: { ...l, fastighet: true }, svar: { typ: 'tips', titel: 'Fastigheten är ifylld', text: 'Exempelby 1:23, med kolon. Fyll i personnumret.' } }
-      if (id === 'pnr') return { lage: { ...l, pnr: true }, svar: { typ: 'tips', titel: 'Personnumret är ifyllt', text: '12 siffror. Är listan grön kan du trycka Nästa.' } }
+      if (id === 'pnr') return { lage: { ...l, pnr: true }, svar: { typ: 'tips', titel: 'Personnumret är ifyllt', text: 'Är listan grön kan du trycka Nästa.' } }
       if (id === 'nasta') {
         if (!klar(l)) return fel('Nästa går inte förrän listan Kvar innan du kan gå vidare är grön. Tryck på det som saknas.')
         return { lage: { ...l, vy: 'granska' }, svar: { typ: 'tips', titel: 'Granska', text: 'Raderna, avdraget och att betala är samma som i Oneflow. Tryck Skapa och visa Oneflows PDF.' } }

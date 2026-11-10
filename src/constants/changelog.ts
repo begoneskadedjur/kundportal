@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.127.2',
+    date: '2026-11-10',
+    title: 'Personnummer med tio siffror fungerar för ROT och RUT',
+    items: [
+      { kind: 'buggfix', text: 'ROT- och RUT-offerter och fakturor godtar nu personnummer med tio siffror (ÅÅMMDD-XXXX), som de flesta ärenden har. Till Fortnox skickas numret med sekel. Förut stoppades fakturan tills numret skrevs om med tolv siffror.' },
+      { kind: 'buggfix', text: 'Personnumret kontrolleras nu mot kontrollsiffran, så ett felskrivet nummer upptäcks redan i offerten i stället för hos Skatteverket.' },
+    ],
+  },
+  {
     version: '3.127.1',
     date: '2026-11-10',
     title: 'ROT- och RUT-avdraget registreras i Fortnox',

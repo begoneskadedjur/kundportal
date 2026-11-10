@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   arRotRutRadmodell, avdragKr, exklFranInkl, fakturaAvdrag, fakturaBrister, fakturaRadIRadmodell,
-  fastighetKlar, fastighetText, giltigFastighetsbeteckning, giltigtPersonnummer, inklMoms, kr,
+  fastighetKlar, fastighetText, giltigFastighetsbeteckning, giltigtPersonnummer, inklMoms, kr, personnummer12,
   maskeratPersonnummer, namnerAndraTypen, prisText, rollForKategori, rollForKod, rotRutBrister,
   sammanstallRotRut, timmarTillFortnox, type RotRutKontrollIndata,
 } from './rotRutOffert'
@@ -92,9 +92,14 @@ describe('roller', () => {
 })
 
 describe('identitet och fastighet', () => {
-  it('personnummer: 12 siffror, inte org.nr', () => {
+  it('personnummer: 10 eller 12 siffror med kontrollsiffra, inte org.nr', () => {
     expect(giltigtPersonnummer('19800523-1553')).toBe(true)
-    expect(giltigtPersonnummer('800523-1553')).toBe(false)
+    expect(giltigtPersonnummer('800523-1553')).toBe(true)
+    expect(giltigtPersonnummer('19800523-1554')).toBe(false)
+    expect(personnummer12('800523-1553', new Date('2026-11-10'))).toBe('19800523-1553')
+    expect(personnummer12('121212+1212', new Date('2026-11-10'))).toBe('19121212-1212')
+    expect(personnummer12('100101-0003', new Date('2026-11-10'))).toBe(null)
+    expect(personnummer12('5593789208')).toBe(null)
     expect(giltigtPersonnummer('16559378-9208')).toBe(false)
     expect(giltigtPersonnummer('')).toBe(false)
   })
@@ -184,7 +189,8 @@ describe('fakturan', () => {
       utforandeAdress: 'Dalstigen 5', utforandeDatum: '2026-11-09', harArbetsrad: true,
     }
     expect(fakturaBrister(ok)).toEqual([])
-    expect(fakturaBrister({ ...ok, personnummer: '800523-1553' })).toHaveLength(1)
+    expect(fakturaBrister({ ...ok, personnummer: '800523-1553' })).toHaveLength(0)
+    expect(fakturaBrister({ ...ok, personnummer: '800523-1554' })).toHaveLength(1)
     expect(fakturaBrister({ ...ok, utforandeAdress: '', utforandeDatum: null })).toHaveLength(2)
   })
 })

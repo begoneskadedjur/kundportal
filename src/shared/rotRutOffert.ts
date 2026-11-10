@@ -6,7 +6,7 @@
 //
 // Beslut (Christian 2026-11-10):
 //   - ROT 30 %, RUT 50 % av arbetskostnaden INKL. moms. Mallen bestämmer typen.
-//   - Bara privatpersoner med giltigt personnummer (12 siffror).
+//   - Bara privatpersoner med giltigt personnummer (10 eller 12 siffror, rätt kontrollsiffra).
 //   - Kunden ser priserna inkl. moms.
 //   - Raderna i en ROT/RUT-mall: ärendets tjänst står kvar på 0 kr och visas som
 //     rubrik "Avser: <tjänst>". Kundraderna är fyra fasta tjänster:
@@ -190,18 +190,52 @@ export const avserText = (avser: string | null): string | null => (avser ? `Avse
 
 const siffror = (s: string | null | undefined) => String(s ?? '').replace(/\D/g, '')
 
-/** Giltigt personnummer: 12 siffror, ÅÅÅÅMMDD-XXXX, rimligt datum. Inte org.nr. */
-export function giltigtPersonnummer(pnr: string | null | undefined): boolean {
+/** Kontrollsiffran (Luhn) på de tio sista siffrorna. */
+function luhnOk(tio: string): boolean {
+  let sum = 0
+  for (let i = 0; i < 10; i++) {
+    let n = Number(tio[i]) * (i % 2 === 0 ? 2 : 1)
+    if (n > 9) n -= 9
+    sum += n
+  }
+  return sum % 10 === 0
+}
+
+/**
+ * Personnumret med tolv siffror, ÅÅÅÅMMDD-XXXX, eller null om det inte är ett
+ * giltigt personnummer (fel datum, fel kontrollsiffra eller org.nr). Tio
+ * siffror (ÅÅMMDD-XXXX) får sekel efter ålder, "+" betyder 100 år eller äldre.
+ */
+export function personnummer12(pnr: string | null | undefined, idag: Date = new Date()): string | null {
   const d = siffror(pnr)
-  if (d.length !== 12) return false
-  const ar = Number(d.slice(0, 4))
-  const man = Number(d.slice(4, 6))
-  const dag = Number(d.slice(6, 8))
-  if (ar < 1900 || ar > 2099) return false
-  if (man < 1 || man > 12) return false
+  let full: string
+  if (d.length === 12) {
+    full = d
+  } else if (d.length === 10) {
+    const aa = Number(d.slice(0, 2))
+    const iAr = idag.getFullYear()
+    let ar = Math.floor(iAr / 100) * 100 + aa
+    if (ar > iAr) ar -= 100
+    if (String(pnr ?? '').includes('+')) ar -= 100
+    full = `${ar}${d.slice(2)}`
+  } else {
+    return null
+  }
+  const ar = Number(full.slice(0, 4))
+  const man = Number(full.slice(4, 6))
+  const dag = Number(full.slice(6, 8))
+  if (ar < 1900 || ar > 2099) return null
+  if (man < 1 || man > 12) return null
   // Samordningsnummer: dag + 60
   const verkligDag = dag > 60 ? dag - 60 : dag
-  return verkligDag >= 1 && verkligDag <= 31
+  if (verkligDag < 1 || verkligDag > 31) return null
+  if (!luhnOk(full.slice(2))) return null
+  return `${full.slice(0, 8)}-${full.slice(8)}`
+}
+
+/** Giltigt personnummer (10 eller 12 siffror, rätt datum och kontrollsiffra). Inte org.nr. */
+export function giltigtPersonnummer(pnr: string | null | undefined): boolean {
+  return personnummer12(pnr) !== null
 }
 
 /** Org.nr (10 siffror, tredje siffran 2 eller högre). */
@@ -363,7 +397,7 @@ export function rotRutBrister(d: RotRutKontrollIndata): RotRutBrist[] {
   } else if (!giltigtPersonnummer(d.personnummer)) {
     ut.push({
       kod: 'personnummer',
-      text: !siffror(d.personnummer) ? 'Personnummer saknas' : 'Personnumret ska ha 12 siffror och inte vara ett org.nr',
+      text: !siffror(d.personnummer) ? 'Personnummer saknas' : 'Personnumret ser fel ut eller är ett org.nr',
     })
   }
 
@@ -447,7 +481,7 @@ export function fakturaBrister(d: {
 }): string[] {
   const ut: string[] = []
   if (!d.privat) ut.push('Bara privatpersoner kan få ROT eller RUT')
-  else if (!giltigtPersonnummer(d.personnummer)) ut.push('Personnummer med 12 siffror saknas på fakturan')
+  else if (!giltigtPersonnummer(d.personnummer)) ut.push('Giltigt personnummer saknas på fakturan')
   if (!fastighetKlar(d.fastighet)) {
     ut.push(d.fastighet.brf ? 'Föreningens org.nr eller lägenhetsnummer saknas' : 'Fastighetsbeteckning saknas eller ser fel ut')
   }

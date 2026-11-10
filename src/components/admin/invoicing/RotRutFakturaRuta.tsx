@@ -46,7 +46,7 @@ export default function RotRutFakturaRuta({ invoice, onChanged }: { invoice: Inv
   const fastighet = { brf, fastighetsbeteckning: invoice.fastighetsbeteckning, brfOrgNr: invoice.brf_org_number, lagenhetsnummer: invoice.apartment_number }
 
   const kontroller: Array<{ ok: boolean; text: string }> = [
-    { ok: invoice.case_type === 'private' && giltigtPersonnummer(invoice.organization_number), text: 'Privatperson med personnummer, 12 siffror' },
+    { ok: invoice.case_type === 'private' && giltigtPersonnummer(invoice.organization_number), text: 'Privatperson med giltigt personnummer' },
     { ok: fastighetKlar(fastighet), text: brf ? 'Föreningens org.nr och lägenhetsnummer' : 'Fastighetsbeteckning med kolon' },
     { ok: arbetskostnadInkl > 0, text: 'Avdraget ligger på arbetskostnaden' },
     { ok: invoice.items.every(i => !i.rot_rut_type || i.rot_rut_type === typ), text: `Bara ${typ} på fakturan` },

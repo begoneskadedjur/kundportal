@@ -70,13 +70,13 @@ export const FASTIGHET_HJALP: HjalpText = {
 
 export const PERSONNUMMER_HJALP: HjalpText = {
   rubrik: 'Den som får avdraget',
-  text: '12 siffror, ÅÅÅÅMMDD-XXXX. Personen ska äga eller bo i bostaden och betala fakturan. Ett org.nr fungerar inte. Företag kan inte få ROT eller RUT.',
+  text: 'ÅÅÅÅMMDD-XXXX eller ÅÅMMDD-XXXX. Personen ska äga eller bo i bostaden och betala fakturan. Ett org.nr fungerar inte. Företag kan inte få ROT eller RUT.',
 }
 
 export const FALT_UNDERTEXT = {
   fastighet: 'Skriv som Kommun område 1:23, med kolon.',
   brf: 'Föreningens org.nr och lägenhetsnumret, till exempel 1102.',
-  personnummer: '12 siffror. Ett org.nr fungerar inte.',
+  personnummer: 'ÅÅÅÅMMDD-XXXX. Ett org.nr fungerar inte.',
 }
 
 export const TIMMAR_UNDERTEXT =
