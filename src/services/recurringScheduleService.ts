@@ -17,6 +17,7 @@ import type {
 import { visitsPerYearFromSelection } from '../types/recurringSchedule'
 import { generateInspectionDates } from '../utils/inspectionDateGenerator'
 import { CaseNumberService } from './caseNumberService'
+import { PaymentBlockService } from './paymentBlockService'
 import { resolveContractForCustomer } from './contractResolver'
 import { ContractScopeService } from './contractScopeService'
 import { scheduleHorizon, type HorizonContract, type ScheduleHorizon } from '../shared/scheduleHorizon'
@@ -719,6 +720,8 @@ interface SessionCreationContext {
   indoorCount: number
   service_type?: string
   serviceId: string | null
+  /** Betalningsspärr (3.128.0): schemat skapar ärenden ändå, märkta created_despite_payment_block */
+  paymentBlocked: boolean
 }
 
 // Tjänst som schemaskapade ärenden kopplas till (alla ärendetyper i
@@ -778,7 +781,8 @@ async function fetchSessionCreationContext(
     outdoorCount: outdoorResult.count || 0,
     indoorCount: indoorResult.count || 0,
     service_type,
-    serviceId: serviceData?.id ?? null
+    serviceId: serviceData?.id ?? null,
+    paymentBlocked: (await PaymentBlockService.getStatusSafe(schedule.customer_id)).blocked,
   }
 }
 
@@ -794,6 +798,7 @@ async function createCaseAndSession(
     .from('cases')
     .insert([{
       customer_id: schedule.customer_id,
+      created_despite_payment_block: ctx.paymentBlocked,
       title: caseNumber,
       description: 'Schemalagd stationskontroll',
       status: 'Bokad',

@@ -20,6 +20,7 @@ import { useMultisite } from '../../contexts/MultisiteContext'
 import { useImpersonation } from '../../contexts/ImpersonationContext'
 import { supabase } from '../../lib/supabase'
 import CustomerSettingsModal from './CustomerSettingsModal'
+import PaymentBlockBanner from './PaymentBlockBanner'
 
 export type CustomerPortalView = 'dashboard' | 'stations' | 'inspections' | 'cases' | 'reports' | 'quotes'
 
@@ -416,6 +417,8 @@ export function CustomerPortalLayout({
           ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}
         `}
       >
+        {/* Betalningsspärr (3.128.0): syns bara när kunden är spärrad */}
+        <PaymentBlockBanner className="mx-4 mt-4 lg:mx-8" />
         {children}
       </main>
 

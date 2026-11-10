@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { Save, Loader2, Calendar, User, Building2, FileSignature } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { PaymentTermsService, type BillingCategory } from '../../../services/paymentTermsService'
+import PaymentBlockSettingsSection from './PaymentBlockSettingsSection'
 
 interface CategoryRow {
   key: BillingCategory
@@ -143,6 +144,8 @@ export default function PaymentTermsSettings() {
           )
         })}
       </div>
+
+      <PaymentBlockSettingsSection />
     </div>
   )
 }

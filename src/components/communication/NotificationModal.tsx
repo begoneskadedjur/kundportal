@@ -158,6 +158,11 @@ export default function NotificationModal({
       // Kundnotis (att göra på avtalskartan): kundens första uppgift i arbetslistan
       if (notification.case_type === 'customer') {
         const base = pathname.includes('/koordinator') ? '/koordinator' : '/admin';
+        // Betalningsspärr (3.128.0): kundkortets flik Fakturering
+        if (notification.title?.startsWith('Betalningsspärr')) {
+          navigate(`${base}/befintliga-kunder/${notification.case_id}?tab=fakturering`);
+          return;
+        }
         void workItemLinkForCustomer(base, notification.case_id).then((href) => navigate(href));
         return;
       }

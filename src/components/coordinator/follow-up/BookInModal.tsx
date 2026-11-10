@@ -11,6 +11,7 @@ import { supabase } from '../../../lib/supabase'
 import { CaseNumberService } from '../../../services/caseNumberService'
 import { CasePipelineService } from '../../../services/casePipelineService'
 import type { FollowUpOffer } from '../../../services/offerFollowUpService'
+import { PaymentBlockService, isPaymentBlockError, paymentBlockErrorText } from '../../../services/paymentBlockService'
 
 interface BookInModalProps {
   offer: FollowUpOffer
@@ -47,6 +48,15 @@ export default function BookInModal({ offer, userId, onClose, onDone }: BookInMo
     try {
       const caseNumber = await CaseNumberService.generateUniqueCaseNumber()
       let bookedCaseId: string
+
+      // Betalningsspärr (3.128.0): ny bokning stoppas, hävning sker på kundkortet
+      if (isContract && offer.customer_id) {
+        const block = await PaymentBlockService.getStatusSafe(offer.customer_id)
+        if (block.blocked) {
+          toast.error(`${block.customer_name ?? 'Kunden'} har betalningsspärr. Spärren hävs på kundkortet.`)
+          return
+        }
+      }
 
       if (isContract) {
         // Avtalskund-ärende i cases-tabellen (kunden skapas av webhooken vid signering)
@@ -110,7 +120,7 @@ export default function BookInModal({ offer, userId, onClose, onDone }: BookInMo
       if (openSchedule) navigate('/koordinator/schema')
     } catch (err) {
       console.error('BookIn:', err)
-      toast.error('Kunde inte skapa ärendet')
+      toast.error(isPaymentBlockError(err) ? paymentBlockErrorText(err) : 'Kunde inte skapa ärendet')
     } finally {
       setSaving(false)
     }

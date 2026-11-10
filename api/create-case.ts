@@ -2,6 +2,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from './_lib/auth'
+import {
+  getServerPaymentBlock,
+  PAYMENT_BLOCK_CUSTOMER_MESSAGE,
+  PAYMENT_BLOCK_HTTP_STATUS,
+  PAYMENT_BLOCK_STAFF_MESSAGE,
+} from './_lib/paymentBlock'
 
 // Supabase admin client
 const supabaseUrl = process.env.VITE_SUPABASE_URL!
@@ -53,8 +59,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Validera required fields
     if (!customer_id || !title || !description) {
-      return res.status(400).json({ 
-        error: 'customer_id, title och description är obligatoriska' 
+      return res.status(400).json({
+        error: 'customer_id, title och description är obligatoriska'
+      })
+    }
+
+    // Betalningsspärr (3.128.0): service_role släpps förbi triggern, så
+    // spärren kontrolleras här. Kunden får aldrig se den interna orsaken.
+    const paymentBlock = await getServerPaymentBlock(supabase, customer_id)
+    if (paymentBlock.blocked) {
+      return res.status(PAYMENT_BLOCK_HTTP_STATUS).json({
+        error: auth.role === 'customer' ? PAYMENT_BLOCK_CUSTOMER_MESSAGE : PAYMENT_BLOCK_STAFF_MESSAGE,
+        code: 'payment_block',
       })
     }
 

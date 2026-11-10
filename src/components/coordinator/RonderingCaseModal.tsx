@@ -56,6 +56,7 @@ import { KlartSteg } from '../technician/ny/steg/KlartSteg'
 import { useStegForArende, grannSteg, formateraKr, type StegId } from '../technician/ny/steg/stegKonfig'
 import { HjalpText } from '../technician/ny/hjalp/HjalpText'
 import { kontrolleraAvslut, RAPPORT_SAKNAS_FEL, type AvslutsHinder } from '../../services/arendeAvslutService'
+import { warnIfPaymentBlocked } from '../../utils/paymentBlockWarning'
 
 registerLocale('sv', sv)
 
@@ -805,10 +806,13 @@ export default function RonderingCaseModal({
     setFollowUpLoading(true)
     try {
       const newCaseNumber = await CaseNumberService.generateCaseNumber()
+      // Betalningsspärr (3.128.0): följeärenden varnar men stoppas inte
+      const paymentBlock = await warnIfPaymentBlocked({ customerId: caseData?.customer_id, context: 'Följeärendet skapas ändå.' })
       const { error } = await supabase
         .from('cases')
         .insert({
           case_number: newCaseNumber,
+          created_despite_payment_block: paymentBlock.blocked,
           title: `Följeärende: ${customerData?.company_name || formData.contact_person || 'Kund'}`,
           description: `Följeärende skapat från ${formData.case_number}.\n\nUrsprungligt ärende: ${formData.title || caseData?.title || 'Ej angivet'}`,
           status: 'Bokad',

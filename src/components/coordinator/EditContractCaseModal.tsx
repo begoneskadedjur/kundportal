@@ -100,6 +100,7 @@ interface EditContractCaseModalProps {
 }
 
 import { CaseNumberService } from '../../services/caseNumberService'
+import { warnIfPaymentBlocked } from '../../utils/paymentBlockWarning'
 
 /** Fält som användaren redigerar och som räknas som osparade ändringar (3.56.0) */
 const OSPARAT_FALT = [
@@ -1596,6 +1597,9 @@ export default function EditContractCaseModal({
         // Datum
         created_date: new Date().toISOString(),
       }
+
+      // Betalningsspärr (3.128.0): följeärenden varnar men stoppas inte
+      await warnIfPaymentBlocked({ customerId: followUpCaseData.customer_id, context: 'Följeärendet skapas ändå.' })
 
       const { data: newCase, error } = await supabase
         .from('cases')

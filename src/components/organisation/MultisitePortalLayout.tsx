@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import Select from '../ui/Select'
 import UserProfileModal from './UserProfileModal'
+import PaymentBlockBanner from '../customer/PaymentBlockBanner'
 
 export type MultisitePortalView = 'dashboard' | 'stations' | 'inspections' | 'egenkontroll' | 'cases' | 'reports' | 'quotes'
 
@@ -442,6 +443,8 @@ export default function MultisitePortalLayout({
           ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}
         `}
       >
+        {/* Betalningsspärr (3.128.0): syns bara när kunden är spärrad */}
+        <PaymentBlockBanner className="mx-4 mt-4 lg:mx-8" />
         {children}
       </main>
 

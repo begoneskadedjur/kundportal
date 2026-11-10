@@ -3,6 +3,7 @@
 
 import { logMissingAuth, requireAuth } from './_lib/auth'
 import { createClient } from '@supabase/supabase-js'
+import { getServerPaymentBlockByIdentity, PAYMENT_BLOCK_HTTP_STATUS, PAYMENT_BLOCK_STAFF_MESSAGE } from './_lib/paymentBlock'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { Database } from '../src/types/database'
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz'
@@ -343,6 +344,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (connError) {
       console.error('[AI Booking] Supabase connection error:', connError)
       throw new Error(`Databasanslutning misslyckades: ${connError}`)
+    }
+
+    // Betalningsspärr (3.128.0): endpointen kör som service_role och släpps
+    // förbi databasens trigger, så spärren kontrolleras här.
+    const paymentBlock = await getServerPaymentBlockByIdentity(
+      supabase as unknown as Parameters<typeof getServerPaymentBlockByIdentity>[0],
+      bookingData.case_type === 'private' ? bookingData.personnummer : bookingData.org_nr,
+    )
+    if (paymentBlock.blocked) {
+      return res.status(PAYMENT_BLOCK_HTTP_STATUS).json({
+        success: false,
+        error: `${PAYMENT_BLOCK_STAFF_MESSAGE}${paymentBlock.customer_name ? ` (${paymentBlock.customer_name})` : ''}`,
+        code: 'payment_block',
+      })
     }
 
     // Insert the case into database

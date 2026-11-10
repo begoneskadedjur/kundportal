@@ -13,6 +13,7 @@ import { ClickUpStatus } from '../../types/database'
 import { CaseImageService } from '../../services/caseImageService'
 import { CaseNumberService } from '../../services/caseNumberService'
 import { useCaseMarkingFields, type MarkingFieldKey } from '../../hooks/useCaseMarkingFields'
+import { PaymentBlockedRequestNotice, PAYMENT_BLOCK_PORTAL_TEXT, isPaymentBlockDbError, useMyPaymentBlocks } from '../customer/PaymentBlockBanner'
 
 interface OrganizationServiceRequestProps {
   isOpen: boolean
@@ -108,6 +109,10 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
     }
   }
 
+  // Betalningsspärr (3.128.0): enhetens egen spärr eller huvudkontorets
+  const { isBlocked } = useMyPaymentBlocks()
+  const paymentBlocked = isBlocked(chosenSiteId || null)
+
   if (!isOpen) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -131,6 +136,11 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
 
     if (!customer) {
       toast.error('Kunde inte identifiera kundinformation')
+      return
+    }
+
+    if (paymentBlocked) {
+      toast.error(PAYMENT_BLOCK_PORTAL_TEXT)
       return
     }
 
@@ -236,7 +246,7 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
       }, 2000)
     } catch (error: any) {
       console.error('Error creating case:', error)
-      toast.error('Kunde inte skicka förfrågan. Försök igen.')
+      toast.error(isPaymentBlockDbError(error) ? PAYMENT_BLOCK_PORTAL_TEXT : 'Kunde inte skicka förfrågan. Försök igen.')
       setSubmitting(false)
     }
   }
@@ -316,6 +326,7 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {paymentBlocked && <PaymentBlockedRequestNotice />}
             {/* Site Selection - om inte förvalt */}
             {!selectedSiteId && (
               <div>
@@ -686,6 +697,7 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
                 className="flex-1 bg-emerald-500 hover:bg-emerald-600"
                 disabled={
                   submitting ||
+                  paymentBlocked ||
                   !subject.trim() ||
                   !description.trim() ||
                   !chosenSiteId ||

@@ -40,6 +40,7 @@ import RevenueSection from './RevenueSection'
 import CustomerPulseRow from './CustomerPulseRow'
 import CaseDetailPanel from './CaseDetailPanel'
 import CustomerEquipmentSection from './CustomerEquipmentSection'
+import PaymentBlockSection, { PaymentBlockStrip } from './PaymentBlockSection'
 import { EmptyContractsIllustration } from './ContractGlyphs'
 import { contractState } from '../../../../utils/contractLifecycle'
 
@@ -71,6 +72,8 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
   // ärendevyn — de fulla modalerna är arbetsverktyg med tabellspecifika
   // fältnamn och hör inte hemma här.
   const [openCase, setOpenCase] = useState<RecordCase | null>(null)
+  // Betalningsspärren (3.128.0): räknare som läser om raden och sektionen efter en åtgärd
+  const [paymentBlockVersion, setPaymentBlockVersion] = useState(0)
 
   const derived = useMemo(() => {
     const { customer, root, units, contracts, billingItems, additions, premiumEvents, contractSites, caseCounts } = data
@@ -293,6 +296,13 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
     <div>
       {header}
 
+      <PaymentBlockStrip
+        customerId={customer.id}
+        version={paymentBlockVersion}
+        basePath={basePath}
+        onOpenBilling={() => setActiveTab('fakturering')}
+      />
+
       {/* Flikrad */}
       <nav className="flex items-center gap-5 mt-6 border-b border-slate-800">
         {tabs
@@ -425,6 +435,13 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       )}
 
       <div hidden={activeTab !== 'fakturering'} className="pt-6">
+        <PaymentBlockSection
+          customerId={customer.id}
+          customerName={customerRowName(customer)}
+          version={paymentBlockVersion}
+          onChanged={() => setPaymentBlockVersion((v) => v + 1)}
+          basePath={basePath}
+        />
         {/* Fakturavägen: sätts automatiskt ur avtalet, ändras här vid behov
             (sparas på kunden och Fortnox-kortet) */}
         {density === 'full' && (

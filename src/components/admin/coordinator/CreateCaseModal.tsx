@@ -37,6 +37,8 @@ import toast from 'react-hot-toast';
 import { sluttidForeStart, SLUTTID_FORE_START_FEL } from '../../../utils/besokstid';
 import { findContractCustomerMatch, type ContractCustomerMatch } from '../../../shared/contractCustomerMatch';
 import LoadingSpinner from '../../shared/LoadingSpinner';
+import PaymentBlockNotice, { customerRecordBasePath } from '../../shared/PaymentBlockNotice';
+import { PaymentBlockService, isPaymentBlockError, paymentBlockErrorText, type PaymentBlockStatus } from '../../../services/paymentBlockService';
 import RoomNumberFields from '../../shared/RoomNumberFields';
 
 import DatePicker from 'react-datepicker';
@@ -849,6 +851,33 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     return match && match.customer.id !== dismissedContractMatchId ? match : null
   }, [caseType, formData, contractCustomers, dismissedContractMatchId])
 
+  // Betalningsspärr (3.128.0): kunden (eller dess huvudkontor) slås upp när
+  // den väljs. Spärrad kund kan inte bokas här; hävning görs på kundkortet.
+  // Privat/företag slås upp på personnummer/org.nr.
+  const [paymentBlock, setPaymentBlock] = useState<PaymentBlockStatus>({ blocked: false });
+  const blockCustomerId = caseType && caseType !== 'private' && caseType !== 'business'
+    ? (selectedSiteId ?? selectedContractCustomer)
+    : null;
+  const blockIdentity = caseType === 'private'
+    ? (formData.personnummer as string | null | undefined) ?? null
+    : caseType === 'business'
+      ? (formData.org_nr as string | null | undefined) ?? null
+      : null;
+  useEffect(() => {
+    let cancelled = false;
+    if (!isOpen || (!blockCustomerId && !blockIdentity)) {
+      setPaymentBlock({ blocked: false });
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const status = blockCustomerId
+        ? await PaymentBlockService.getStatusSafe(blockCustomerId)
+        : await PaymentBlockService.getStatusByIdentitySafe(blockIdentity);
+      if (!cancelled) setPaymentBlock(status);
+    }, blockCustomerId ? 0 : 400);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [isOpen, blockCustomerId, blockIdentity]);
+
   const switchToContractVisit = (match: ContractCustomerMatch) => {
     const c = match.customer
     setCaseType('contract')
@@ -1114,6 +1143,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
     if (sluttidForeStart(formData.start_date, formData.due_date)) {
       return toast.error(SLUTTID_FORE_START_FEL);
+    }
+    if (paymentBlock.blocked) {
+      return toast.error('Kunden har betalningsspärr. Spärren hävs på kundkortet.');
     }
 
     // Företagsnamn krävs för business-ärenden
@@ -1697,6 +1729,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         onClose();
       }, 1500);
     } catch (err: any) {
+      if (isPaymentBlockError(err)) {
+        setError(paymentBlockErrorText(err));
+        toast.error('Kunden har betalningsspärr. Ärendet skapades inte.');
+        return;
+      }
       setError(`Fel: ${err.message}`);
       toast.error('Kunde inte spara ärendet.');
     } finally {
@@ -1717,7 +1754,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const footer = step === 'form' ? (
     <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 px-4 py-2.5 border-t border-slate-700/50">
       <Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="w-full sm:w-auto">Avbryt</Button>
-      <Button type="submit" form="create-case-form" loading={loading} disabled={loading} className="w-full sm:w-auto">
+      <Button type="submit" form="create-case-form" loading={loading} disabled={loading || paymentBlock.blocked} className="w-full sm:w-auto">
         <Icon name="station.klar" className="w-4 h-4 mr-1.5" />
         {initialCaseData ? 'Boka In Ärende' : 'Skapa & Boka Ärende'}
       </Button>
@@ -1844,6 +1881,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="flex items-center gap-2 text-slate-400 hover:text-white -ml-2"><Icon name="rapport.tillbaka" className="w-4 h-4" /> Byt kundtyp</Button>
               )}
               {bookingNotice}
+              <PaymentBlockNotice
+                status={paymentBlock}
+                variant="stop"
+                customerBasePath={customerRecordBasePath(typeof window !== 'undefined' ? window.location.pathname : '')}
+              />
               {error && (<div className="bg-red-500/20 border border-red-500/40 p-3 rounded-xl flex items-center gap-3"><Icon name="rapport.avvikelse" className="w-4 h-4 text-red-400 flex-shrink-0" /><p className="text-sm text-red-400">{error}</p></div>)}
 
               {/* Engångsjobb hos en avtalskund: föreslå Extrabesök Avtalskund */}

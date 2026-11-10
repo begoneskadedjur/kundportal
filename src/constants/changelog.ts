@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.128.0',
+    date: '2026-11-10',
+    title: 'Betalningsspärr för kunder med obetalda fakturor',
+    items: [
+      { kind: 'nyhet', text: 'Kunder med förfallna fakturor från portalen spärras automatiskt för nya bokningar, som standard när skulden är över 100 kr och mer än 20 dagar efter förfallodagen. Spärren hävs av sig själv när fakturan är betald. Gränserna ändras under Inställningar, Betalningsvillkor.' },
+      { kind: 'nyhet', text: 'Skapa ärende visar en röd ruta och går inte att spara för en spärrad kund. Spärren hävs, pausas eller sätts manuellt på kundkortet under Fakturering, alltid med kommentar, och historiken visar vem som gjorde vad. Följeärenden, återbesök och scheman varnar men stoppas inte.' },
+      { kind: 'nyhet', text: 'Spärrade kunder ser en ruta i kundportalen om obetalda fakturor med vårt telefonnummer och e-post, och kan inte skicka nya förfrågningar där. Kundansvarig och fakturagodkännare får en notis när en spärr sätts eller hävs automatiskt.' },
+      { kind: 'buggfix', text: 'Fakturorna i portalen visar nu kvar att betala och förfallodag direkt från Fortnox. ROT- och RUT-fakturor där kunden betalat sin del står inte längre som förfallna, och makulerade fakturor i Fortnox blir makulerade i portalen.' },
+    ],
+  },
+  {
     version: '3.127.6',
     date: '2026-11-10',
     title: 'ROT- och RUT-offerten: förhandsvisning och guider',

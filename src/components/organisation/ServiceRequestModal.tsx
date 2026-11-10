@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
 import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
 import { CaseNumberService } from '../../services/caseNumberService'
+import { PaymentBlockedRequestNotice, PAYMENT_BLOCK_PORTAL_TEXT, isPaymentBlockDbError, useMyPaymentBlocks } from '../customer/PaymentBlockBanner'
 
 interface ServiceRequestModalProps {
   isOpen: boolean
@@ -108,6 +109,10 @@ const ServiceRequestModal: React.FC<ServiceRequestModalProps> = ({
     }
   }
 
+  // Betalningsspärr (3.128.0): enhetens egen spärr eller huvudkontorets
+  const { isBlocked } = useMyPaymentBlocks()
+  const paymentBlocked = isBlocked(selectedCustomerId || null)
+
   if (!isOpen) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -120,6 +125,11 @@ const ServiceRequestModal: React.FC<ServiceRequestModalProps> = ({
 
     if (!selectedCustomerId) {
       toast.error('Vänligen välj en enhet')
+      return
+    }
+
+    if (paymentBlocked) {
+      toast.error(PAYMENT_BLOCK_PORTAL_TEXT)
       return
     }
 
@@ -183,7 +193,7 @@ const ServiceRequestModal: React.FC<ServiceRequestModalProps> = ({
       }, 2000)
     } catch (error: any) {
       console.error('Error creating case:', error)
-      toast.error('Kunde inte skicka förfrågan. Försök igen.')
+      toast.error(isPaymentBlockDbError(error) ? PAYMENT_BLOCK_PORTAL_TEXT : 'Kunde inte skicka förfrågan. Försök igen.')
       setSubmitting(false)
     }
   }
@@ -263,6 +273,7 @@ const ServiceRequestModal: React.FC<ServiceRequestModalProps> = ({
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {paymentBlocked && <PaymentBlockedRequestNotice />}
             {/* Site Selection - Only show if multiple sites available */}
             {availableSites.length > 1 && (
               <div>
@@ -529,7 +540,7 @@ const ServiceRequestModal: React.FC<ServiceRequestModalProps> = ({
                 type="submit"
                 variant="primary"
                 className="flex-1 bg-purple-500 hover:bg-purple-600"
-                disabled={submitting || !subject.trim() || !description.trim() || !selectedCustomerId}
+                disabled={submitting || paymentBlocked || !subject.trim() || !description.trim() || !selectedCustomerId}
               >
                 {submitting ? 'Skickar...' : 'Skicka förfrågan'}
               </Button>

@@ -31,6 +31,7 @@ import { CaseBillingService } from '../../../services/caseBillingService'
 import { CaseCustomerService } from '../../../services/caseCustomerService'
 import { VisitService } from '../../../services/visitService'
 import toast from 'react-hot-toast'
+import { warnIfPaymentBlocked } from '../../../utils/paymentBlockWarning'
 import "react-datepicker/dist/react-datepicker.css"
 
 registerLocale('sv', sv)
@@ -248,6 +249,13 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
           ? 'business_cases'
           : 'cases'
       const billingCaseType = caseData.case_type === 'private' ? 'private' : 'business'
+
+      // Betalningsspärr (3.128.0): återbesök varnar men stoppas inte
+      await warnIfPaymentBlocked(
+        caseData.case_type === 'contract'
+          ? { customerId: (caseData as { customer_id?: string | null }).customer_id ?? null, context: 'Återbesöket bokas ändå.' }
+          : { identity: caseData.case_type === 'private' ? caseData.personnummer : caseData.org_nr, context: 'Återbesöket bokas ändå.' }
+      )
 
       const newStartDate = toLocalISOStringWithOffset(new Date(selectedSuggestion.start_time))
       const newDueDate = toLocalISOStringWithOffset(new Date(selectedSuggestion.end_time))

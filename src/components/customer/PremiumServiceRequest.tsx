@@ -10,6 +10,7 @@ import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
 import { CaseImageService } from '../../services/caseImageService'
 import { CaseNumberService } from '../../services/caseNumberService'
 import { useCaseMarkingFields, type MarkingFieldKey } from '../../hooks/useCaseMarkingFields'
+import { PaymentBlockedRequestNotice, PAYMENT_BLOCK_PORTAL_TEXT, isPaymentBlockDbError, useMyPaymentBlocks } from './PaymentBlockBanner'
 
 interface PremiumServiceRequestProps {
   isOpen: boolean
@@ -64,6 +65,10 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
   const effectiveAddress = useCustomAddress ? customAddress.trim() : siteAddress
   const missingMarking = markingFields.filter(f => !markingValues[f.key].trim())
 
+  // Betalningsspärr (3.128.0): spärrad kund kan inte skicka förfrågningar
+  const { isBlocked } = useMyPaymentBlocks()
+  const paymentBlocked = isBlocked(customer?.id)
+
   // Hooks måste köras innan denna guard — annars bryts hook-ordningen
   if (!isOpen) return null
 
@@ -77,6 +82,11 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
 
     if (!customer?.id) {
       toast.error('Kunde inte identifiera kundinformation')
+      return
+    }
+
+    if (paymentBlocked) {
+      toast.error(PAYMENT_BLOCK_PORTAL_TEXT)
       return
     }
 
@@ -159,7 +169,7 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
       }, 2000)
     } catch (error: any) {
       console.error('Error creating case:', error)
-      toast.error('Kunde inte skicka förfrågan. Försök igen.')
+      toast.error(isPaymentBlockDbError(error) ? PAYMENT_BLOCK_PORTAL_TEXT : 'Kunde inte skicka förfrågan. Försök igen.')
       setSubmitting(false)
     }
   }
@@ -234,8 +244,10 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
             </div>
           </div>
 
+          {paymentBlocked && <PaymentBlockedRequestNotice className="m-6" />}
+
           {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} hidden={paymentBlocked} className="p-6 space-y-6">
             {/* Service Type Selection */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-3">

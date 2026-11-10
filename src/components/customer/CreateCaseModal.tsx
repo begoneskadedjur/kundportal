@@ -6,6 +6,7 @@ import Input from '../ui/Input'
 import Card from '../ui/Card'
 import Select from '../ui/Select'
 import { getAuthHeaders } from '../../lib/supabase'
+import { PaymentBlockedRequestNotice, useMyPaymentBlocks } from './PaymentBlockBanner'
 
 interface CreateCaseModalProps {
   isOpen: boolean
@@ -29,6 +30,9 @@ export default function CreateCaseModal({
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Betalningsspärr (3.128.0): api/create-case svarar 423, formuläret göms här
+  const { isBlocked } = useMyPaymentBlocks()
+  const paymentBlocked = isBlocked(customerId)
   
   const [formData, setFormData] = useState({
     title: '',
@@ -135,8 +139,10 @@ export default function CreateCaseModal({
           </Button>
         </div>
 
+        {paymentBlocked && <PaymentBlockedRequestNotice className="m-6" />}
+
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} hidden={paymentBlocked} className="p-6 space-y-6">
           {error && (
             <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
               <AlertCircle className="w-5 h-5 text-red-400" />

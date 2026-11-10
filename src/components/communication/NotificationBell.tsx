@@ -102,6 +102,11 @@ export default function NotificationBell({
       // på kundens första uppgift i arbetslistan
       if (notification.case_type === 'customer') {
         const base = pathname.includes('/koordinator') ? '/koordinator' : '/admin';
+        // Betalningsspärr (3.128.0): kundkortets flik Fakturering
+        if (notification.title?.startsWith('Betalningsspärr')) {
+          window.location.href = `${base}/befintliga-kunder/${notification.case_id}?tab=fakturering`;
+          return;
+        }
         void workItemLinkForCustomer(base, notification.case_id).then((href) => { window.location.href = href; });
         return;
       }

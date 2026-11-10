@@ -100,6 +100,7 @@ import { KlartSteg } from '../../technician/ny/steg/KlartSteg'
 import { useStegForArende, grannSteg, type StegId } from '../../technician/ny/steg/stegKonfig'
 import { HjalpText } from '../../technician/ny/hjalp/HjalpText'
 import { kontrolleraAvslut, RAPPORT_SAKNAS_FEL, type AvslutsHinder } from '../../../services/arendeAvslutService'
+import { warnIfPaymentBlocked } from '../../../utils/paymentBlockWarning';
 
 registerLocale('sv', sv) // Registrera svenskt språk för komponenten
 
@@ -878,6 +879,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         newCaseData.org_nr = currentCase.org_nr;
         newCaseData.customer_group_id = currentCase.customer_group_id ?? null;
       }
+
+      // Betalningsspärr (3.128.0): följeärenden varnar men stoppas inte
+      await warnIfPaymentBlocked({
+        identity: currentCase.case_type === 'private' ? currentCase.personnummer : currentCase.org_nr,
+        context: 'Följeärendet skapas ändå.',
+      });
 
       const { data: newCase, error: insertError } = await supabase
         .from(tableName)

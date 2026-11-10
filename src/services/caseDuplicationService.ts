@@ -3,6 +3,7 @@
 
 import { supabase } from '../lib/supabase'
 import { CaseNumberService } from './caseNumberService'
+import { warnIfPaymentBlocked } from '../utils/paymentBlockWarning'
 
 export type DuplicateCaseType = 'private' | 'business' | 'contract'
 
@@ -356,6 +357,14 @@ async function copyImages(
 export class CaseDuplicationService {
   static async duplicateCase(input: DuplicateCaseInput): Promise<DuplicateCaseResult> {
     const source = await fetchSourceCase(input.sourceCaseId, input.caseType)
+
+    // Betalningsspärr (3.128.0): kopian är ett följeärende (parent_case_id),
+    // varnar men stoppas inte
+    await warnIfPaymentBlocked(
+      input.caseType === 'contract'
+        ? { customerId: source.customer_id, context: 'Kopian skapas ändå.' }
+        : { identity: input.caseType === 'private' ? source.personnummer : source.org_nr, context: 'Kopian skapas ändå.' }
+    )
 
     let newCaseId: string
     let newCaseNumber: string | null = null

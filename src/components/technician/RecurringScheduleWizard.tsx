@@ -44,6 +44,7 @@ import {
   visitsPerYearFromSelection
 } from '../../types/recurringSchedule'
 import type { WorkSchedule } from '../../types/database'
+import { warnIfPaymentBlocked } from '../../utils/paymentBlockWarning'
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
 
@@ -560,6 +561,8 @@ export function RecurringScheduleWizard({
             service_type: serviceType
           }
 
+          // Betalningsspärr (3.128.0): varning, inget stopp
+          await warnIfPaymentBlocked({ customerId: input.customer_id, context: `Schemat för ${result.unit.customerName} skapas ändå.` })
           const res = await createScheduleWithSessions(input, includedDates)
           if (res.schedule) {
             totalSessions += res.sessionsCreated
@@ -591,6 +594,8 @@ export function RecurringScheduleWizard({
           service_type: serviceType
         }
 
+        // Betalningsspärr (3.128.0): varning, inget stopp
+        await warnIfPaymentBlocked({ customerId: input.customer_id, context: 'Schemat skapas ändå.' })
         const result = await createScheduleWithSessions(input, filteredDates)
 
         if (result.schedule) {
