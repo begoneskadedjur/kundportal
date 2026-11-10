@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { netUnitPrice, oneflowProductsValue, visiblePriceKey, wizardProductsValue, type OneflowProductGroup } from './oneflowProductValue'
+import { arAvdragsrad, netUnitPrice, oneflowProductsValue, visiblePriceKey, wizardProductsValue, type OneflowProductGroup } from './oneflowProductValue'
 
 const cols = (p1: boolean, p2: boolean) => ({
   columns: [
@@ -92,5 +92,37 @@ describe('wizardProductsValue', () => {
   })
   it('antal 0 eller saknat räknas som 1, som förut', () => {
     expect(wizardProductsValue([{ products: [{ price_1: { amount: { amount: '100' } }, quantity: { amount: 0 } }, { price_1: { amount: { amount: '50' } } }] }])).toBe(150)
+  })
+})
+
+describe('ROT/RUT-offertens avdragsrad (3.127.3)', () => {
+  // Som Oneflow returnerar utkast 16807724: listpris 0, rabatt 3 600, amount -3 600
+  const p = (a: string, base = a, rab = '0') => ({ amount: { amount: a }, base_amount: { amount: base }, discount_amount: { amount: rab } })
+  const rot: OneflowProductGroup = { configuration: cols(false, true), products: [
+    { name: 'Arbetskostnad', price_1: p('12000'), price_2: p('12000'), quantity: { amount: 1 } },
+    { name: 'Material och utrustning', price_1: p('2000'), price_2: p('2000'), quantity: { amount: 1 } },
+    { name: 'Servicebil', price_1: p('500'), price_2: p('500'), quantity: { amount: 1 } },
+    { name: 'ROT-avdrag 30 %', price_1: p('-3600', '0', '3600'), price_2: p('-3600', '0', '3600'), quantity: { amount: 1 } },
+  ] }
+  it('värdet är totalen före avdrag', () => {
+    expect(wizardProductsValue([rot])).toBe(14500)
+    expect(oneflowProductsValue([rot]).total).toBe(14500)
+  })
+  it('raden finns kvar i rows med sitt minusbelopp för kontrollen', () => {
+    const rows = oneflowProductsValue([rot]).rows
+    const rad = rows[rows.length - 1]
+    expect(rad).toMatchObject({ name: 'ROT-avdrag 30 %', total: -3600, avdragsrad: true })
+  })
+  it('utan amount räknas listpris minus rabatt', () => {
+    const utan: OneflowProductGroup = { configuration: cols(false, true), products: [
+      { name: 'RUT-avdrag 50 %', price_2: { base_amount: { amount: '0' }, discount_amount: { amount: '6000' } }, quantity: { amount: 1 } },
+    ] }
+    expect(oneflowProductsValue([utan]).rows[0].total).toBe(-6000)
+    expect(oneflowProductsValue([utan]).total).toBe(0)
+  })
+  it('bara namnet med listpris 0 är en avdragsrad', () => {
+    expect(arAvdragsrad({ name: 'ROT-avdrag 30 %', price_1: p('-3600', '0', '3600') })).toBe(true)
+    expect(arAvdragsrad({ name: 'ROT-avdrag 30 %', price_1: p('500') })).toBe(false)
+    expect(arAvdragsrad({ name: 'Arbetskostnad', price_1: p('0') })).toBe(false)
   })
 })

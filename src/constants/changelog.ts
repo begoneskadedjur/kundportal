@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.127.3',
+    date: '2026-11-10',
+    title: 'ROT- och RUT-avdraget syns som egen rad i offerten',
+    items: [
+      { kind: 'andring', text: 'I ROT- och RUT-offerter står avdraget nu som en egen rad sist i prislistan, till exempel "ROT-avdrag 30 %" med minusbelopp. Summan kunden ser i Oneflow är det kunden betalar efter avdraget.' },
+      { kind: 'andring', text: 'Varje rad i offerten har en kort beskrivning av vad kostnaden avser, och priskolumnen heter "Att betala (inkl moms)". Granskningen i Skapa offert visar samma rader och samma summa som Oneflow.' },
+      { kind: 'andring', text: 'Offertens värde i portalen är fortfarande totalen före avdrag. Avdragsraden blir aldrig en rad på ärendet eller fakturan, och Fortnox räknar skattereduktionen som förut.' },
+    ],
+  },
+  {
     version: '3.127.2',
     date: '2026-11-10',
     title: 'Personnummer med tio siffror fungerar för ROT och RUT',

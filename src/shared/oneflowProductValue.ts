@@ -16,6 +16,13 @@
 // i båda kolumnerna (api/oneflow/create-contract.ts), så wizardProductsValue
 // blir den synliga summan inkl. moms för dem. oneflowProductsValue gäller avtal
 // som skapats direkt i Oneflow, och premien från dem ska bekräftas.
+//
+// ROT/RUT-offerter sedan 3.127.3 har en avdragsrad sist ("ROT-avdrag 30 %",
+// listpris 0, rabatt = avdraget, Oneflow ger amount -avdraget). Den räknas
+// aldrig in i värdet: contracts.total_value är totalen före avdrag. Raden
+// finns kvar i rows (avdragsrad: true) så att webhookens kontroll ser den.
+
+import { arAvdragsradNamn } from './rotRutOffert'
 
 type Amount = { amount?: string | number | null } | null | undefined
 
@@ -51,6 +58,8 @@ export interface ProductValueRow {
   quantity: number
   /** unitPrice x quantity */
   total: number
+  /** ROT/RUT-offertens avdragsrad: ingår aldrig i totalen */
+  avdragsrad: boolean
 }
 
 function toNumber(v: unknown): number | null {
@@ -94,6 +103,24 @@ export function netUnitPrice(price: OneflowPrice | null | undefined): number {
   return off != null && off > 0 ? Math.max(0, base - off) : base
 }
 
+/**
+ * ROT/RUT-offertens avdragsrad (3.127.3): namnet "ROT-avdrag 30 %" eller
+ * "RUT-avdrag 50 %" och listpris 0. Ingår aldrig i avtalets värde.
+ */
+export function arAvdragsrad(product: OneflowProduct | null | undefined): boolean {
+  if (!product || !arAvdragsradNamn(product.name)) return false
+  const price = product.price_1 ?? product.price_2
+  return (amountOf(price?.base_amount) ?? 0) === 0
+}
+
+/** Avdragsradens belopp per enhet (negativt). Oneflow ger amount, annars listpris minus rabatt. */
+function avdragsradUnitPrice(price: OneflowPrice | null | undefined): number {
+  if (!price) return 0
+  const amount = amountOf(price.amount)
+  if (amount != null) return amount
+  return (amountOf(price.base_amount) ?? 0) - (amountOf(price.discount_amount) ?? 0)
+}
+
 function listUnitPrice(price: OneflowPrice | null | undefined): number {
   if (!price) return 0
   return amountOf(price.base_amount) ?? amountOf(price.amount) ?? 0
@@ -117,11 +144,13 @@ export function oneflowProductsValue(groups: OneflowProductGroup[] | null | unde
     const visible = visiblePriceKey(group)
     const other: PriceKey = visible === 'price_1' ? 'price_2' : 'price_1'
     for (const product of group.products ?? []) {
+      const avdragsrad = arAvdragsrad(product)
+      const unitOf = avdragsrad ? avdragsradUnitPrice : netUnitPrice
       let key = visible
-      let unit = netUnitPrice(product[visible])
+      let unit = unitOf(product[visible])
       if (!product[visible] && product[other]) {
         key = other
-        unit = netUnitPrice(product[other])
+        unit = unitOf(product[other])
       }
       const quantity = quantityOf(product)
       rows.push({
@@ -131,19 +160,24 @@ export function oneflowProductsValue(groups: OneflowProductGroup[] | null | unde
         listPrice: listUnitPrice(product[key]),
         quantity,
         total: Math.round(unit * quantity * 100) / 100,
+        avdragsrad,
       })
     }
   }
-  const total = Math.round(rows.reduce((s, r) => s + r.total, 0) * 100) / 100
+  const total = Math.round(rows.filter(r => !r.avdragsrad).reduce((s, r) => s + r.total, 0) * 100) / 100
   return { total, rows }
 }
 
 
-/** Wizardens beräkning, oförändrad sedan före 3.102.0: price_1 efter rabatt gånger antal */
+/**
+ * Wizardens beräkning, oförändrad sedan före 3.102.0: price_1 efter rabatt
+ * gånger antal. ROT/RUT-offertens avdragsrad räknas inte (3.127.3).
+ */
 export function wizardProductsValue(groups: OneflowProductGroup[] | null | undefined): number {
   let total = 0
   for (const group of groups ?? []) {
     for (const product of group.products ?? []) {
+      if (arAvdragsrad(product)) continue
       const price = toNumber(product.price_1?.amount?.amount) ?? 0
       const q = toNumber(product.quantity?.amount)
       total += price * (q == null || q === 0 ? 1 : q)

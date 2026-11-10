@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
+import { arAvdragsrad } from '../../src/shared/oneflowProductValue'
 import { requireAuth } from '../_lib/auth'
 import { refreshTemplates, getOfferTemplateIds } from '../_lib/oneflowTemplates'
 
@@ -223,6 +224,8 @@ function mapOfferToInsertData(detail: OneFlowContractDetail, listItem?: OneFlowC
   if (detail.product_groups) {
     for (const group of detail.product_groups) {
       for (const product of group.products || []) {
+        // ROT/RUT-offertens avdragsrad räknas aldrig in i värdet (3.127.3)
+        if (arAvdragsrad(product)) continue
         const price =
           parseFloat(product.price_2?.amount?.amount || '0') ||
           parseFloat(product.price_1?.amount?.amount || '0') ||

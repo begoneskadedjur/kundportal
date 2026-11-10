@@ -9,8 +9,8 @@ import { identityNumberVariants } from '../../src/shared/contractSigning'
 import { delaArbetsrader, mallensAvdrag, rotRutFel, type MallAvdrag } from '../../src/shared/rotRutDokument'
 import { getTemplateById } from '../../src/constants/oneflowTemplates'
 import {
-  avserText, fastighetText, prisText, rollForKod, rotRutBrister, sammanstallRotRut, timmarForArbete,
-  type Avdrag, type KontrollArtikel, type OffertTjanstRad, type RotRutSammanstallning,
+  KOLUMN_BESKRIVNING, KOLUMN_PRIS, avserText, fastighetText, oneflowRader, prisText, rollForKod, rotRutBrister,
+  sammanstallRotRut, timmarForArbete, type Avdrag, type KontrollArtikel, type OffertTjanstRad, type RotRutSammanstallning,
 } from '../../src/shared/rotRutOffert'
 // Node.js 18+ har inbyggd fetch
 
@@ -710,14 +710,19 @@ export default async function handler(
   const avserRubrik = rotRutPlan ? avserText(rotRutPlan.sammanstallning.avser) : null
   if (rotRutPlan) {
     // Kundraderna inkl. moms, hela kronor, 1 st, låsta för kunden. Samma pris i
-    // båda kolumnerna (bara price_2 visas), så avtalets värde (wizardProductsValue,
-    // price_1 x antal) blir den synliga summan inkl. moms.
+    // båda kolumnerna (bara price_2 visas). Sist avdragsraden (variant B,
+    // 3.127.3): listpris 0 och rabatt lika med avdraget, eftersom Oneflow inte
+    // godtar negativa belopp eller negativt antal (utkast 16807724). Summan i
+    // Oneflow blir då att betala. Avtalets värde (wizardProductsValue) hoppar
+    // över avdragsraden och blir totalen före avdrag inkl. moms.
     const s = rotRutPlan.sammanstallning
-    const pris = (belopp: number) => ({ base_amount: { amount: String(belopp) }, discount_amount: { amount: '0' } })
+    const pris = (belopp: number) => belopp < 0
+      ? { base_amount: { amount: '0' }, discount_amount: { amount: String(-belopp) } }
+      : { base_amount: { amount: String(belopp) }, discount_amount: { amount: '0' } }
     productGroups = [{
-      products: s.rader.map(r => ({
+      products: oneflowRader(s).map(r => ({
         name: r.namn,
-        description: r.avdrag ? `${s.typ}-avdrag ${s.procent} %` : 'Inget avdrag',
+        description: r.beskrivning,
         price_1: pris(r.belopp),
         price_2: pris(r.belopp),
         quantity: { type: 'quantity', amount: 1 },
@@ -729,10 +734,11 @@ export default async function handler(
         ...(avserRubrik ? { name: { enabled: true, label: avserRubrik } } : {}),
         columns: [
           // Mallarnas beskrivningskolumn heter "Avser", som krockar med rubriken
-          // "Avser: <tjänst>" (utkast 16806487 visade "Avser: Inget avdrag")
-          { key: 'description', enabled: true, label: 'Avdrag' },
+          // "Avser: <tjänst>" (utkast 16806487 visade "Avser: Inget avdrag").
+          // Prisets rubrik blir även summeringens etikett i Oneflow.
+          { key: 'description', enabled: true, label: KOLUMN_BESKRIVNING },
           { key: 'price_1', enabled: false, label: 'Pris' },
-          { key: 'price_2', enabled: true, label: 'Pris inkl. moms' },
+          { key: 'price_2', enabled: true, label: KOLUMN_PRIS },
         ],
       },
     }]
@@ -921,13 +927,16 @@ export default async function handler(
 
     // ROT/RUT: raderna och beloppen som skickades, för webhookens kontroll mot
     // Oneflow (contracts.rot_rut_mismatch). Inga personuppgifter och inga timmar.
+    // Avdragsraden ingår (belopp = minus avdraget) så att ett ändrat eller
+    // borttaget avdrag larmar. Värdet är totalen före avdrag, som webhooken.
     if (rotRutPlan) {
       const s = rotRutPlan.sammanstallning
+      upsertData.total_value = s.totaltInkl > 0 ? s.totaltInkl : null
       upsertData.rot_rut_expected = {
         typ: s.typ,
         procent: s.procent,
         avser: s.avser,
-        rader: s.rader.map(r => ({ namn: r.namn, belopp: r.belopp })),
+        rader: oneflowRader(s).map(r => ({ namn: r.namn, belopp: r.belopp })),
         totalt_inkl: s.totaltInkl,
         avdrag: s.avdrag,
         att_betala: s.attBetala,

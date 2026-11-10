@@ -33,7 +33,7 @@ import { mapBillingItemsToPrefillServices, mapBillingItemsToSelectedArticles } f
 import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES, getTemplateById, type OneflowTemplate } from '../../constants/oneflowTemplates'
 import {
-  KUNDNAMN, ROT_RUT_ROLLER, avserText, fastighetText, giltigFastighetsbeteckning, giltigtOrgNr, giltigtPersonnummer,
+  KOLUMN_PRIS, KUNDNAMN, ROT_RUT_ROLLER, avdragsradNamn, avserText, oneflowRader, fastighetText, giltigFastighetsbeteckning, giltigtOrgNr, giltigtPersonnummer,
   mallensTyp, rollForKod, rotRutBrister, sammanstallRotRut, type Avdrag, type BristKod, type RotRutBrist,
 } from '../../shared/rotRutOffert'
 import {
@@ -2077,27 +2077,28 @@ export default function OneflowContractCreator() {
         <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1.2fr)] text-[15px] border-t border-slate-700">
           <span className="py-2.5 text-[13px] text-slate-400">Tjänst</span>
           <span className="py-2.5 text-[13px] text-slate-400 text-right">Antal</span>
-          <span className="py-2.5 text-[13px] text-slate-400 text-right">Pris inkl. moms</span>
+          <span className="py-2.5 text-[13px] text-slate-400 text-right">{KOLUMN_PRIS}</span>
           {s.rader.length === 0 && (
             <span className="col-span-3 py-2.5 border-t border-slate-700/60 text-red-400">Inga rader med pris</span>
           )}
-          {s.rader.map(r => (
-            <React.Fragment key={r.roll}>
-              <span className="py-2.5 border-t border-slate-700/60 text-white">{r.namn}</span>
+          {/* Samma rader som i Oneflow: kundraderna och sist avdraget som minusbelopp */}
+          {oneflowRader(s).map(r => (
+            <React.Fragment key={r.namn}>
+              <span className="py-2.5 border-t border-slate-700/60 flex flex-col gap-0.5 min-w-0">
+                <span className={r.avdragsrad ? 'text-[#20c58f]' : 'text-white'}>{r.namn}</span>
+                <span className="text-[13px] text-slate-400">{r.beskrivning}</span>
+              </span>
               <span className="py-2.5 border-t border-slate-700/60 text-right text-white tabular-nums">1</span>
-              <span className="py-2.5 border-t border-slate-700/60 text-right text-white tabular-nums">{fmtSEK(r.belopp)}</span>
+              <span className={`py-2.5 border-t border-slate-700/60 text-right tabular-nums ${r.avdragsrad ? 'text-[#20c58f]' : 'text-white'}`}>{fmtSEK(r.belopp)}</span>
             </React.Fragment>
           ))}
-          <span className="py-2.5 border-t border-slate-600 font-bold text-white">Totalt inkl. moms</span>
-          <span className="py-2.5 border-t border-slate-600" />
-          <span className="py-2.5 border-t border-slate-600 text-right font-bold text-white tabular-nums">{fmtSEK(s.totaltInkl)}</span>
-          <span className="py-2 text-[#20c58f]">{s.typ}-avdrag {s.procent} %</span>
-          <span />
-          <span className="py-2 text-right text-[#20c58f] tabular-nums">-{fmtSEK(s.avdrag)}</span>
-          <span className="py-2.5 border-t border-slate-600 font-bold text-white">Att betala</span>
+          <span className="py-2.5 border-t border-slate-600 font-bold text-white">{KOLUMN_PRIS}</span>
           <span className="py-2.5 border-t border-slate-600" />
           <span className="py-2.5 border-t border-slate-600 text-right font-bold text-white tabular-nums">{fmtSEK(s.attBetala)}</span>
         </div>
+        <p className="text-[13px] text-slate-400">
+          Totalt före avdrag {fmtSEK(s.totaltInkl)} inkl. moms, varav arbetskostnad {fmtSEK(s.arbetskostnadInkl)}.
+        </p>
         <p className="text-[13px] text-slate-400">
           {f.brf ? 'Bostadsrätt' : 'Fastighetsbeteckning'}: <span className="text-slate-200">{fastighet || 'saknas'}</span>
         </p>
@@ -2986,7 +2987,8 @@ export default function OneflowContractCreator() {
     rotSammanstallning
       ? {
           namn: 'Pris',
-          text: `${fmtSEK(rotSammanstallning.attBetala)} att betala efter ${rotSammanstallning.typ}-avdrag, totalt ${fmtSEK(rotSammanstallning.totaltInkl)} inkl. moms`,
+          // Som i Oneflow: summan är att betala, avdraget står som minusbelopp
+          text: `${KOLUMN_PRIS} ${fmtSEK(rotSammanstallning.attBetala)}, ${avdragsradNamn(rotSammanstallning.typ)} ${fmtSEK(-rotSammanstallning.avdrag)}`,
           klar: rotSammanstallning.totaltInkl > 0,
         }
       : {

@@ -507,7 +507,9 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
   // Beräkna totalt värde från produkter (src/shared/oneflowProductValue.ts).
   // Avtal gjorda direkt i Oneflow: den priskolumn som syns, efter rabatt,
   // gånger antal. Wizardens avtal räknas som förut (wizard_total_value),
-  // eftersom wizardens ROT-offerter har avdraget i den dolda kolumnen.
+  // eftersom äldre ROT-offerter har avdraget i den dolda kolumnen. ROT/RUT-
+  // offerternas avdragsrad (3.127.3) räknas inte i någon av dem: värdet är
+  // totalen före avdrag.
   const productValue = oneflowProductsValue(details.product_groups)
   const totalValue = productValue.total
   const wizardTotalValue = wizardProductsValue(details.product_groups)

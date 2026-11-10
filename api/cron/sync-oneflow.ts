@@ -15,6 +15,7 @@ import { withCronLog } from '../_lib/cronLogger'
 import { fetchTemplatesStrict, getKnownTemplateIds, getOfferTemplateIds } from '../_lib/oneflowTemplates'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
+import { arAvdragsrad } from '../../src/shared/oneflowProductValue'
 import {
   ONEFLOW_STATE_TO_STATUS,
   PRE_SIGNING_STATUSES,
@@ -274,6 +275,8 @@ function mapToInsertData(detail: OneFlowContractDetail, listItem: OneFlowContrac
   if (detail.product_groups) {
     for (const group of detail.product_groups) {
       for (const product of group.products || []) {
+        // ROT/RUT-offertens avdragsrad räknas aldrig in i värdet (3.127.3)
+        if (arAvdragsrad(product)) continue
         const price =
           parseFloat(product.price_2?.amount?.amount || '0') ||
           parseFloat(product.price_1?.amount?.amount || '0') ||
