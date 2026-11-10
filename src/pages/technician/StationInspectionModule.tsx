@@ -243,6 +243,8 @@ export default function StationInspectionModule() {
   const [measurementValue, setMeasurementValue] = useState<string>('')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  // Sant när teknikern tagit bort ett redan sparat foto; annars behålls det vid omsparning
+  const [photoRemoved, setPhotoRemoved] = useState(false)
   const [selectedPreparationId, setSelectedPreparationId] = useState<string | null>(null)
   const [inspectedStationIds, setInspectedStationIds] = useState<Set<string>>(new Set())
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -793,6 +795,7 @@ export default function StationInspectionModule() {
       setPhotoPreview(null)
     }
     setPhotoFile(null)
+    setPhotoRemoved(false)
     // Historiken laddas alltid (kompakt "Senast"-rad), panelen fälls ut via verktygsraden
     setShowHistory(false)
     setExpandedHistoryId(null)
@@ -1160,6 +1163,7 @@ export default function StationInspectionModule() {
         return
       }
       setPhotoFile(file)
+      setPhotoRemoved(false)
       // Skapa förhandsvisning
       const reader = new FileReader()
       reader.onloadend = () => {
@@ -1172,6 +1176,7 @@ export default function StationInspectionModule() {
   const handleRemovePhoto = () => {
     setPhotoFile(null)
     setPhotoPreview(null)
+    setPhotoRemoved(true)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -1294,7 +1299,8 @@ export default function StationInspectionModule() {
         session_id: currentSession.id,
         status: autoStatus,
         findings: inspectionNotes || undefined,
-        photo_path: photoPath || undefined,
+        // Ny bild ersätter, borttagen bild nollas, annars behålls sparat foto (undefined)
+        photo_path: photoPath ?? (photoRemoved ? null : undefined),
         measurement_value: numMeasurement !== null ? numMeasurement : 0,
         measurement_unit: measurementUnit || undefined,
         preparation_id: selectedPreparationId || undefined
@@ -1342,7 +1348,7 @@ export default function StationInspectionModule() {
           measurementUnit: measurementUnit || null,
           preparationId: selectedPreparationId,
           preparationName: selectedPrep?.name || null,
-          hasPhoto: !!photoPath,
+          hasPhoto: !!photoPath || (!photoRemoved && (!!photoPreview || !!prev[selectedStation.id]?.hasPhoto)),
           photoPreview: photoPreview || null,
           timestamp: new Date().toISOString()
         }

@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.126.3',
+    date: '2026-11-10',
+    title: 'Foton i stationskontrollen försvann',
+    items: [
+      { kind: 'buggfix', text: 'Om du öppnade en redan kontrollerad station igen och sparade utan att ta en ny bild, försvann det tidigare fotot från kontrollen och rapporten. Nu ligger fotot kvar tills du själv tar bort det eller tar ett nytt.' },
+    ],
+  },
+  {
     version: '3.126.2',
     date: '2026-11-06',
     title: 'Enheter med eget kundkort i Fortnox',

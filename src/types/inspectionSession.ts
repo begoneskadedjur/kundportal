@@ -226,7 +226,8 @@ export interface CreateOutdoorInspectionInput {
   session_id?: string
   status: InspectionStatus
   findings?: string
-  photo_path?: string
+  /** undefined = behåll befintligt foto vid uppdatering, null = ta bort */
+  photo_path?: string | null
   measurement_value?: number
   measurement_unit?: MeasurementUnit
   preparation_id?: string
@@ -240,7 +241,8 @@ export interface CreateIndoorInspectionInput {
   session_id?: string
   status: InspectionStatus
   findings?: string
-  photo_path?: string
+  /** undefined = behåll befintligt foto vid uppdatering, null = ta bort */
+  photo_path?: string | null
   measurement_value?: number
   measurement_unit?: MeasurementUnit
   preparation_id?: string

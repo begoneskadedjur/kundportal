@@ -768,7 +768,8 @@ export async function upsertOutdoorInspection(
         .update({
           status: input.status,
           findings: input.findings || null,
-          photo_path: input.photo_path || null,
+          // Utelämnat foto (undefined) behåller det sparade, null tar bort det
+          ...(input.photo_path !== undefined && { photo_path: input.photo_path || null }),
           measurement_value: input.measurement_value ?? null,
           measurement_unit: input.measurement_unit || null,
           preparation_id: input.preparation_id || null,
@@ -998,7 +999,8 @@ export async function upsertIndoorInspection(
         .update({
           status: input.status,
           findings: input.findings || null,
-          photo_path: input.photo_path || null,
+          // Utelämnat foto (undefined) behåller det sparade, null tar bort det
+          ...(input.photo_path !== undefined && { photo_path: input.photo_path || null }),
           measurement_value: input.measurement_value ?? null,
           measurement_unit: input.measurement_unit || null,
           preparation_id: input.preparation_id || null,
