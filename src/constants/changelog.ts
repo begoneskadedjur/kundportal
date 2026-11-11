@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.128.3',
+    date: '2026-11-11',
+    title: 'Rättat månadsvalet i Egenkontroll och datumfältet i Löptid',
+    items: [
+      { kind: 'buggfix', text: 'Egenkontroll öppnar nu på innevarande månad, eller senaste månaden med ronderingar, i stället för januari 2001. Byter du kund börjar vyn om från rätt månad.' },
+      { kind: 'buggfix', text: 'När du ändrar Löptid i avtalets inställningar fälls kalendern inte längre ut av sig själv. Den öppnas först när du klickar i datumfältet.' },
+    ],
+  },
+  {
     version: '3.128.2',
     date: '2026-11-10',
     title: 'Guide för betalningsspärren',

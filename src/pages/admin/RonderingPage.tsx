@@ -25,6 +25,7 @@ import { CaseImageService } from '../../services/caseImageService'
 import type { CaseImageWithUrl } from '../../services/caseImageService'
 import ImageLightbox from '../../components/shared/ImageLightbox'
 import toast from 'react-hot-toast'
+import { swedishMonthKey, pickDefaultMonthKey } from '../../utils/egenkontrollMonth'
 
 // ── Typer ────────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ function fmtDate(iso: string | null) {
 }
 
 function toMonthKey(iso: string): string {
-  return iso.slice(0, 7) // 'YYYY-MM'
+  return swedishMonthKey(iso) // 'YYYY-MM' i svensk tid
 }
 
 // Deduplicera: ett ärende per region per månad — senast genomförda vinner
@@ -489,7 +490,7 @@ export default function RonderingPage() {
   const [loadingOrgs, setLoadingOrgs] = useState(true)
 
   const [availableMonths, setAvailableMonths] = useState<string[]>([])
-  const [selectedMonth, setSelectedMonth] = useState<string>('')
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => pickDefaultMonthKey([]))
   const [allEnriched, setAllEnriched] = useState<RegionMonthData[]>([])
   const [monthData, setMonthData] = useState<RegionMonthData[]>([])
   const [allMonthsAggregated, setAllMonthsAggregated] = useState<{ month: string; all: number; partial: number; none: number }[]>([])
@@ -564,6 +565,9 @@ export default function RonderingPage() {
     const load = async () => {
       setLoading(true)
       setMonthData([])
+      setAvailableMonths([])
+      setSelectedMonth(pickDefaultMonthKey([]))
+      setEgenkontrollCases([])
       setAllEnriched([])
       setAllMonthsAggregated([])
       setHotspots([])
@@ -656,8 +660,7 @@ export default function RonderingPage() {
           .sort((a, b) => b.localeCompare(a))
         setAvailableMonths(monthKeys)
 
-        const latestMonth = monthKeys[0] || ''
-        setSelectedMonth(latestMonth)
+        setSelectedMonth(pickDefaultMonthKey(monthKeys))
 
         // Spara alla enriched ärenden — monthData räknas om via useEffect nedan
         setAllEnriched(enriched)

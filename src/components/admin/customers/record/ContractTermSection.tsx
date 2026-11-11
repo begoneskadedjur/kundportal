@@ -196,7 +196,7 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
       ) : (
         <div className="font-sans py-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-center text-[12px]" style={{ color: ink.secondary }}>
           <label htmlFor={`term-start-${contract.id}`}>Startdatum</label>
-          <DateField id={`term-start-${contract.id}`} className={`${inputClass} pl-7 w-full`} value={startInput} onChange={setStartInput} autoFocus />
+          <DateField id={`term-start-${contract.id}`} className={`${inputClass} pl-7 w-full`} value={startInput} onChange={setStartInput} />
           <label htmlFor={`term-end-${contract.id}`}>Slutdatum</label>
           <DateField id={`term-end-${contract.id}`} className={`${inputClass} pl-7 w-full`} value={endInput} onChange={setEndInput} clearable />
           <label htmlFor={`term-notice-${contract.id}`}>Uppsägningstid (mån)</label>
