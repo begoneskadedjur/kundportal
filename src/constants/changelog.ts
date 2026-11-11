@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.130.0',
+    date: '2026-11-11',
+    title: 'Kundens tidigare besök syns för teknikern',
+    items: [
+      { kind: 'nyhet', text: 'Om ärendet i Idag visar nu också förra besöket hos avtalskunden, med datum, typ, tekniker och rapport, även när en kollega gjorde det. Det står i en egen ruta märkt Annat ärende, skild från det som hör till ärendet du ska till.' },
+      { kind: 'nyhet', text: 'Besökshistoriken i avtalsärenden har fått en sektion Tidigare ärenden hos kunden under historiken för ärendet. Där ser teknikern kundens alla avslutade ärenden och rapporter, oavsett vem som gjorde dem. Varje rad är märkt Annat ärende.' },
+    ],
+  },
+  {
     version: '3.129.0',
     date: '2026-11-11',
     title: 'Om ärendet i nya arbetsvyn',

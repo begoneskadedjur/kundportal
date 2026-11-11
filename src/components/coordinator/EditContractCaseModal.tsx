@@ -2244,7 +2244,7 @@ export default function EditContractCaseModal({
           id: 'besokshistorik',
           ikon: 'allman.historik' as const,
           text: 'Besökshistorik',
-          beskrivning: 'Tidigare besök, återbesök och fakturor med betalstatus.',
+          beskrivning: 'Besök, återbesök och fakturor i ärendet, och kundens tidigare ärenden.',
           onClick: () => setShowVisitHistoryPanel(true),
         },
       ] : [],
@@ -3773,6 +3773,7 @@ export default function EditContractCaseModal({
         <VisitHistoryPanel
           caseId={caseData?.id || ''}
           caseTitle={formData.title || caseData?.title || 'Avtalsärende'}
+          customerId={caseData?.customer_id || null}
           onClose={() => setShowVisitHistoryPanel(false)}
         />
       )}

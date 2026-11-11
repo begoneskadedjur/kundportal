@@ -202,7 +202,7 @@ function teknikerLista(par: [unknown, unknown][]): { id: string; namn: string | 
   return ut
 }
 
-function typForServiceType(st: string | null | undefined): BesokTyp {
+export function typForServiceType(st: string | null | undefined): BesokTyp {
   switch (st) {
     case 'inspection': return 'inspection'
     case 'establishment': return 'establishment'
@@ -366,6 +366,41 @@ export async function hamtaAllaArenden(technicianId: string): Promise<DagBesok[]
     ...(privRes.data || []).map(c => franClickUp(c, 'private')),
     ...(bizRes.data || []).map(c => franClickUp(c, 'business')),
   ])
+}
+
+/** Ett avslutat ärende hos kunden, ur kundhistoriken */
+export interface KundhistorikRad {
+  id: string
+  arendenummer: string | null
+  typ: BesokTyp
+  skadedjur: string | null
+  avslutad: Date | null
+  tekniker: string | null
+  rapport: string | null
+}
+
+/**
+ * Kundens avslutade avtalsärenden, senaste först, oavsett vilken tekniker som gjorde
+ * dem. Läses via hamta_kundhistorik eftersom en tekniker bara får läsa sina egna
+ * ärenden i cases. Tom lista om man saknar ärende hos kunden eller något går fel.
+ */
+export async function hamtaKundhistorik(customerId: string, utomCaseId?: string | null, antal = 20): Promise<KundhistorikRad[]> {
+  const { data, error } = await supabase.rpc('hamta_kundhistorik', {
+    p_customer_id: customerId,
+    p_utom_case_id: utomCaseId ?? null,
+    p_antal: antal,
+  })
+  if (error || !Array.isArray(data)) return []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return data.map((r: any) => ({
+    id: r.id,
+    arendenummer: r.case_number ?? null,
+    typ: typForServiceType(r.service_type),
+    skadedjur: r.pest_type ?? null,
+    avslutad: tid(r.completed_date),
+    tekniker: r.tekniker ?? null,
+    rapport: r.work_report ?? null,
+  }))
 }
 
 /** Antal aktiva stationer (ute + inne) per kund. Tomt om inget går att läsa. */

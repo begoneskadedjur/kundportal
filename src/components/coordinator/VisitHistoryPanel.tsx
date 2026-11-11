@@ -11,6 +11,7 @@ import { INVOICE_STATUS_CONFIG } from '../../types/invoice'
 import type { InvoiceStatus } from '../../types/invoice'
 import CaseContextImagePreview from '../communication/CaseContextImagePreview'
 import { formatVisitTechnicians } from '../../services/visitService'
+import { hamtaKundhistorik, TYP_ETIKETT, type KundhistorikRad } from '../../services/teknikerDagService'
 
 interface CaseInvoice {
   id: string
@@ -64,6 +65,8 @@ interface BillingItem {
 interface VisitHistoryPanelProps {
   caseId: string
   caseTitle: string
+  /** Avtalskunden. Ger sektionen Tidigare ärenden hos kunden (andra ärenden, ofta en kollegas). */
+  customerId?: string | null
   onClose: () => void
 }
 
@@ -111,13 +114,23 @@ function formatMinutes(minutes: number | null): string {
   return `${h} h ${m} min`
 }
 
-export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitHistoryPanelProps) {
+export default function VisitHistoryPanel({ caseId, caseTitle, customerId, onClose }: VisitHistoryPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const [visits, setVisits] = useState<Visit[]>([])
   const [billingItems, setBillingItems] = useState<BillingItem[]>([])
   const [invoices, setInvoices] = useState<CaseInvoice[]>([])
   const [events, setEvents] = useState<HistoryEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [kundRader, setKundRader] = useState<KundhistorikRad[]>([])
+
+  // Kundens andra avslutade ärenden. Via hamta_kundhistorik så att teknikern ser
+  // kollegornas besök hos kunden (cases släpper bara igenom egna ärenden).
+  useEffect(() => {
+    if (!customerId) { setKundRader([]); return }
+    let avbruten = false
+    hamtaKundhistorik(customerId, caseId || null, 20).then(r => { if (!avbruten) setKundRader(r) })
+    return () => { avbruten = true }
+  }, [customerId, caseId])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -247,14 +260,16 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
               <div className="w-5 h-5 border-2 border-slate-600 border-t-teal-400 rounded-full animate-spin mr-2" />
               <span className="text-sm">Hämtar historik...</span>
             </div>
-          ) : visits.length === 0 && invoices.length === 0 && events.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-              <History className="w-10 h-10 mb-3 opacity-30" />
-              <p className="text-sm">Ingen historik ännu</p>
-              <p className="text-xs mt-1 text-slate-600">Besök, fakturor och bokningar samlas här</p>
-            </div>
           ) : (
             <>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">I det här ärendet</h3>
+            {visits.length === 0 && invoices.length === 0 && events.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-6 text-slate-500">
+                <History className="w-8 h-8 mb-2 opacity-30" />
+                <p className="text-sm">Ingen historik i det här ärendet ännu</p>
+                <p className="text-xs mt-1 text-slate-600">Besök, fakturor och bokningar samlas här</p>
+              </div>
+            )}
             {/* Fakturor på ärendet — vem/när/vad + betalstatus (synkas från Fortnox) */}
             {invoices.length > 0 && (
               <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
@@ -487,6 +502,40 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
 
             {/* Bilder från ärendet — komponenten döljer sig själv om inga finns */}
             <CaseContextImagePreview caseId={caseId} caseType="contract" compact />
+
+            {/* Andra ärenden hos samma kund, tydligt skilda från det här ärendet */}
+            {customerId && (
+              <section aria-label="Tidigare ärenden hos kunden" className="space-y-3 pt-4 border-t border-slate-800">
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tidigare ärenden hos kunden</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Andra ärenden hos samma kund, oavsett vem som gjorde dem.</p>
+                </div>
+                {kundRader.length === 0 ? (
+                  <p className="text-sm text-slate-500">Inga andra avslutade ärenden hos kunden.</p>
+                ) : kundRader.map(r => (
+                  <div key={r.id} className="border border-dashed border-slate-700 rounded-xl overflow-hidden">
+                    <div className="px-4 py-2.5 border-b border-dashed border-slate-700 flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-slate-200">Annat ärende: {TYP_ETIKETT[r.typ].toLowerCase()}</span>
+                      {r.avslutad && (
+                        <span className="text-xs text-slate-400 font-mono flex-shrink-0">{format(r.avslutad, 'yyyy-MM-dd', { locale: sv })}</span>
+                      )}
+                    </div>
+                    <div className="px-4 py-3 space-y-2">
+                      <p className="text-xs text-slate-400 flex flex-wrap gap-x-3 gap-y-0.5">
+                        {r.tekniker && <span className="inline-flex items-center gap-1"><User className="w-3 h-3" />{r.tekniker}</span>}
+                        {r.arendenummer && <span className="font-mono">{r.arendenummer}</span>}
+                        {r.skadedjur && <span>{r.skadedjur}</span>}
+                      </p>
+                      {r.rapport ? (
+                        <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{r.rapport.replace(/<[^>]+>/g, ' ').trim()}</p>
+                      ) : (
+                        <p className="text-sm italic text-slate-500">Ingen rapport skriven.</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </section>
+            )}
             </>
           )}
         </div>

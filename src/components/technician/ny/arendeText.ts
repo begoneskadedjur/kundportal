@@ -1,13 +1,19 @@
 // src/components/technician/ny/arendeText.ts
 // Ärendets beskrivning och senaste rapport, hämtade för ett enskilt besök.
 // Finns inte i besökslistornas data (för tungt att hämta för alla ärenden), så de
-// läses först när ärendet väljs eller fälls ut.
+// läses först när ärendet väljs eller fälls ut. Med medKund hämtas också förra
+// avslutade ärendet hos avtalskunden (ett annat ärende, ofta en kollegas).
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
-import type { DagBesok } from '../../../services/teknikerDagService'
+import { hamtaKundhistorik, type DagBesok, type KundhistorikRad } from '../../../services/teknikerDagService'
 
-export interface ArendeText { beskrivning: string | null; rapport: string | null }
+export interface ArendeText {
+  beskrivning: string | null
+  rapport: string | null
+  /** Förra avslutade ärendet hos kunden. undefined = hämtades inte (ej avtalskund) */
+  forra?: KundhistorikRad | null
+}
 
 /** Ren text ur fält som ibland innehåller HTML */
 export function renText(v: unknown): string | null {
@@ -16,11 +22,12 @@ export function renText(v: unknown): string | null {
   return t || null
 }
 
-export function useArendeText(b: DagBesok | null): { text: ArendeText | null; laddar: boolean } {
+export function useArendeText(b: DagBesok | null, medKund = false): { text: ArendeText | null; laddar: boolean } {
   const [text, setText] = useState<ArendeText | null>(null)
   const [laddar, setLaddar] = useState(false)
   const kalla = b?.kalla
   const id = b?.id
+  const kundId = medKund && kalla === 'cases' ? b?.customerId ?? null : null
   useEffect(() => {
     if (!kalla || !id) { setText(null); return }
     let avbruten = false
@@ -28,9 +35,15 @@ export function useArendeText(b: DagBesok | null): { text: ArendeText | null; la
     setText(null)
     ;(async () => {
       try {
+        const forraP = kundId
+          ? hamtaKundhistorik(kundId, id, 1).then(r => r[0] ? { ...r[0], rapport: renText(r[0].rapport) } : null)
+          : Promise.resolve(undefined)
         if (kalla === 'cases') {
-          const { data } = await supabase.from('cases').select('description, work_report').eq('id', id).maybeSingle()
-          if (!avbruten) setText({ beskrivning: renText(data?.description), rapport: renText(data?.work_report) })
+          const [{ data }, forra] = await Promise.all([
+            supabase.from('cases').select('description, work_report').eq('id', id).maybeSingle(),
+            forraP,
+          ])
+          if (!avbruten) setText({ beskrivning: renText(data?.description), rapport: renText(data?.work_report), forra })
         } else {
           const tabell = kalla === 'private' ? 'private_cases' : 'business_cases'
           const { data } = await supabase.from(tabell).select('description, rapport').eq('id', id).maybeSingle()
@@ -43,6 +56,6 @@ export function useArendeText(b: DagBesok | null): { text: ArendeText | null; la
       }
     })()
     return () => { avbruten = true }
-  }, [kalla, id])
+  }, [kalla, id, kundId])
   return { text, laddar }
 }
