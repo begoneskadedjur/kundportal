@@ -281,7 +281,7 @@ async function loadReportData(report: SpecialReport): Promise<ReportData> {
   const events = (eventsRes.data || []) as SpecialReportEvent[]
   const images = (imagesRes.data || []) as SpecialReportImage[]
 
-  // Bilderna bäddas in (de är redan komprimerade till WebP vid uppladdning)
+  // Bilderna bäddas in (WebP från uppladdningen, görs om till JPEG i compressImagesForPdf)
   const dataUris = await Promise.all(images.map(i => imageToDataUri(i.storage_path)))
   const imagesWithData = images.map((img, i) => ({ ...img, dataUri: dataUris[i] }))
 
@@ -784,6 +784,7 @@ async function renderPdf(data: ReportData, version: number, dateText: string): P
     headless: (chromium as unknown as { headless: boolean | 'shell' }).headless,
   })
   try {
+    await compressImagesForPdf(browser, data)
     // Kartorna i samma browser-session som PDF:en
     const maps = await renderMapShots(browser, buildMapShots(data))
     const html = buildHtml(data, maps, version, dateText)
@@ -801,6 +802,52 @@ async function renderPdf(data: ReportData, version: number, dateText: string): P
     return { pdf, pageCount: countPdfPages(pdf) }
   } finally {
     await browser.close().catch(() => {})
+  }
+}
+
+// Chromium bäddar bara in JPEG som den är. WebP och PNG packas upp till okomprimerade
+// pixlar (2-3 MB per foto), så alla foton görs om till JPEG i rimlig storlek först.
+// Bilderna visas som små rutor i rapporten, 1200 px räcker gott även vid utskrift.
+const PDF_IMAGE_MAX_DIMENSION = 1200
+const PDF_IMAGE_QUALITY = 0.8
+
+async function compressImagesForPdf(browser: Browser, data: ReportData): Promise<void> {
+  const images = data.sections.flatMap(s => s.images).filter(img => img.dataUri)
+  if (images.length === 0) return
+
+  let page: Page | null = null
+  try {
+    page = await browser.newPage()
+    for (const img of images) {
+      try {
+        const jpeg = await page.evaluate(async (src: string, maxDim: number, quality: number) => {
+          const el = new Image()
+          el.src = src
+          await el.decode()
+          const scale = Math.min(1, maxDim / Math.max(el.naturalWidth, el.naturalHeight))
+          const canvas = document.createElement('canvas')
+          canvas.width = Math.max(1, Math.round(el.naturalWidth * scale))
+          canvas.height = Math.max(1, Math.round(el.naturalHeight * scale))
+          const ctx = canvas.getContext('2d')
+          if (!ctx) return null
+          // Vit bakgrund, annars blir genomskinliga delar svarta i JPEG
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+          ctx.drawImage(el, 0, 0, canvas.width, canvas.height)
+          return canvas.toDataURL('image/jpeg', quality)
+        }, img.dataUri as string, PDF_IMAGE_MAX_DIMENSION, PDF_IMAGE_QUALITY)
+        // En JPEG som redan är mindre behålls, allt annat ersätts
+        const original = img.dataUri as string
+        const keepOriginal = original.startsWith('data:image/jpeg') && original.length <= (jpeg?.length ?? Infinity)
+        if (jpeg && !keepOriginal) img.dataUri = jpeg
+      } catch (err) {
+        console.error('[special-report-pdf] Bilden kunde inte komprimeras:', img.storage_path, err)
+      }
+    }
+  } catch (err) {
+    console.error('[special-report-pdf] Bildkomprimeringen kunde inte starta:', err)
+  } finally {
+    if (page) await page.close().catch(() => {})
   }
 }
 

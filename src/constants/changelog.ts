@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.128.4',
+    date: '2026-11-11',
+    title: 'Mindre PDF för specialrapporter med bilder',
+    items: [
+      { kind: 'buggfix', text: 'Specialrapporter med många bilder blir nu en bråkdel så stora som PDF, några MB i stället för över 30 MB, så att de går att mejla till kunden. Bilderna ser likadana ut i rapporten.' },
+    ],
+  },
+  {
     version: '3.128.3',
     date: '2026-11-11',
     title: 'Rättat månadsvalet i Egenkontroll och datumfältet i Löptid',
