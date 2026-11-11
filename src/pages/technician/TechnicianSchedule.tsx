@@ -24,6 +24,8 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import ReportModal from '../../components/admin/technicians/ReportModal'
 import { BeGoneCaseRow, WorkSchedule } from '../../types/database' // NYTT: Importerar den centrala typen
 import { getTechWorkHours } from '../../components/coordinator/schedule/scheduleUtils'
+import { Icon } from '../../components/icons/Icon'
+import { franvaroTyp, franvaroRubrik } from '../../utils/franvaroTyper'
 import '../../styles/FullCalendar.css'
 
 // Definiera en mer komplett typ för ärenden som används i denna komponent
@@ -217,7 +219,49 @@ const SearchResultsList = ({ results, query, onOpen, onClear }: { results: Sched
     );
 };
 
-type TechnicianAbsence = { id: string; technician_id: string; start_date: string; end_date: string; reason: string; notes: string | null };
+type TechnicianAbsence = { id: string; technician_id: string; start_date: string; end_date: string; reason: string; notes: string | null; title?: string | null };
+
+const parseTid = (v: string): Date => new Date(v.replace(' ', 'T'));
+const klockslag = (d: Date): string => d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+
+/** Frånvaro som berör dagen, med start och slut klippta till dagen */
+function absencesForDay(dateStr: string, absences: TechnicianAbsence[]): { absence: TechnicianAbsence; start: Date; slut: Date; heldag: boolean }[] {
+  const dayStart = new Date(dateStr + 'T00:00:00');
+  const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+  return absences
+    .map(absence => ({ absence, aStart: parseTid(absence.start_date), aSlut: parseTid(absence.end_date) }))
+    .filter(({ aStart, aSlut }) => !isNaN(aStart.getTime()) && !isNaN(aSlut.getTime()) && aStart < dayEnd && aSlut > dayStart)
+    .map(({ absence, aStart, aSlut }) => ({
+      absence,
+      start: aStart < dayStart ? dayStart : aStart,
+      slut: aSlut > dayEnd ? dayEnd : aSlut,
+      heldag: aStart <= dayStart && aSlut >= dayEnd,
+    }))
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+}
+
+// Frånvaro, möten, admin och kundbesök som koordinatorn lagt in (3.128.5).
+// Samma typ, ikon och färg som i nya arbetsvyn.
+const AgendaAbsenceItem = ({ absence, start, slut, heldag }: { absence: TechnicianAbsence; start: Date; slut: Date; heldag: boolean }) => {
+    const typ = franvaroTyp(absence.reason);
+    const rubrik = franvaroRubrik(absence);
+    const tid = heldag ? 'Hela dagen' : `${klockslag(start)} till ${slut.getHours() === 0 && slut.getMinutes() === 0 && slut > start ? '24:00' : klockslag(slut)}`;
+    return (
+        <motion.div layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.2 } }} className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden" style={{ borderLeft: `4px solid ${typ.farg}` }}>
+            <div className="px-4 py-3 flex items-start gap-3">
+                <span className="flex-shrink-0 mt-0.5" style={{ color: typ.farg }}><Icon name={typ.ikon} size={20} /></span>
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                        <h3 className="text-base font-bold text-white leading-tight">{rubrik}</h3>
+                        <span className="font-mono text-sm font-semibold text-slate-300 whitespace-nowrap">{tid}</span>
+                    </div>
+                    {rubrik !== typ.kort && <p className="text-sm text-slate-400">{typ.kort}</p>}
+                    {absence.notes?.trim() && <p className="mt-1 text-sm text-slate-300 whitespace-pre-line">{absence.notes.trim()}</p>}
+                </div>
+            </div>
+        </motion.div>
+    );
+};
 
 const DAY_KEYS: (keyof WorkSchedule)[] = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
 
@@ -228,7 +272,7 @@ function isOffDay(dateStr: string, workSchedule: WorkSchedule | null): boolean {
   return !workSchedule[key]?.active;
 }
 
-function getAbsenceStatus(dateStr: string, absences: TechnicianAbsence[], workSchedule: WorkSchedule | null): { absent: boolean; fullDay: boolean } {
+function getAbsenceStatus(dateStr: string, absences: TechnicianAbsence[], workSchedule: WorkSchedule | null): { absent: boolean; fullDay: boolean; reason?: string } {
   const dayStart = new Date(dateStr + 'T00:00:00');
   const dayEnd = new Date(dateStr + 'T23:59:59');
   const overlapping = absences.filter(a => {
@@ -246,7 +290,7 @@ function getAbsenceStatus(dateStr: string, absences: TechnicianAbsence[], workSc
   const workEnd = schedule ? new Date(dateStr + 'T' + schedule.end + ':00') : new Date(dateStr + 'T17:00:00');
 
   const fullDay = overlapping.some(a => new Date(a.start_date.replace(' ', 'T')) <= workStart && new Date(a.end_date.replace(' ', 'T')) >= workEnd);
-  return { absent: true, fullDay };
+  return { absent: true, fullDay, reason: overlapping[0].reason };
 }
 
 const FilterPanel = ({ isOpen, onClose, activeStatuses, setActiveStatuses }: { isOpen: boolean, onClose: () => void, activeStatuses: Set<string>, setActiveStatuses: (s: Set<string>) => void }) => { const toggleStatus = (status: string) => { const newStatuses = new Set(activeStatuses); if (newStatuses.has(status)) newStatuses.delete(status); else newStatuses.add(status); setActiveStatuses(newStatuses); }; return (<AnimatePresence>{isOpen && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-40 flex justify-center items-center p-4"><motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl"><header className="p-4 border-b border-slate-800 flex items-center justify-between"><h2 className="text-lg font-bold">Filtrera Ärenden</h2><Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button></header><div className="p-4 flex-grow overflow-y-auto"><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{ALL_VALID_STATUSES.map(status => (<label key={status} className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-slate-800/50"><input type="checkbox" checked={activeStatuses.has(status)} onChange={() => toggleStatus(status)} className="h-5 w-5 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 shrink-0" /><span className={`text-sm ${activeStatuses.has(status) ? 'text-white' : 'text-slate-400'}`}>{status}</span></label>))}</div></div><footer className="p-4 border-t border-slate-800 flex flex-col sm:flex-row gap-2"><Button variant="secondary" onClick={() => setActiveStatuses(new Set(ALL_VALID_STATUSES))} className="w-full">Visa alla</Button><Button variant="secondary" onClick={() => setActiveStatuses(new Set(DEFAULT_ACTIVE_STATUSES))} className="w-full">Återställ</Button><Button variant="primary" onClick={onClose} className="w-full">Klar</Button></footer></motion.div></motion.div>)}</AnimatePresence>);};
@@ -432,6 +476,17 @@ export default function TechnicianSchedule() {
       .sort((a, b) => new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime());
   }, [filteredCases, selectedDate]);
   
+  const absencesForSelectedDay = useMemo(() => absencesForDay(selectedDate, absences), [selectedDate, absences]);
+
+  // Dagens lista: frånvaro och ärenden i tidsordning, frånvaro först vid samma tid
+  const renderAgenda = (empty: React.ReactNode) => {
+    const rader = [
+      ...absencesForSelectedDay.map(a => ({ t: a.start.getTime(), o: 0, node: <AgendaAbsenceItem key={`fr-${a.absence.id}`} {...a} /> })),
+      ...casesForSelectedDay.map(c => ({ t: parseTid(c.start_date!).getTime(), o: 1, node: <AgendaCaseItem key={c.id} caseData={c} onOpen={handleOpenModal} /> })),
+    ].sort((a, b) => a.t - b.t || a.o - b.o);
+    return <div className="space-y-3"><AnimatePresence>{rader.length > 0 ? rader.map(r => r.node) : empty}</AnimatePresence></div>;
+  };
+
   const casesByDay = useMemo(() => filteredCases.reduce((acc, event) => {
     if (!event.start_date) return acc;
     const d = new Date(event.start_date.replace(' ', 'T'));
@@ -582,7 +637,10 @@ export default function TechnicianSchedule() {
 
     return (
       <div className={`flex flex-col items-center justify-center w-full h-full gap-0.5 transition-opacity ${faded ? 'opacity-30' : ''}`}>
-        <span className="leading-none">{dayRenderInfo.dayNumberText}</span>
+        <span className="relative leading-none">
+          {dayRenderInfo.dayNumberText}
+          {absenceStatus.absent && <span className="absolute -right-2 top-0 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: franvaroTyp(absenceStatus.reason).farg }} title="Frånvaro eller möte" />}
+        </span>
         <div className="w-4/5 h-1 bg-slate-700/50 rounded-full overflow-hidden">
           <div className={`h-full ${barColor} rounded-full transition-all`} style={{ width: `${ratio * 100}%` }} />
         </div>
@@ -679,7 +737,7 @@ export default function TechnicianSchedule() {
                     </div>
                     <div className="flex items-center gap-1"><Button variant="secondary" size="icon" onClick={() => handleDayChange(-1)}><ChevronLeft className="w-5 h-5"/></Button><Button variant="secondary" size="sm" onClick={goToToday}>Idag</Button><Button variant="secondary" size="icon" onClick={() => handleDayChange(1)}><ChevronRight className="w-5 h-5"/></Button></div>
                   </header>
-                  <div className="space-y-3"><AnimatePresence>{casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-12 h-12 text-slate-600 mb-2" /><h3 className="text-lg font-semibold text-slate-300">Inga ärenden</h3><p className="text-slate-500">Du har inga schemalagda ärenden för denna dag.</p></motion.div>)}</AnimatePresence></div>
+                  {renderAgenda(<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-12 h-12 text-slate-600 mb-2" /><h3 className="text-lg font-semibold text-slate-300">Inga ärenden</h3><p className="text-slate-500">Du har inga schemalagda ärenden för denna dag.</p></motion.div>)}
                   </>
                   )}
                 </div>
@@ -713,7 +771,7 @@ export default function TechnicianSchedule() {
                   </div>
                   <div className="mt-4">
                     <h2 className="text-base font-semibold text-white mb-3">{selectedDateObject.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
-                    <div className="space-y-3"><AnimatePresence>{casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-8 h-8 text-slate-600 mb-2" /><p className="text-slate-500 text-sm">Inga ärenden denna dag.</p></motion.div>)}</AnimatePresence></div>
+                    {renderAgenda(<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-8 h-8 text-slate-600 mb-2" /><p className="text-slate-500 text-sm">Inga ärenden denna dag.</p></motion.div>)}
                   </div>
                   </>
                   )}

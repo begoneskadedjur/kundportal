@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.128.5',
+    date: '2026-11-11',
+    title: 'Möten, admin och kundbesök syns i teknikernas schema',
+    items: [
+      { kind: 'buggfix', text: 'Tekniker med det gamla schemat ser nu möten, admin, kundbesök och annan frånvaro som koordinatorn lagt in, med typ, rubrik, klockslag och anteckning i dagens lista. Tidigare syntes bara frånvaro som täckte hela dagen. Dagar med frånvaro får en färgad prick i månadskalendern.' },
+      { kind: 'buggfix', text: 'Tekniker med en annan roll än tekniker, till exempel säljare, ser nu också sin egen frånvaro i schemat.' },
+    ],
+  },
+  {
     version: '3.128.4',
     date: '2026-11-11',
     title: 'Mindre PDF för specialrapporter med bilder',
