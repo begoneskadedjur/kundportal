@@ -7,8 +7,14 @@
 
 import { useId } from 'react'
 import { Icon } from '../../icons/Icon'
-import { TYP_ETIKETT, svenskDag, type DagBesok } from '../../../services/teknikerDagService'
+import { TYP_ETIKETT, besokBeskrivning, svenskDag, type BesokTyp, type DagBesok } from '../../../services/teknikerDagService'
+import { TYP_IKON } from './besokTyp'
 import { useArendeText, type ArendeText } from './arendeText'
+
+/** Besökstyper där stationerna ska kontrolleras. Övriga visar bara vad kunden har. */
+const KONTROLL = new Set<BesokTyp>(['inspection', 'routine', 'rondering', 'egenkontroll'])
+
+const antalStationer = (n: number) => `${n} ${n === 1 ? 'station' : 'stationer'}`
 
 function Laddar() {
   return (
@@ -55,6 +61,22 @@ function Innehall({ besok }: { besok: DagBesok }) {
   return (
     <div className="space-y-3">
       <section aria-label="Det här ärendet" className="space-y-3">
+        <div>
+          <h4 className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-300">
+            <Icon name={TYP_IKON[besok.typ]} size={16} className="text-slate-400" />
+            Ärendetyp
+          </h4>
+          <p className="mt-0.5 text-sm text-white">
+            {besokBeskrivning(besok)}
+            {besok.kalla === 'cases' && besok.skadedjur && `, ${besok.skadedjur.toLowerCase()}`}
+          </p>
+          {text.stationer && text.stationer.ute + text.stationer.inne > 0 && (
+            <p className="mt-0.5 text-sm text-slate-300">
+              {KONTROLL.has(besok.typ) ? 'Att kontrollera' : 'Hos kunden'}: {antalStationer(text.stationer.ute + text.stationer.inne)}
+              {' '}({text.stationer.ute} utomhus, {text.stationer.inne} inomhus)
+            </p>
+          )}
+        </div>
         <div>
           <h4 className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-300">
             <Icon name="dok.konversation" size={16} className="text-slate-400" />

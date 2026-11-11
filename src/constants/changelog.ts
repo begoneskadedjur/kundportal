@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.130.1',
+    date: '2026-11-11',
+    title: 'Ärendetyp och stationer i Om ärendet',
+    items: [
+      { kind: 'andring', text: 'Om ärendet i Idag visar nu ärendetypen överst. För avtalsbesök står också hur många stationer kunden har och hur de fördelar sig utomhus och inomhus, till exempel "Att kontrollera: 4 stationer (3 utomhus, 1 inomhus)" vid kontroll- och rutinbesök.' },
+    ],
+  },
+  {
     version: '3.130.0',
     date: '2026-11-11',
     title: 'Kundens tidigare besök syns för teknikern',

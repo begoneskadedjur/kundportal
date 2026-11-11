@@ -6,13 +6,15 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { hamtaKundhistorik, type DagBesok, type KundhistorikRad } from '../../../services/teknikerDagService'
+import { hamtaKundhistorik, hamtaStationsfordelning, type DagBesok, type KundhistorikRad, type Stationsfordelning } from '../../../services/teknikerDagService'
 
 export interface ArendeText {
   beskrivning: string | null
   rapport: string | null
   /** Förra avslutade ärendet hos kunden. undefined = hämtades inte (ej avtalskund) */
   forra?: KundhistorikRad | null
+  /** Kundens aktiva stationer. undefined = hämtades inte (ej avtalskund) */
+  stationer?: Stationsfordelning | null
 }
 
 /** Ren text ur fält som ibland innehåller HTML */
@@ -39,11 +41,12 @@ export function useArendeText(b: DagBesok | null, medKund = false): { text: Aren
           ? hamtaKundhistorik(kundId, id, 1).then(r => r[0] ? { ...r[0], rapport: renText(r[0].rapport) } : null)
           : Promise.resolve(undefined)
         if (kalla === 'cases') {
-          const [{ data }, forra] = await Promise.all([
+          const [{ data }, forra, stationer] = await Promise.all([
             supabase.from('cases').select('description, work_report').eq('id', id).maybeSingle(),
             forraP,
+            kundId ? hamtaStationsfordelning([kundId]).then(m => m.get(kundId) ?? null) : Promise.resolve(undefined),
           ])
-          if (!avbruten) setText({ beskrivning: renText(data?.description), rapport: renText(data?.work_report), forra })
+          if (!avbruten) setText({ beskrivning: renText(data?.description), rapport: renText(data?.work_report), forra, stationer })
         } else {
           const tabell = kalla === 'private' ? 'private_cases' : 'business_cases'
           const { data } = await supabase.from(tabell).select('description, rapport').eq('id', id).maybeSingle()

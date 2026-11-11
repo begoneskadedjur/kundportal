@@ -403,32 +403,43 @@ export async function hamtaKundhistorik(customerId: string, utomCaseId?: string 
   }))
 }
 
-/** Antal aktiva stationer (ute + inne) per kund. Tomt om inget går att läsa. */
-export async function hamtaStationsantal(customerIds: string[]): Promise<Map<string, number>> {
-  const antal = new Map<string, number>()
+export interface Stationsfordelning { ute: number; inne: number }
+
+/** Antal aktiva stationer per kund, utomhus och inomhus var för sig. Tomt om inget går att läsa. */
+export async function hamtaStationsfordelning(customerIds: string[]): Promise<Map<string, Stationsfordelning>> {
+  const antal = new Map<string, Stationsfordelning>()
   const ids = [...new Set(customerIds.filter(Boolean))]
   if (ids.length === 0) return antal
+  const rad = (k: string) => {
+    let r = antal.get(k)
+    if (!r) { r = { ute: 0, inne: 0 }; antal.set(k, r) }
+    return r
+  }
   try {
     const [ute, planer] = await Promise.all([
       supabase.from('equipment_placements').select('customer_id').in('customer_id', ids).eq('status', 'active'),
       supabase.from('floor_plans').select('id, customer_id').in('customer_id', ids),
     ])
-    for (const r of ute.data || []) {
-      antal.set(r.customer_id, (antal.get(r.customer_id) || 0) + 1)
-    }
+    for (const r of ute.data || []) rad(r.customer_id).ute++
     const planTillKund = new Map<string, string>()
     for (const p of planer.data || []) planTillKund.set(p.id, p.customer_id)
     if (planTillKund.size > 0) {
       const inne = await supabase.from('indoor_stations').select('floor_plan_id').in('floor_plan_id', [...planTillKund.keys()]).eq('status', 'active')
       for (const r of inne.data || []) {
         const k = planTillKund.get(r.floor_plan_id)
-        if (k) antal.set(k, (antal.get(k) || 0) + 1)
+        if (k) rad(k).inne++
       }
     }
   } catch (e) {
     console.warn('[teknikerDag] stationsantal kunde inte läsas', e)
   }
   return antal
+}
+
+/** Antal aktiva stationer (ute + inne) per kund. Tomt om inget går att läsa. */
+export async function hamtaStationsantal(customerIds: string[]): Promise<Map<string, number>> {
+  const fordelning = await hamtaStationsfordelning(customerIds)
+  return new Map([...fordelning].map(([k, f]) => [k, f.ute + f.inne]))
 }
 
 // ─── Grupperingar ───
