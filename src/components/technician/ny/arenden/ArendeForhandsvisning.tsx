@@ -3,9 +3,8 @@
 // beskrivning, med Öppna ärendet, Navigera och Ring. Beskrivningen och senaste
 // rapporten hämtas när ärendet väljs (finns inte i listans data).
 
-import { useEffect, useState } from 'react'
-import { supabase } from '../../../../lib/supabase'
 import { Icon } from '../../../icons/Icon'
+import { useArendeText } from '../arendeText'
 import { StatusPunkt } from '../besokUi'
 import { TYP_IKON } from '../besokTyp'
 import {
@@ -17,46 +16,6 @@ import { alderTon, avslutsdag, dagarSedan, langDatum, sedanText } from './arende
 
 const SEKUNDAR = 'h-11 flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]'
 const AV = 'h-11 flex items-center justify-center gap-2 rounded-xl border border-slate-700 text-sm font-semibold text-slate-500 cursor-not-allowed'
-
-interface Text { beskrivning: string | null; rapport: string | null }
-
-/** Ren text ur fält som ibland innehåller HTML */
-function renText(v: unknown): string | null {
-  if (typeof v !== 'string') return null
-  const t = v.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/[ \t]+/g, ' ').trim()
-  return t || null
-}
-
-function useArendeText(b: DagBesok | null): { text: Text | null; laddar: boolean } {
-  const [text, setText] = useState<Text | null>(null)
-  const [laddar, setLaddar] = useState(false)
-  const kalla = b?.kalla
-  const id = b?.id
-  useEffect(() => {
-    if (!kalla || !id) { setText(null); return }
-    let avbruten = false
-    setLaddar(true)
-    setText(null)
-    ;(async () => {
-      try {
-        if (kalla === 'cases') {
-          const { data } = await supabase.from('cases').select('description, work_report').eq('id', id).maybeSingle()
-          if (!avbruten) setText({ beskrivning: renText(data?.description), rapport: renText(data?.work_report) })
-        } else {
-          const tabell = kalla === 'private' ? 'private_cases' : 'business_cases'
-          const { data } = await supabase.from(tabell).select('description, rapport').eq('id', id).maybeSingle()
-          if (!avbruten) setText({ beskrivning: renText(data?.description), rapport: renText(data?.rapport) })
-        }
-      } catch {
-        if (!avbruten) setText({ beskrivning: null, rapport: null })
-      } finally {
-        if (!avbruten) setLaddar(false)
-      }
-    })()
-    return () => { avbruten = true }
-  }, [kalla, id])
-  return { text, laddar }
-}
 
 interface Props {
   besok: DagBesok | null

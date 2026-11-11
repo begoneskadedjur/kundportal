@@ -16,6 +16,7 @@ import { useNySidhuvud } from '../../../components/technician/ny/layout/NySidhuv
 import { BesokKnappar, StatusPunkt } from '../../../components/technician/ny/besokUi'
 import { TYP_IKON } from '../../../components/technician/ny/besokTyp'
 import { RestidRad } from '../../../components/technician/ny/RestidRad'
+import { OmArendet } from '../../../components/technician/ny/OmArendet'
 import { useAllaArenden } from '../../../hooks/useTeknikerBesok'
 import { useMapsKlar, useMinPosition, useRestid } from '../../../hooks/useRestid'
 import type { MinPosition, Restid } from '../../../services/restidService'
@@ -75,12 +76,14 @@ function TestarRad() {
   )
 }
 
-function NastaKort({ besok, stationer, restid, position, onOppna }: {
+function NastaKort({ besok, stationer, restid, position, onOppna, omOppen, onVaxlaOm }: {
   besok: DagBesok
   stationer?: number
   restid: Restid | null
   position: MinPosition | null
   onOppna: () => void
+  omOppen: boolean
+  onVaxlaOm: () => void
 }) {
   const omTid = tidTill(besok.start)
   return (
@@ -116,6 +119,7 @@ function NastaKort({ besok, stationer, restid, position, onOppna }: {
           )}
         </p>
       ) : null}
+      <OmArendet besok={besok} oppen={omOppen} onVaxla={onVaxlaOm} className="border-t border-slate-700/60 pt-1" />
       <BesokKnappar besok={besok} onOppna={onOppna} />
     </article>
   )
@@ -143,6 +147,10 @@ export default function NyIdag() {
   const [offerter, setOfferter] = useState<OffertLage | null>(null)
   const [stationer, setStationer] = useState<Map<string, number>>(new Map())
   const [nu, setNu] = useState(() => new Date())
+  // Utfälld "Om ärendet": bara en åt gången. Nästa uppdrag har egen nyckel eftersom
+  // samma besök också står i Dagens rutt.
+  const [utfalld, setUtfalld] = useState<string | null>(null)
+  const vaxlaOm = (nyckel: string) => setUtfalld(u => (u === nyckel ? null : nyckel))
 
   // Uppdatera "om 25 min" och nästa uppdrag varje minut
   useEffect(() => {
@@ -203,7 +211,7 @@ export default function NyIdag() {
           <div className="space-y-5 min-w-0">
             <section aria-labelledby="hjalp-idag-nasta-rubrik" className="space-y-2">
               <HjalpText id="idag-nasta" rubrik="Nästa uppdrag" ikon="falt.framme">
-                Navigera öppnar vägbeskrivningen, Ring ringer kontaktpersonen och Öppna visar hela ärendet.
+                Navigera öppnar vägbeskrivningen, Ring ringer kontaktpersonen och Öppna visar hela ärendet. Om ärendet visar beskrivningen så att du kan förbereda dig.
               </HjalpText>
               {nasta ? (
                 <NastaKort
@@ -212,6 +220,8 @@ export default function NyIdag() {
                   restid={restid}
                   position={position}
                   onOppna={() => oppna(nasta)}
+                  omOppen={utfalld === `nasta:${nasta.nyckel}`}
+                  onVaxlaOm={() => vaxlaOm(`nasta:${nasta.nyckel}`)}
                 />
               ) : (
                 <div data-genomgang="idag-nasta" className="rounded-2xl bg-slate-900 border border-slate-700/60 p-5 flex items-center gap-3">
@@ -235,7 +245,7 @@ export default function NyIdag() {
                   </Link>
                 )}
               >
-                Besöken i den ordning de är bokade. Tryck på ett besök för att öppna ärendet.
+                Besöken i den ordning de är bokade. Tryck på ett besök för att öppna ärendet, eller på Om ärendet för att läsa vad det gäller innan du kör.
               </HjalpText>
               {dagens.length === 0 ? (
                 <p className="text-sm text-slate-500">Inget inbokat idag.</p>
@@ -271,6 +281,12 @@ export default function NyIdag() {
                             </span>
                           </span>
                         </button>
+                        <OmArendet
+                          besok={b}
+                          oppen={utfalld === b.nyckel}
+                          onVaxla={() => vaxlaOm(b.nyckel)}
+                          className="pl-14 pr-3 -mt-2 pb-1"
+                        />
                       </li>
                     )
                   })}

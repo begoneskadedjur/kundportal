@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.129.0',
+    date: '2026-11-11',
+    title: 'Om ärendet i nya arbetsvyn',
+    items: [
+      { kind: 'nyhet', text: 'I Idag har Nästa uppdrag och varje besök i Dagens rutt en rad Om ärendet. Ett tryck visar koordinatorns beskrivning och senaste rapporten i ärendet, så att du kan förbereda dig, packa bilen och hämta på lagret innan du kör. Bara ett besök är utfällt åt gången.' },
+    ],
+  },
+  {
     version: '3.128.5',
     date: '2026-11-11',
     title: 'Möten, admin och kundbesök syns i teknikernas schema',
