@@ -110,13 +110,40 @@ export function stationMarkerSvg(spec: StationMarkerSpec): { svg: string; size: 
     body += `<g transform="translate(${c - 12 * sc} ${c - 12 * sc}) scale(${sc})" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPaths}</g>`
   }
   if (badge) {
-    const w = Math.max(pillH, 6 + badge.length * 6)
-    body +=
-      `<rect x="${c - w / 2}" y="${pillTop}" width="${w}" height="${pillH}" rx="${pillH / 2}" fill="#0f172a" fill-opacity="0.9" stroke="#ffffff" stroke-width="1"/>` +
-      `<text x="${c}" y="${pillTop + pillH / 2 + 3.2}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#ffffff">${badge}</text>`
+    body += badgePillMarkup(badge, c, pillTop)
   }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${height}" viewBox="0 0 ${size} ${height}">${body}</svg>`
   return { svg, size, height, center: c }
+}
+
+/** Nummerbrickans höjd i px */
+export const BADGE_PILL_HEIGHT = 12
+
+/** Nummerbrickans bredd i px för ett visst nummer */
+export function badgePillWidth(badge: string): number {
+  return Math.max(BADGE_PILL_HEIGHT, 6 + badge.length * 6)
+}
+
+function badgePillMarkup(badge: string, cx: number, top: number): string {
+  const pillH = BADGE_PILL_HEIGHT
+  const w = badgePillWidth(badge)
+  return `<rect x="${cx - w / 2}" y="${top}" width="${w}" height="${pillH}" rx="${pillH / 2}" fill="#0f172a" fill-opacity="0.9" stroke="#ffffff" stroke-width="1"/>` +
+    `<text x="${cx}" y="${top + pillH / 2 + 3.2}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#ffffff">${badge}</text>`
+}
+
+/**
+ * Bara nummerbrickan, som en egen bild. Används när brickorna ritas i ett
+ * eget lager ovanpå cirklarna (rapportkartorna), så att ingen grannes cirkel
+ * täcker ett nummer. Ankaret är (anchorX, 0): stationens punkt, och brickan
+ * börjar gap px under punkten, precis där den sitter i stationMarkerSvg.
+ */
+export function stationBadgeSvg(badge: string, gap: number): { svg: string; width: number; height: number; anchorX: number } {
+  const w = badgePillWidth(badge)
+  const width = w + 2
+  const cx = width / 2
+  const height = Math.ceil(gap + BADGE_PILL_HEIGHT + 1)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${badgePillMarkup(badge, cx, gap)}</svg>`
+  return { svg, width, height, anchorX: cx }
 }
 
 /** Mörka typfärger (t.ex. Betesstation #1f2937) syns inte mot klustrets mörka botten. */

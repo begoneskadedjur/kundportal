@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.131.3',
+    date: '2026-11-12',
+    title: 'Alla stationsnummer syns på rapportkartan',
+    items: [
+      { kind: 'buggfix', text: 'Satellitkartan i kontrollrapporten och stationskartan visar nu numret för varje station. Förut kunde nummer längst ner i bilden skäras av, en grannstation kunde dölja ett nummer och två stationer på nästan samma plats visades som en.' },
+      { kind: 'buggfix', text: 'Stationer som står nästan på samma plats ritas nu en bit isär på kartbilden så att båda numren går att läsa. Stationernas sparade position ändras inte.' },
+    ],
+  },
+  {
     version: '3.131.2',
     date: '2026-11-12',
     title: 'Fastighetsbeteckning utan kolon godtas',

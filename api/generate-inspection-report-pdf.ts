@@ -9,7 +9,8 @@ import { numberStations } from '../src/shared/stationNumbering'
 import nodemailer from 'nodemailer'
 import { requireAuth, requireAuthenticated } from './_lib/auth'
 import { canonicalTypeCode } from '../src/utils/stationTaxonomy'
-import { reportLegendHtml, reportMarkerSvg, svgDataUri, type LegendStation } from '../src/shared/reportStationMarkers'
+import { reportLegendHtml, reportMarkerLayers, type LegendStation } from '../src/shared/reportStationMarkers'
+import { renderSatelliteMapShot } from './_lib/satelliteMapShot'
 
 // Gräns för bifogad PDF vid e-postutskick. Resend tillåter 40 MB per mejl, men många
 // mottagande e-postservrar avvisar bilagor över ~10 MB, så vi stannar vid 8 MB.
@@ -120,75 +121,28 @@ function resolveReportStation(insp: any, number: number, types: ReportTypeRow[])
   }
 }
 
-function markerFor(s: ResolvedStation) {
-  return reportMarkerSvg({ color: s.color, icon: s.icon, status: s.status, addon: s.addon, number: s.number, radius: 11 })
+function markerLayersFor(s: ResolvedStation) {
+  return reportMarkerLayers({ color: s.color, icon: s.icon, status: s.status, addon: s.addon, number: s.number, radius: 11 })
 }
 
-// Rendera Google Maps satellitbild via Puppeteer + JavaScript API (Static API blockerar satellit i EU/EEA)
+// Rendera Google Maps satellitbild via Puppeteer + JavaScript API (Static API blockerar satellit i EU/EEA).
+// Delad med stationskartan i api/_lib/satelliteMapShot.ts: marginal efter markörens mått,
+// nummerbrickor i eget lager överst och utspridning av stationer på samma pixel.
 async function renderSatelliteMapScreenshot(
   browser: any,
   stations: Array<ResolvedStation & { lat: number; lng: number }>
 ): Promise<string | null> {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY
-  if (!apiKey) return null
   if (stations.length === 0) return null
-
-  // Markören som SVG-ikon (samma som kunden ser i appen), ankrad i cirkelns mitt
-  const markersJSON = JSON.stringify(stations.map(s => {
-    const m = markerFor(s)
-    return { lat: s.lat, lng: s.lng, url: svgDataUri(m.svg), w: m.size, h: m.height, c: m.center }
-  }))
-
-  const mapHtml = `<!DOCTYPE html>
-<html><head>
-  <style>* { margin: 0; padding: 0; } #map { width: 900px; height: 450px; }</style>
-</head><body>
-  <div id="map"></div>
-  <script>
-    function initMap() {
-      var markers = ${markersJSON};
-      var bounds = new google.maps.LatLngBounds();
-      var map = new google.maps.Map(document.getElementById('map'), {
-        mapTypeId: 'satellite',
-        disableDefaultUI: true,
-        isFractionalZoomEnabled: true
-      });
-      markers.forEach(function(m) {
-        var pos = { lat: m.lat, lng: m.lng };
-        bounds.extend(pos);
-        new google.maps.Marker({
-          position: pos,
-          map: map,
-          icon: {
-            url: m.url,
-            scaledSize: new google.maps.Size(m.w, m.h),
-            anchor: new google.maps.Point(m.c, m.c)
-          }
-        });
-      });
-      map.fitBounds(bounds, 15);
-      google.maps.event.addListenerOnce(map, 'tilesloaded', function() {
-        setTimeout(function() { window.__MAP_READY = true; }, 500);
-      });
-    }
-  </script>
-  <script src="https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initMap" async defer></script>
-</body></html>`
-
-  let page: any = null
-  try {
-    page = await browser.newPage()
-    await page.setViewport({ width: 900, height: 450, deviceScaleFactor: 2 })
-    await page.setContent(mapHtml, { waitUntil: 'networkidle0', timeout: 20000 })
-    await page.waitForFunction('window.__MAP_READY === true', { timeout: 15000 })
-    const screenshot = await page.screenshot({ type: 'png' })
-    await page.close()
-    return `data:image/png;base64,${Buffer.from(screenshot).toString('base64')}`
-  } catch (err) {
-    console.error('[MapScreenshot] Error:', err)
-    if (page) await page.close().catch(() => {})
-    return null
-  }
+  return renderSatelliteMapShot(browser, {
+    width: 900,
+    height: 450,
+    minPadding: 15,
+    logTag: 'MapScreenshot',
+    stations: stations.map(s => ({
+      lat: s.lat, lng: s.lng,
+      color: s.color, icon: s.icon, status: s.status, addon: s.addon, number: s.number, radius: 11,
+    })),
+  })
 }
 
 // Rendera planritning + markörer som Puppeteer screenshot (löser sidbrytningsproblem)
@@ -198,13 +152,16 @@ async function renderFloorPlanScreenshot(
   stations: Array<ResolvedStation & { x: number; y: number }>
 ): Promise<string | null> {
   // Samma markör som på satellitkartan, cirkelns mitt på stationens punkt
-  const markerHtml = stations.map(s => {
-    const m = markerFor(s)
-    return `
+  // Cirklarna först och alla nummerbrickor efter, så att ingen cirkel täcker ett nummer
+  const layers = stations.map(s => ({ s, l: markerLayersFor(s) }))
+  const markerHtml = layers.map(({ s, l }) => `
     <div style="position:absolute;left:${s.x}%;top:${s.y}%;
-      margin-left:-${m.center}px;margin-top:-${m.center}px;line-height:0;
-      filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));">${m.svg}</div>`
-  }).join('')
+      margin-left:-${l.circle.center}px;margin-top:-${l.circle.center}px;line-height:0;
+      filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));">${l.circle.svg}</div>`).join('') +
+    layers.filter(({ l }) => l.badge).map(({ s, l }) => `
+    <div style="position:absolute;left:${s.x}%;top:${s.y}%;
+      margin-left:-${l.badge!.anchorX}px;line-height:0;
+      filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));">${l.badge!.svg}</div>`).join('')
 
   const html = `<!DOCTYPE html><html><head>
     <style>*{margin:0;padding:0;}

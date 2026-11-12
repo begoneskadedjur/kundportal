@@ -7,7 +7,7 @@
 // Ren TypeScript utan React och DOM, så att både servern (api/) och
 // webbläsaren (jsPDF) kan använda den.
 
-import { stationIconPaths, stationMarkerSvg } from './stationMarkers'
+import { stationBadgeSvg, stationIconPaths, stationMarkerSvg } from './stationMarkers'
 
 export interface ReportStatusStyle {
   stroke: string
@@ -86,6 +86,31 @@ export function reportMarkerSvg(input: ReportMarkerInput): ReportMarker {
   if (!statusStyle) return marker
   const svg = marker.svg.replace(/<\/svg>$/, `${symbolMarkup(statusStyle.symbol, marker.center, radius)}</svg>`)
   return { ...marker, svg: removed ? svg.replace('<svg ', '<svg opacity="0.75" ') : svg }
+}
+
+export interface ReportMarkerLayers {
+  /** Cirkeln utan nummer, ankrad i (center, center) */
+  circle: ReportMarker
+  /** Nummerbrickan som egen bild, ankrad i (anchorX, 0) = stationens punkt */
+  badge: { svg: string; width: number; height: number; anchorX: number } | null
+}
+
+/**
+ * Samma markör som reportMarkerSvg men i två lager: cirkeln och
+ * nummerbrickan var för sig. Kartorna ritar alla cirklar först och alla
+ * brickor överst, så att en grannes cirkel aldrig döljer ett nummer.
+ */
+export function reportMarkerLayers(input: ReportMarkerInput): ReportMarkerLayers {
+  const radius = input.radius ?? 11
+  const circle = reportMarkerSvg({ ...input, number: null })
+  const badgeText = input.number !== null && input.number !== undefined && input.number !== ''
+    ? String(input.number).replace(/[^0-9A-Za-z\-.]/g, '')
+    : ''
+  if (!badgeText) return { circle, badge: null }
+  const statusStyle = input.status ? REPORT_STATUS_STYLES[input.status] : undefined
+  const strokeWeight = statusStyle ? 3 : 2
+  // Samma avstånd som i stationMarkerSvg: under cirkelns kant plus 1 px
+  return { circle, badge: stationBadgeSvg(badgeText, radius + strokeWeight / 2 + 1) }
 }
 
 /** Markören som data-URI, för Google Maps-ikoner och bilder. */

@@ -8,12 +8,12 @@
 
 import { numberStations } from '../src/shared/stationNumbering'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import puppeteer, { type Browser, type Page } from 'puppeteer-core'
+import puppeteer, { type Browser } from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuthenticated } from './_lib/auth'
 import { canonicalTypeCode } from '../src/utils/stationTaxonomy'
-import { reportMarkerSvg, svgDataUri } from '../src/shared/reportStationMarkers'
+import { renderSatelliteMapShot, type SatelliteStation } from './_lib/satelliteMapShot'
 import {
   buildStationMapHtml,
   buildStationOverviewHtml,
@@ -204,69 +204,23 @@ async function fetchFloorPlanBase64(imagePath: string): Promise<string | null> {
   }
 }
 
-// Markören är stationstypens SVG-markör (samma som kunden ser i appen) som data-URI
-interface MapMarker { lat: number; lng: number; url: string; w: number; h: number; c: number }
 interface MapPolygon { path: Array<{ lat: number; lng: number }>; color: string; label: string }
 
 // Satellitkarta med numrerade markörer och/eller regionpolygoner med antal.
-// Samma metod som kontrollrapporten: Google Maps JS API i en Puppeteer-sida
-// (Static Maps saknar satellitvy i EU).
-async function renderSatelliteMap(browser: Browser, markers: MapMarker[], polygons: MapPolygon[]): Promise<string | null> {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY
-  if (!apiKey) return null
-  if (markers.length === 0 && polygons.length === 0) return null
-
-  const html = `<!DOCTYPE html>
-<html><head><style>* { margin:0; padding:0; } #map { width:1000px; height:560px; }
-.cnt { background:#0f172a; color:#fff; font:700 12px 'Segoe UI',Arial,sans-serif; padding:3px 8px; border-radius:10px; border:2px solid #fff; white-space:nowrap; }
-</style></head><body><div id="map"></div>
-<script>
-  function initMap() {
-    var markers = ${JSON.stringify(markers)};
-    var polygons = ${JSON.stringify(polygons)};
-    var bounds = new google.maps.LatLngBounds();
-    var map = new google.maps.Map(document.getElementById('map'), {
-      mapTypeId: 'satellite', disableDefaultUI: true, isFractionalZoomEnabled: true
-    });
-    polygons.forEach(function(p) {
-      new google.maps.Polygon({ paths: p.path, map: map, strokeColor: p.color, strokeOpacity: 0.95, strokeWeight: 2, fillColor: p.color, fillOpacity: 0.28 });
-      var pb = new google.maps.LatLngBounds();
-      p.path.forEach(function(pt) { pb.extend(pt); bounds.extend(pt); });
-      var c = pb.getCenter();
-      var el = document.createElement('div'); el.className = 'cnt'; el.textContent = p.label; el.style.borderColor = p.color;
-      new google.maps.marker.AdvancedMarkerElement({ position: c, map: map, content: el });
-    });
-    markers.forEach(function(m) {
-      var pos = { lat: m.lat, lng: m.lng };
-      bounds.extend(pos);
-      new google.maps.Marker({
-        position: pos, map: map,
-        icon: { url: m.url, scaledSize: new google.maps.Size(m.w, m.h), anchor: new google.maps.Point(m.c, m.c) }
-      });
-    });
-    map.fitBounds(bounds, 40);
-    google.maps.event.addListenerOnce(map, 'tilesloaded', function() {
-      setTimeout(function() { window.__MAP_READY = true; }, 600);
-    });
-  }
-</script>
-<script src="https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=marker&callback=initMap" async defer></script>
-</body></html>`
-
-  let page: Page | null = null
-  try {
-    page = await browser.newPage()
-    await page.setViewport({ width: 1000, height: 560, deviceScaleFactor: 2 })
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 20000 })
-    await page.waitForFunction('window.__MAP_READY === true', { timeout: 15000 })
-    const shot = await page.screenshot({ type: 'png' })
-    await page.close()
-    return `data:image/png;base64,${Buffer.from(shot).toString('base64')}`
-  } catch (err) {
-    console.error('[station-map] satellitkarta misslyckades:', err)
-    if (page) await page.close().catch(() => {})
-    return null
-  }
+// Samma metod och samma delade helper som kontrollrapporten
+// (api/_lib/satelliteMapShot.ts): Google Maps JS API i en Puppeteer-sida
+// (Static Maps saknar satellitvy i EU), marginal efter markörens mått,
+// nummerbrickor överst och utspridning av stationer på samma pixel.
+async function renderSatelliteMap(browser: Browser, stations: SatelliteStation[], polygons: MapPolygon[]): Promise<string | null> {
+  return renderSatelliteMapShot(browser, {
+    width: 1000,
+    height: 560,
+    minPadding: 40,
+    settleMs: 600,
+    logTag: 'station-map',
+    stations,
+    polygons,
+  })
 }
 
 function geoJsonToPath(geojson: { type?: string; coordinates?: unknown } | null): Array<{ lat: number; lng: number }> | null {
@@ -333,10 +287,10 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
     })
     const mapDataUri = await renderSatelliteMap(
       browser,
-      stations.map(s => {
-        const m = reportMarkerSvg({ color: s.color, icon: s.icon, status: s.status, addon: s.addon, number: s.idx, radius: 12 })
-        return { lat: s.lat, lng: s.lng, url: svgDataUri(m.svg), w: m.size, h: m.height, c: m.center }
-      }),
+      stations.map(s => ({
+        lat: s.lat, lng: s.lng,
+        color: s.color, icon: s.icon, status: s.status, addon: s.addon, number: s.idx, radius: 12,
+      })),
       []
     )
     sections.push({ kind: 'outdoor', title: 'Utomhus', mapDataUri, stations })

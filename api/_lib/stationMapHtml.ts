@@ -5,7 +5,7 @@
 // Ren mall utan databasanrop så att den kan testas lokalt.
 
 import { BEGONE_LOGO_DATA_URI } from './begoneLogo'
-import { reportLegendRows, reportMarkerSvg } from '../../src/shared/reportStationMarkers'
+import { reportLegendRows, reportMarkerLayers, reportMarkerSvg } from '../../src/shared/reportStationMarkers'
 
 const BRAND = '#20c58f'
 
@@ -258,11 +258,17 @@ export function buildStationMapHtml(data: StationMapData): string {
   const mapPages = sections.map(section => {
     let mapBlock: string
     if (section.kind === 'indoor') {
-      // Cirkelns mitt på stationens punkt, numret i brickan under
-      const markers = section.stations.map(s => {
-        const m = reportMarkerSvg({ color: s.color, icon: s.icon, status: s.status, addon: s.addon, number: s.idx, radius: 12 })
-        return `<div class="marker" style="left:${s.x}%; top:${s.y}%; margin-left:-${m.center}px; margin-top:-${m.center}px">${m.svg}</div>`
-      }).join('')
+      // Cirkelns mitt på stationens punkt, numret i brickan under. Alla
+      // cirklar först och alla brickor efter, så att ingen cirkel täcker ett nummer.
+      const layers = section.stations.map(s => ({
+        s,
+        l: reportMarkerLayers({ color: s.color, icon: s.icon, status: s.status, addon: s.addon, number: s.idx, radius: 12 }),
+      }))
+      const markers = layers.map(({ s, l }) =>
+        `<div class="marker" style="left:${s.x}%; top:${s.y}%; margin-left:-${l.circle.center}px; margin-top:-${l.circle.center}px">${l.circle.svg}</div>`
+      ).join('') + layers.filter(({ l }) => l.badge).map(({ s, l }) =>
+        `<div class="marker" style="left:${s.x}%; top:${s.y}%; margin-left:-${l.badge!.anchorX}px">${l.badge!.svg}</div>`
+      ).join('')
       mapBlock = section.imageDataUri
         ? `<div class="mapwrap"><div class="map"><img src="${section.imageDataUri}" alt="Planritning">${markers}</div></div>`
         : `<div class="nomap">Planritningen kunde inte l&auml;sas in.</div>`
