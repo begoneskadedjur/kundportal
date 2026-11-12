@@ -148,6 +148,26 @@ export function IndoorStationForm({
   const [showCopiedHint, setShowCopiedHint] = useState(
     !isEditing && (!!initialPreparation || initialIsAddon)
   )
+  // Etablering av ett bokat avtal: stationerna ingår i avtalet. "Tillägg utöver
+  // avtal" förväljs aldrig och följer inte med från föregående station; bara
+  // teknikerns eget kryss gäller (Heimstaden Maria 5, 2026-11-09).
+  const [etableringsAvtal, setEtableringsAvtal] = useState<string | null>(null)
+  const addonValtAvTekniker = useRef(false)
+  useEffect(() => {
+    if (isEditing || !floorPlanId) { setEtableringsAvtal(null); return }
+    let cancelled = false
+    AddonStationBillingService.findEstablishmentContractForFloorPlan(floorPlanId)
+      .then(avtal => {
+        if (cancelled) return
+        setEtableringsAvtal(avtal?.label ?? null)
+        if (avtal && !addonValtAvTekniker.current) {
+          setIsAddon(false)
+          setAddonBillingModel(null)
+        }
+      })
+      .catch(() => { if (!cancelled) setEtableringsAvtal(null) })
+    return () => { cancelled = true }
+  }, [floorPlanId, isEditing])
   // Produkten som placeras ut: intern kostnad, syns aldrig för kund
   const [articleId, setArticleId] = useState<string | null>(
     existingStation?.article_id ?? initialArticleId ?? null
@@ -591,6 +611,7 @@ export function IndoorStationForm({
           checked={isAddon}
           disabled={paidLock.locked}
           onChange={(e) => {
+            addonValtAvTekniker.current = true
             setIsAddon(e.target.checked)
             setAddonBillingModel(e.target.checked ? (addonBillingModel ?? defaultAddonBillingModel(addonPrices)) : null)
           }}
@@ -601,6 +622,11 @@ export function IndoorStationForm({
           <span className="block text-xs text-slate-400 mt-0.5">
             Stationen ingår inte i avtalets årspremie. Välj hur den betalas: priserna kommer från kundens prislista.
           </span>
+          {etableringsAvtal && (
+            <span className={`block text-xs mt-1.5 ${isAddon ? 'text-amber-400' : 'text-slate-400'}`}>
+              Etableringen gäller {etableringsAvtal}. Stationerna i avtalet ingår i premien. Kryssa bara i för stationer som kunden beställt utöver avtalet.
+            </span>
+          )}
           {isAddon && (
             <AddonModelPicker
               value={addonBillingModel}

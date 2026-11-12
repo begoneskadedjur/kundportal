@@ -344,7 +344,11 @@ export default function CaseServiceSelector({
           const freshItems = allStatusItems.filter(i => i.status === 'pending')
           if (stillMissing) {
             const customerPrice = customerPricesData[svc.id]
-            const coveredByContract = coverageData.coveredServiceIds.has(svc.id)
+            // Etablering av ett bokat avtal ingår alltid i avtalet: premien
+            // faktureras på avtalsfakturan, aldrig på etableringsärendet
+            // (Heimstaden Maria 5, 2026-11-09).
+            const coveredByContract =
+              coverageData.coveredServiceIds.has(svc.id) || (serviceType === 'establishment' && !!caseContractId)
             const priceToUse = coveredByContract ? 0 : customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)
             try {
               await CaseBillingService.addServiceToCase({
@@ -2074,11 +2078,13 @@ export default function CaseServiceSelector({
             <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-auto">
               {formatPrice((splitTotalExkl ?? item.total_price) * priceMultiplier)}
             </span>
-          ) : hasFixedPrice || isDerivedLocked ? (
+          ) : hasFixedPrice || isDerivedLocked || item.covered_by_contract ? (
             <div className="flex items-center gap-1 ml-auto">
               <span
                 className="w-24 px-2 py-0.5 text-sm text-right bg-[#20c58f]/10 border border-[#20c58f]/30 rounded text-[#20c58f] font-medium cursor-not-allowed"
-                title={hasFixedPrice
+                title={item.covered_by_contract
+                  ? 'Ingår i avtalet och faktureras via avtalet – priset kan inte ändras här'
+                  : hasFixedPrice
                   ? 'Fast pris från kundens prislista – kan inte ändras här'
                   : 'Låst av avtal: kundpris × antal på mappade artiklar – ändra antal eller mappning i stället'}
               >

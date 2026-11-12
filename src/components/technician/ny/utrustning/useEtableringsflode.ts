@@ -312,10 +312,13 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
 
         toast.success('Utrustning uppdaterad')
       } else {
-        // Multi-kontrakt-refaktor (Fas 8d): auto-resolva contract_id från
-        // kundens aktiva kontrakt. Vid >1 avtal väljs det första. Synth-rader
-        // (id 'synth-...') sparas inte. Cachas per kund så batch-placering
-        // inte gör samma avtalsuppslag för varje station.
+        // Stationen hör till avtalet som det öppna etableringsärendet är bokat
+        // för (cases.contract_id). Kundens första aktiva avtal används bara när
+        // ärendet saknar avtal: med flera avtal hamnade stationen annars på fel
+        // avtal (Heimstaden Maria 5, 2026-11-09). Synth-rader (id 'synth-...')
+        // sparas inte. Cachas per kund så batch-placering inte gör samma
+        // avtalsuppslag för varje station.
+        const placering = await AddonStationBillingService.findOpenEstablishmentCase(customerId)
         let resolvedContractId: string | null = null
         if (resolvedContractCache.current.has(customerId)) {
           resolvedContractId = resolvedContractCache.current.get(customerId) ?? null
@@ -334,14 +337,11 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
         // (placed_case_id). Samma ärendeuppslag som preparatet nedan, nu före
         // utsättningen; fel här stoppar aldrig utsättningen.
         const behoverArende = !!((formData.preparation_id && formData.preparation_quantity) || formData.is_addon)
-        const placering = behoverArende
-          ? await AddonStationBillingService.findOpenEstablishmentCase(customerId)
-          : null
 
         const result = await EquipmentService.createEquipment({
           customer_id: customerId,
-          contract_id: resolvedContractId,
-          placed_case_id: placering?.case?.id ?? null,
+          contract_id: placering.case?.contract_id ?? resolvedContractId,
+          placed_case_id: behoverArende ? placering.case?.id ?? null : null,
           placed_by_technician_id: technicianId,
           equipment_type: formData.equipment_type,
           serial_number: formData.serial_number || null,
@@ -377,8 +377,8 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
         // Spara preparat på öppet etableringsärende
         if (behoverArende) {
           try {
-            if (placering?.error) throw placering.error
-            const establishmentCase = placering?.case ?? null
+            if (placering.error) throw placering.error
+            const establishmentCase = placering.case ?? null
 
             if (establishmentCase) {
               if (formData.preparation_id && formData.preparation_quantity) {
@@ -414,8 +414,8 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
           const warning = AddonStationBillingService.priceMissingMessage(missing)
           if (warning) toast.error(warning, { duration: 8000 })
           const arendeText = AddonStationBillingService.placementCaseMessage(
-            placering?.openCount ?? 0,
-            placering?.case?.case_number
+            placering.openCount,
+            placering.case?.case_number
           )
           if (arendeText && !flerArendenVisade.current.has(customerId)) {
             flerArendenVisade.current.add(customerId)

@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.131.1',
+    date: '2026-11-12',
+    title: 'Etablering av nytt avtal faktureras via avtalet',
+    items: [
+      { kind: 'buggfix', text: 'Stationer som sätts ut i en etablering hamnar nu på avtalet som etableringen är bokad för. Förut fick de kundens första avtal när kunden hade flera, och tillägg räknades då mot fel avtal och fel årsdag.' },
+      { kind: 'andring', text: 'I en etablering av ett bokat avtal är "Tillägg utöver avtal" aldrig förvalt och följer inte med från föregående station. Rutan påminner om att avtalets stationer ingår i premien.' },
+      { kind: 'buggfix', text: 'Etableringskostnaden i en etablering av ett bokat avtal blir 0 kr och märks Ingår i avtalet. Priset går inte att ändra, årspremien faktureras på avtalsfakturan.' },
+    ],
+  },
+  {
     version: '3.131.0',
     date: '2026-11-12',
     title: 'ROT- och RUT-offerten fungerar som vanligt',

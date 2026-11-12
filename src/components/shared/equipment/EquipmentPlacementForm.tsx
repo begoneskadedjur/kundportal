@@ -279,6 +279,26 @@ export function EquipmentPlacementForm({
     !existingEquipment && (!!initialPreparation || initialIsAddon)
   )
 
+  // Etablering av ett bokat avtal: stationerna ingår i avtalet. "Tillägg utöver
+  // avtal" förväljs aldrig och följer inte med från föregående station; bara
+  // teknikerns eget kryss gäller (Heimstaden Maria 5, 2026-11-09).
+  const [etableringsAvtal, setEtableringsAvtal] = useState<string | null>(null)
+  const addonValtAvTekniker = useRef(false)
+  useEffect(() => {
+    if (isEditing || !customerId) { setEtableringsAvtal(null); return }
+    let cancelled = false
+    AddonStationBillingService.findEstablishmentContract(customerId)
+      .then(avtal => {
+        if (cancelled) return
+        setEtableringsAvtal(avtal?.label ?? null)
+        if (avtal && !addonValtAvTekniker.current) {
+          setFormData(prev => prev.is_addon ? { ...prev, is_addon: false, addon_billing_model: null } : prev)
+        }
+      })
+      .catch(() => { if (!cancelled) setEtableringsAvtal(null) })
+    return () => { cancelled = true }
+  }, [customerId, isEditing])
+
   // Betald tilläggsstation: typ, tilläggsläge och modell är låsta
   const paidLock = useAddonPaidLock(existingEquipment ? { ...existingEquipment, indoor: false } : null)
 
@@ -826,13 +846,14 @@ export function EquipmentPlacementForm({
           type="checkbox"
           checked={formData.is_addon}
           disabled={paidLock.locked}
-          onChange={(e) =>
+          onChange={(e) => {
+            addonValtAvTekniker.current = true
             setFormData(prev => ({
               ...prev,
               is_addon: e.target.checked,
               addon_billing_model: e.target.checked ? (prev.addon_billing_model ?? defaultAddonBillingModel(addonPrices)) : null,
             }))
-          }
+          }}
           className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f]"
         />
         <span className="flex-1 min-w-0">
@@ -840,6 +861,11 @@ export function EquipmentPlacementForm({
           <span className="block text-xs text-slate-400 mt-0.5">
             Stationen ingår inte i avtalets årspremie. Välj hur den betalas: priserna kommer från kundens prislista.
           </span>
+          {etableringsAvtal && (
+            <span className={`block text-xs mt-1.5 ${formData.is_addon ? 'text-amber-400' : 'text-slate-400'}`}>
+              Etableringen gäller {etableringsAvtal}. Stationerna i avtalet ingår i premien. Kryssa bara i för stationer som kunden beställt utöver avtalet.
+            </span>
+          )}
           {formData.is_addon && (
             <AddonModelPicker
               value={formData.addon_billing_model}
