@@ -14,6 +14,7 @@ import { DEFAULT_PRICING_SETTINGS } from '../../types/pricingSettings'
 import { calculateSuggestedPrice, calculateMarginPercent, discountApprovalText } from '../../types/caseBilling'
 import type { DiscountApprovalState } from '../../types/caseBilling'
 import { Icon } from '../icons/Icon'
+import NumberField from '../ui/NumberField'
 import type { QuantityTier } from '../../types/articles'
 import { resolveTieredPrice } from '../../types/articles'
 import { getEffectiveRotPercent, getEffectiveRutPercent } from '../../utils/rotRutConstants'
@@ -612,7 +613,7 @@ export default function PriceCalculatorPanel({
                                             <div className="mt-2 space-y-1">
                                               <div className="flex justify-between text-xs text-slate-500">
                                                 <span>Påslag på dessa</span>
-                                                <span className="font-medium text-slate-300">{markup.toFixed(0)}%</span>
+                                                <span className="flex items-center gap-0.5 font-medium text-slate-300"><NumberField value={Math.round(markup)} integer min={0} max={1000} aria-label="Påslag i procent" onCommit={n => onMarkupsChange({ ...markups, [si.id]: n })} className="w-12 px-1 py-0 text-xs text-right bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]" />%</span>
                                               </div>
                                               <input
                                                 type="range"
@@ -667,7 +668,7 @@ export default function PriceCalculatorPanel({
                                     <div className="space-y-1">
                                       <div className="flex justify-between text-xs text-slate-500">
                                         <span>Påslag</span>
-                                        <span className="font-medium text-slate-300">{markup.toFixed(0)}%</span>
+                                        <span className="flex items-center gap-0.5 font-medium text-slate-300"><NumberField value={Math.round(markup)} integer min={0} max={1000} aria-label="Påslag i procent" onCommit={n => onMarkupsChange({ ...markups, [si.id]: n })} className="w-12 px-1 py-0 text-xs text-right bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]" />%</span>
                                       </div>
                                       <input
                                         type="range"

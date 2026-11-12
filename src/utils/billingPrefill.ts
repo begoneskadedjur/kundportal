@@ -21,6 +21,8 @@ export interface PrefillService {
   discount_motivation?: string | null
   /** ROT/RUT-arbetsrad: tjänsteraden den hör till. Följer med till offertens rader (3.106.0) */
   labor_for_item_id?: string | null
+  /** När raden skapades: avgör i ROT/RUT-mallen om den är rubriken Avser (avserIds, 3.131.0) */
+  created_at?: string | null
   service?: {
     rot_rate_percent?: number | null
     rut_rate_percent?: number | null
@@ -48,6 +50,7 @@ export function mapBillingItemsToPrefillServices(
       discount_percent: Number(item.discount_percent || 0),
       discount_motivation: item.discount_motivation ?? null,
       labor_for_item_id: item.labor_for_item_id ?? null,
+      created_at: item.created_at ?? null,
       service: item.service
         ? {
             rot_rate_percent: item.service.rot_rate_percent ?? null,

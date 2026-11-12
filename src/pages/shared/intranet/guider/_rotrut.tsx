@@ -5,7 +5,7 @@
 // Efterbildning av OneflowContractCreator med ROT-mallen: steget Mall
 // (Offertförslag ROT (Privatperson)), steget Tjänster i ROT-läget
 // (CaseServiceSelector: Avser, Arbetskostnad, Material och utrustning,
-// Servicebil, Övriga kostnader, interna kostnader med ROT/Inget på arbetstiden,
+// Servicebil, Övriga kostnader, interna kostnader mappade i prisguiden, mallen ger avdraget,
 // fälten Fastighetsbeteckning och Personnummer, listan Kvar innan du kan gå
 // vidare), Granska och Oneflows PDF. Påhittad kund: Familjen Exempel.
 // Texterna och knappnamnen följer src/constants/rotRutHjalp.ts.
@@ -19,7 +19,7 @@ export type RotVy = 'mall' | 'tjanster' | 'granska' | 'pdf' | 'klart'
 
 export interface RotLage {
   vy: RotVy
-  /** ROT vald på arbetstiden */
+  /** Arbetstiden mappad mot Arbetskostnad i prisguiden (mallen ger avdraget) */
   rot: boolean
   fastighet: boolean
   pnr: boolean
@@ -132,23 +132,28 @@ export function RotWizard({ l, mk, tryck }: { l: RotLage; mk: Mk; tryck: Tryck }
       {l.vy === 'tjanster' && (
         <div className="grid gap-1.5">
           <p className="rounded-md border border-[#20c58f]/25 bg-[#20c58f]/10 px-2 py-1.5 text-[10.5px] leading-snug">
-            Mallen har ROT-avdrag 30 %. Raderna nedan har skapats åt dig.
+            Mallen har ROT-avdrag 30 %. Raderna nedan har lagts till åt dig.
           </p>
           <p className="text-[10.5px] text-slate-300">Avser: <span className="text-white">Tätning gnagare</span> <span className="text-slate-500">0 kr</span></p>
           <Rad namn="Arbetskostnad" belopp={l.rot ? ARBETE : '0 kr'} under="visas som Arbetskostnad, 1 st" gron />
           <Rad namn="Material och utrustning" belopp={MATERIAL} under="3 interna kostnader" />
-          <Rad namn="Servicebil" belopp={BIL} under="Priset skrivs in för hand" />
+          <Rad namn="Servicebil" belopp={BIL} under="pris per gång gånger antal" />
           <p className="pt-1 text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Interna kostnader</p>
           <div className="rounded-md border border-slate-700 bg-slate-800/40 px-2 py-1.5">
             <div className="flex items-center gap-1.5 text-[11.5px] text-white">Arbetstid Privatperson <span className="ml-auto text-slate-400">{ROT_TIMMAR} h</span></div>
             <div className="mt-1 flex items-center gap-1.5 text-[10.5px] text-slate-400">
-              Ligger på Arbetskostnad
-              <span className="ml-auto inline-flex overflow-hidden rounded border border-slate-600">
-                <Markor markor={mk('rot')}>
-                  <button type="button" onClick={() => tryck('rot')} className={`px-2 py-0.5 font-semibold ${l.rot ? 'bg-[#20c58f] text-[#06281c]' : ''}`}>ROT</button>
-                </Markor>
-                <button type="button" onClick={() => tryck('inget')} className={`px-2 py-0.5 font-semibold ${!l.rot ? 'bg-slate-600 text-white' : ''}`}>Inget</button>
-              </span>
+              {l.rot ? (
+                <span>Ligger på <span className="text-white">Arbetskostnad</span> <span className="text-[#20c58f]">· ROT från mallen</span></span>
+              ) : (
+                <span className="text-amber-400">Ligger inte på någon rad.</span>
+              )}
+              {!l.rot && (
+                <span className="ml-auto">
+                  <Markor markor={mk('rot')}>
+                    <button type="button" onClick={() => tryck('rot')} className="rounded border border-slate-600 px-2 py-0.5 font-semibold text-white">Mappa i prisguiden</button>
+                  </Markor>
+                </span>
+              )}
             </div>
           </div>
           <div className="grid gap-1.5 sm:grid-cols-2">
@@ -167,8 +172,8 @@ export function RotWizard({ l, mk, tryck }: { l: RotLage; mk: Mk; tryck: Tryck }
           </div>
           <div className="grid gap-1 rounded-md bg-slate-800/60 p-2">
             <span className="text-[9.5px] uppercase tracking-wide text-slate-400">Kvar innan du kan gå vidare</span>
-            <Kvar ok={l.rot} text="Arbetstid med ROT" />
-            <Kvar ok text="Alla interna kostnader ligger på en rad" />
+            <Kvar ok={l.rot} text="Arbetstid på Arbetskostnad" />
+            <Kvar ok={l.rot} text="Alla interna kostnader ligger på en rad" />
             <Kvar ok={l.fastighet} text="Fastighetsbeteckning ifylld" />
             <Kvar ok={l.pnr} text="Personnummer ifyllt" />
           </div>
@@ -214,12 +219,11 @@ export function rotOvningTryck(l: RotLage, id: string): { lage?: RotLage; svar: 
   const fel = (text: string) => ({ miss: true, svar: { typ: 'fel' as const, titel: 'Inte där', text } })
   switch (l.vy) {
     case 'mall':
-      if (id === 'mall:rot') return { lage: { ...l, vy: 'tjanster' }, svar: { typ: 'tips', titel: 'ROT-mallen är vald', text: 'Raderna har skapats åt dig. Arbetstiden ligger redan på Arbetskostnad. Välj ROT på den.' } }
+      if (id === 'mall:rot') return { lage: { ...l, vy: 'tjanster' }, svar: { typ: 'tips', titel: 'ROT-mallen är vald', text: 'Raderna har lagts till åt dig. Arbetstiden ligger inte på någon rad än. Mappa den mot Arbetskostnad i prisguiden.' } }
       if (id === 'mall:rut') return fel('Tätning är byggarbete på huset. Det är ROT, inte RUT.')
       return fel('Den mallen har inget avdrag. Välj ROT-mallen.')
     case 'tjanster':
-      if (id === 'rot') return { lage: { ...l, rot: true }, svar: { typ: 'tips', titel: 'ROT på arbetstiden', text: `Arbetskostnad fick priset från de ${ROT_TIMMAR} timmarna. Timmarna syns aldrig för kunden. Fyll i fastighetsbeteckningen.` } }
-      if (id === 'inget') return fel('Utan avdrag hör arbetstiden inte till Arbetskostnad. Tryck ROT.')
+      if (id === 'rot') return { lage: { ...l, rot: true }, svar: { typ: 'tips', titel: 'Arbetstiden ligger på Arbetskostnad', text: `Mallen ger ROT-avdraget, du väljer det aldrig. Prisguiden föreslår priset på Arbetskostnad från de ${ROT_TIMMAR} timmarna, du kan också skriva ett eget. Timmarna syns aldrig för kunden. Fyll i fastighetsbeteckningen.` } }
       if (id === 'fastighet') return { lage: { ...l, fastighet: true }, svar: { typ: 'tips', titel: 'Fastigheten är ifylld', text: 'Exempelby 1:23, med kolon. Fyll i personnumret.' } }
       if (id === 'pnr') return { lage: { ...l, pnr: true }, svar: { typ: 'tips', titel: 'Personnumret är ifyllt', text: 'Är listan grön kan du trycka Nästa.' } }
       if (id === 'nasta') {

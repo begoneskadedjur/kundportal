@@ -9,13 +9,20 @@
 //   - Bara privatpersoner med giltigt personnummer (10 eller 12 siffror, rätt kontrollsiffra).
 //   - Kunden ser priserna inkl. moms.
 //   - Raderna i en ROT/RUT-mall: ärendets tjänst står kvar på 0 kr och visas som
-//     rubrik "Avser: <tjänst>". Kundraderna är fyra fasta tjänster:
+//     rubrik "Avser: <tjänst>". Fyra tjänster läggs till som förval:
 //       135 Skadedjurstekniker timpris -> "Arbetskostnad", 1 st, bär avdraget
 //       120 Material & Utrustning      -> "Material och utrustning"
-//       143 Servicebil                 -> "Servicebil" (pris för hand)
+//       143 Servicebil                 -> "Servicebil"
 //       145 Övriga kostnader           -> "Övriga kostnader"
-//   - Interna kostnader mappas mot raderna, automatiskt efter kategori.
-//   - Timmarna (summan av ROT/RUT-markerad Arbetstid på arbetsraden) går till
+//   - Ändrat 2026-11-12 (3.131.0): ROT/RUT-läget fungerar som vanligt läge.
+//     Varje rad har pris, antal och papperskorg (Arbetskostnad går inte att ta
+//     bort). Interna kostnader mappas av användaren i prisguiden, inget sker
+//     automatiskt, och alla måste ligga på en rad. Mallen ger avdraget på all
+//     Arbetstid som ligger på Arbetskostnad, användaren väljer det aldrig.
+//     Tjänster som läggs till efter raderna (t.ex. Tippavgift) blir egna
+//     prissatta rader utan avdrag (egen = true). Avser-rubriken gäller bara
+//     tjänsterna som fanns innan raderna skapades (avserIds).
+//   - Timmarna (summan av Arbetstid på arbetsraden) går till
 //     Skatteverket via Fortnox och visas aldrig för kunden.
 //   - Rader på 0 kr visas inte för kunden.
 //
@@ -56,7 +63,10 @@ export function rollForKod(code: string | null | undefined): RadRoll | null {
   return null
 }
 
-/** Automatisk mappning av en intern kostnad efter artikelns kategori. */
+/**
+ * Raden en intern kostnad naturligt hör till efter artikelns kategori. Sedan
+ * 3.131.0 mappas ingenting automatiskt, användaren mappar i prisguiden.
+ */
 export function rollForKategori(category: string | null | undefined): RadRoll {
   switch (category) {
     case 'Arbetstid':
@@ -106,6 +116,11 @@ export function kr(n: number): string {
 export interface OffertTjanstRad {
   id: string
   roll: RadRoll | null
+  /**
+   * Bara när roll är null: true = egen prissatt rad utan avdrag (en tillagd
+   * tjänst, t.ex. Tippavgift). false eller utelämnad = rubriken Avser på 0 kr.
+   */
+  egen?: boolean
   service_name?: string | null
   /** Radens summa exkl. moms (efter ev. rabatt) */
   total_price: number
@@ -115,7 +130,8 @@ export interface OffertTjanstRad {
 }
 
 export interface KundRad {
-  roll: RadRoll
+  /** null = egen rad (tillagd tjänst) med katalogens namn */
+  roll: RadRoll | null
   namn: string
   /** Belopp inkl. moms, hela kronor */
   belopp: number
@@ -140,9 +156,12 @@ export interface RotRutSammanstallning {
   timmar: number
 }
 
+/** Rubriken Avser: ingen roll och inte en egen rad */
+export const arAvserRad = (r: Pick<OffertTjanstRad, 'roll' | 'egen'>): boolean => r.roll === null && !r.egen
+
 export function sammanstallRotRut(rader: OffertTjanstRad[], typ: Avdrag): RotRutSammanstallning {
   const avserNamn = rader
-    .filter(r => r.roll === null)
+    .filter(arAvserRad)
     .map(r => (r.service_name ?? '').trim())
     .filter(Boolean)
   const kundRader: KundRad[] = []
@@ -153,10 +172,17 @@ export function sammanstallRotRut(rader: OffertTjanstRad[], typ: Avdrag): RotRut
     if (belopp === 0) continue
     kundRader.push({ roll, namn: KUNDNAMN[roll], belopp, avdrag: roll === 'arbete' })
   }
+  // Egna rader (tillagda tjänster) efter de fyra, i den ordning de lades till
+  for (const r of rader) {
+    if (r.roll !== null || !r.egen) continue
+    const belopp = inklMoms(r.total_price, r.vat_rate ?? 25)
+    if (belopp === 0) continue
+    kundRader.push({ roll: null, namn: (r.service_name ?? '').trim() || 'Tjänst', belopp, avdrag: false })
+  }
   const totaltInkl = kundRader.reduce((s, r) => s + r.belopp, 0)
   const arbetskostnadInkl = kundRader.filter(r => r.roll === 'arbete').reduce((s, r) => s + r.belopp, 0)
   const totaltExkl = Math.round(
-    rader.filter(r => r.roll !== null).reduce((s, r) => s + (Number(r.total_price) || 0), 0) * 100
+    rader.filter(r => !arAvserRad(r)).reduce((s, r) => s + (Number(r.total_price) || 0), 0) * 100
   ) / 100
   const avdrag = avdragKr(arbetskostnadInkl, typ)
   const timmar = rader
@@ -222,7 +248,8 @@ export function arAvdragsradNamn(name: string | null | undefined): boolean {
 }
 
 export interface OneflowRad {
-  roll: RadRoll
+  /** null = egen rad (tillagd tjänst): tom beskrivning, samma pris i båda kolumnerna */
+  roll: RadRoll | null
   namn: string
   beskrivning: string
   /** Pris inkl. moms, hela kronor (price_1) */
@@ -248,7 +275,7 @@ export function oneflowRader(s: RotRutSammanstallning): OneflowRad[] {
     return {
       roll: r.roll,
       namn: r.namn,
-      beskrivning: r.roll === 'arbete' ? arbetsBeskrivning(s) : KUNDBESKRIVNING[r.roll],
+      beskrivning: r.roll === 'arbete' ? arbetsBeskrivning(s) : r.roll ? KUNDBESKRIVNING[r.roll] : '',
       belopp: r.belopp,
       efterAvdrag: r.belopp - dra,
     }
@@ -334,9 +361,43 @@ export function rotRutForhandsvisning(s: RotRutSammanstallning): RotRutForhandsv
   }
 }
 
+/** Raden behöver id, roll och när den skapades */
+export interface AvserKalla {
+  id: string
+  roll: RadRoll | null
+  created_at?: string | null
+}
+
+const tidFor = (t: string | null | undefined): number | null => {
+  if (!t) return null
+  const n = Date.parse(t)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * Raderna som är rubriken Avser: tjänster utan roll som fanns innan de fyra
+ * raderna skapades (skapade före den tidigaste raden med roll). Finns ingen
+ * rad med roll är alla tjänster utan roll Avser. En tjänst som läggs till
+ * efter raderna är alltid en egen prissatt rad. Bygger bara på created_at,
+ * så samma svar i ärendet (databasen) och i utkastet (lokala rader).
+ */
+export function avserIds(rader: AvserKalla[]): Set<string> {
+  const rollTider = rader
+    .filter(r => r.roll !== null)
+    .map(r => tidFor(r.created_at))
+    .filter((t): t is number => t !== null)
+  const forsta = rollTider.length > 0 ? Math.min(...rollTider) : Infinity
+  return new Set(
+    rader
+      .filter(r => r.roll === null && (tidFor(r.created_at) ?? -Infinity) < forsta)
+      .map(r => r.id)
+  )
+}
+
 /** En tjänsterad som wizarden har den (case_billing_items eller utkastets rader). */
 export interface WizardTjanstKalla {
   id: string
+  created_at?: string | null
   service_code?: string | null
   /** Katalogtjänsten. rot_eligible finns bara för att prefill-raderna (utan code) ska passa typen */
   service?: { code?: string | null; rot_eligible?: boolean | null } | null
@@ -349,9 +410,16 @@ export interface WizardTjanstKalla {
 
 /** Wizardens tjänsterader i ROT/RUT-läget. Rollen ur tjänstekoden. */
 export function wizardTjanstRader(rader: WizardTjanstKalla[]): OffertTjanstRad[] {
-  return rader.map(i => ({
+  const roller = rader.map(i => ({
     id: i.id,
     roll: rollForKod(i.service_code ?? i.service?.code ?? null),
+    created_at: i.created_at ?? null,
+  }))
+  const avser = avserIds(roller)
+  return rader.map((i, idx) => ({
+    id: i.id,
+    roll: roller[idx].roll,
+    egen: roller[idx].roll === null && !avser.has(i.id),
     service_name: i.service_name ?? null,
     total_price: Number(i.total_price || 0),
     vat_rate: i.vat_rate,
@@ -368,18 +436,28 @@ export interface ServerTjanstKalla {
   total_price: number | string | null
   vat_rate?: number | null
   rot_rut_type?: Avdrag | null
+  /**
+   * Klientens flagga (3.131.0, avserIds): true = rubriken Avser, false = egen
+   * prissatt rad. Utelämnad (äldre klient) = Avser som före 3.131.0. En rad med
+   * roll är aldrig Avser. Servern kontrollerar att Avser har 0 kr (rotRutBrister).
+   */
+  rot_avser?: boolean | null
 }
 
 /** Serverns tjänsterader. Rollen ur katalogens kod för service_id, klientens kod används inte. */
 export function serverTjanstRader(rader: ServerTjanstKalla[], kodFor: (serviceId: string) => string | null | undefined): OffertTjanstRad[] {
-  return rader.map((r, idx) => ({
-    id: r.draft_id || `rad-${idx}`,
-    roll: r.service_id ? rollForKod(kodFor(r.service_id)) : null,
-    service_name: r.service_name ?? null,
-    total_price: Number(r.total_price) || 0,
-    vat_rate: r.vat_rate ?? 25,
-    rot_rut_type: r.rot_rut_type ?? null,
-  }))
+  return rader.map((r, idx) => {
+    const roll = r.service_id ? rollForKod(kodFor(r.service_id)) : null
+    return {
+      id: r.draft_id || `rad-${idx}`,
+      roll,
+      egen: roll === null && r.rot_avser === false,
+      service_name: r.service_name ?? null,
+      total_price: Number(r.total_price) || 0,
+      vat_rate: r.vat_rate ?? 25,
+      rot_rut_type: r.rot_rut_type ?? null,
+    }
+  })
 }
 
 /**
@@ -516,17 +594,21 @@ export interface RotRutKontrollIndata {
 
 export type BristKod =
   | 'privat' | 'personnummer' | 'arbete' | 'fastighet' | 'blandning'
-  | 'mappning' | 'arbete_ej_avdrag' | 'avser' | 'fritext'
+  | 'mappning' | 'arbete_ej_avdrag' | 'arbete_fel_rad' | 'avser' | 'fritext'
 
 export interface RotRutBrist {
   kod: BristKod
   text: string
 }
 
-/** Arbetstidens timmar med mallens typ, mappade mot arbetsraden(erna). */
-export function timmarForArbete(artiklar: KontrollArtikel[], arbetsradIds: Set<string>, typ: Avdrag): number {
+/**
+ * Timmarna till Skatteverket: all Arbetstid mappad mot arbetsraden(erna).
+ * Sedan 3.131.0 styr mallen avdraget, användaren väljer det aldrig, så
+ * artikelns rot_rut_type spelar ingen roll här.
+ */
+export function timmarForArbete(artiklar: KontrollArtikel[], arbetsradIds: Set<string>): number {
   const t = artiklar
-    .filter(a => a.mappadMot && arbetsradIds.has(a.mappadMot) && a.category === 'Arbetstid' && a.rot_rut_type === typ)
+    .filter(a => a.mappadMot && arbetsradIds.has(a.mappadMot) && a.category === 'Arbetstid')
     .reduce((s, a) => s + (Number(a.quantity) || 0), 0)
   return Math.round(t * 100) / 100
 }
@@ -538,9 +620,16 @@ export function namnerAndraTypen(text: string, typ: Avdrag): boolean {
   return re.test(text ?? '')
 }
 
+const namnLista = (a: KontrollArtikel[]) => Array.from(new Set(a.map(x => x.namn))).join(', ')
+
 /**
  * Det som stoppar offerten, i den ordning listan visas. Tom lista = klart.
  * Samma funktion i wizarden och på servern.
+ *
+ * 3.131.0 (Christian 2026-11-12): mallen ger avdraget på all Arbetstid som
+ * ligger på Arbetskostnad. Spärrar kring arbetet: Arbetstid bara på
+ * Arbetskostnad, inget annat än Arbetstid på Arbetskostnad, minst en timme på
+ * Arbetskostnad. Alla interna kostnader ska ligga på en rad (mappas i prisguiden).
  */
 export function rotRutBrister(d: RotRutKontrollIndata): RotRutBrist[] {
   const ut: RotRutBrist[] = []
@@ -549,7 +638,9 @@ export function rotRutBrister(d: RotRutKontrollIndata): RotRutBrist[] {
 
   const arbetsrader = d.tjanster.filter(t => t.roll === 'arbete')
   const arbetsIds = new Set(arbetsrader.map(t => t.id))
-  const timmar = timmarForArbete(d.artiklar, arbetsIds, typ)
+  // Rader en intern kostnad kan ligga på: alla utom rubriken Avser
+  const radIds = new Set(d.tjanster.filter(t => !arAvserRad(t)).map(t => t.id))
+  const timmar = timmarForArbete(d.artiklar, arbetsIds)
   const arbetsBelopp = arbetsrader.reduce((s, r) => s + inklMoms(r.total_price, r.vat_rate ?? 25), 0)
   if (arbetsrader.length === 0 || timmar <= 0 || arbetsBelopp <= 0) {
     ut.push({
@@ -557,35 +648,48 @@ export function rotRutBrister(d: RotRutKontrollIndata): RotRutBrist[] {
       text: arbetsrader.length === 0
         ? 'Raden Arbetskostnad saknas'
         : timmar <= 0
-          ? `Arbetstid med ${typ} saknas`
+          ? 'Arbetstid saknas på Arbetskostnad. Mappa arbetstiden mot Arbetskostnad i prisguiden'
           : 'Arbetskostnaden är 0 kr',
     })
   }
 
-  const ejAvdrag = d.artiklar.filter(a =>
-    a.mappadMot && arbetsIds.has(a.mappadMot) && !(a.category === 'Arbetstid' && a.rot_rut_type === typ)
-  )
-  if (ejAvdrag.length > 0) {
+  // Annat än arbetstid på Arbetskostnad skulle ge avdrag på material
+  const ejArbete = d.artiklar.filter(a => a.mappadMot && arbetsIds.has(a.mappadMot) && a.category !== 'Arbetstid')
+  if (ejArbete.length > 0) {
     ut.push({
       kod: 'arbete_ej_avdrag',
-      text: `Bara arbetstid med ${typ} hör till Arbetskostnad: ${Array.from(new Set(ejAvdrag.map(a => a.namn))).join(', ')}`,
+      text: `Bara arbetstid hör till Arbetskostnad: ${namnLista(ejArbete)}. Mappa om i prisguiden`,
     })
   }
 
-  const tjanstIds = new Set(d.tjanster.filter(t => t.roll !== null).map(t => t.id))
-  const omappade = d.artiklar.filter(a => !a.mappadMot || !tjanstIds.has(a.mappadMot))
-  if (omappade.length > 0) {
-    ut.push({ kod: 'mappning', text: 'Alla interna kostnader ligger på en rad' })
+  // Arbetstid på en annan rad: timmarna och avdraget skulle tappas
+  const felRad = d.artiklar.filter(a =>
+    a.category === 'Arbetstid' && a.mappadMot && radIds.has(a.mappadMot) && !arbetsIds.has(a.mappadMot)
+  )
+  if (felRad.length > 0) {
+    ut.push({
+      kod: 'arbete_fel_rad',
+      text: `Arbetstid ska ligga på Arbetskostnad: ${namnLista(felRad)}. Mappa om i prisguiden`,
+    })
   }
 
+  // Alla interna kostnader ska ligga på en rad (inte på rubriken Avser)
+  const omappade = d.artiklar.filter(a => !a.mappadMot || !radIds.has(a.mappadMot))
+  if (omappade.length > 0) {
+    ut.push({
+      kod: 'mappning',
+      text: `Interna kostnader utan rad: ${namnLista(omappade)}. Mappa dem i prisguiden`,
+    })
+  }
+
+  // Avdraget hör bara till Arbetskostnad och har mallens typ
   const blandade = d.tjanster.some(t => t.rot_rut_type && t.rot_rut_type !== typ)
-    || d.artiklar.some(a => a.rot_rut_type && a.rot_rut_type !== typ)
     || d.tjanster.some(t => t.rot_rut_type && t.roll !== 'arbete')
   if (blandade) {
     ut.push({ kod: 'blandning', text: `Mallen gäller bara ${typ}. Ta bort ${andra} och avdrag på andra rader än Arbetskostnad` })
   }
 
-  const avserMedPris = d.tjanster.filter(t => t.roll === null && Math.abs(Number(t.total_price) || 0) >= 0.005)
+  const avserMedPris = d.tjanster.filter(t => arAvserRad(t) && Math.abs(Number(t.total_price) || 0) >= 0.005)
   if (avserMedPris.length > 0) {
     ut.push({
       kod: 'avser',
@@ -620,7 +724,18 @@ export function rotRutBrister(d: RotRutKontrollIndata): RotRutBrist[] {
   return ut
 }
 
-// ─── Fakturan ───────────────────────────────────────────────────────────────
+/** Det som inte stoppar men bör ses över: tillagda tjänster på 0 kr (syns inte för kunden). */
+export function rotRutVarningar(d: Pick<RotRutKontrollIndata, 'tjanster'>): string[] {
+  const ut: string[] = []
+  for (const t of d.tjanster) {
+    if (t.roll === null && t.egen && inklMoms(t.total_price, t.vat_rate ?? 25) === 0) {
+      ut.push(`${t.service_name || 'Tjänsten'} har 0 kr och syns inte i offerten.`)
+    }
+  }
+  return ut
+}
+
+// ─── Fakturan───────────────────────────────────────────────────────────────
 
 export interface FakturaRadKalla {
   item_type?: string | null

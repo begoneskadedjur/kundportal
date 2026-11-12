@@ -34,7 +34,7 @@ import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES, getTemplateById, type OneflowTemplate } from '../../constants/oneflowTemplates'
 import {
   avdragsradNamn, fastighetText, giltigFastighetsbeteckning, giltigtOrgNr, giltigtPersonnummer,
-  mallensTyp, rollForKod, rotRutBrister, rotRutForhandsvisning, rotRutForslagText, sammanstallRotRut, wizardTjanstRader,
+  arAvserRad, mallensTyp, rollForKod, rotRutBrister, rotRutForhandsvisning, rotRutForslagText, rotRutVarningar, sammanstallRotRut, wizardTjanstRader,
   type Avdrag, type BristKod, type RotRutBrist, type WizardTjanstKalla,
 } from '../../shared/rotRutOffert'
 import {
@@ -139,6 +139,8 @@ interface WizardData {
     discount_motivation?: string | null
     /** ROT/RUT-arbetsrad: tjänsteraden den hör till (case_billing_items.id) */
     labor_for_item_id?: string | null
+    /** När raden skapades: ROT/RUT-mallens rubrik Avser (3.131.0) */
+    created_at?: string | null
     service?: {
       rot_rate_percent?: number | null
       rut_rate_percent?: number | null
@@ -1277,6 +1279,10 @@ export default function OneflowContractCreator() {
         fritext: wizardData.agreementText,
       })
     : []
+  // Varnar men stoppar inte, som i vanligt läge (3.131.0)
+  const rotVarningar: string[] = rotMall ? rotRutVarningar({ tjanster: rotTjanstRader }) : []
+  // Rubriken Avser (ärendets tjänst) per rad, skickas till servern som rot_avser
+  const rotAvserIds = new Set(rotTjanstRader.filter(arAvserRad).map(r => r.id))
   // Offertinnehållet kontrolleras i sitt eget steg och i granskningen
   const rotTjansterBrister = rotBrister.filter(b => b.kod !== 'fritext')
   const rotSammanstallning = rotMall ? sammanstallRotRut(rotTjanstRader, rotMall) : null
@@ -1591,6 +1597,7 @@ export default function OneflowContractCreator() {
                 rot_rut_type: s.rot_rut_type ?? null,
                 fastighetsbeteckning: s.fastighetsbeteckning ?? null,
                 house_work_hours: rotMall ? (wizardData.caseItems.find(c => c.id === s.id)?.house_work_hours ?? null) : null,
+                ...(rotMall ? { rot_avser: rotAvserIds.has(s.id) } : {}),
                 mapped_service_id: null,
                 // ROT/RUT-arbetsraden pekar på sin tjänsterad (draft_id); servern pekar om till de nya id:na
                 labor_for_item_id: s.labor_for_item_id ?? null,
@@ -1617,6 +1624,7 @@ export default function OneflowContractCreator() {
                 rot_rut_type: i.rot_rut_type,
                 fastighetsbeteckning: i.fastighetsbeteckning ?? null,
                 house_work_hours: i.house_work_hours ?? null,
+                ...(rotMall && i.item_type === 'service' ? { rot_avser: rotAvserIds.has(i.id) } : {}),
                 mapped_service_id: (rotMall && i.item_type === 'article' ? wizardData.draftPriceAssignments[i.id] : null) || i.mapped_service_id,
                 // ROT/RUT-arbetsraden pekar på tjänsteradens lokala id (draft_id). Servern pekar
                 // om till de nya id:na, så att kopplingen följer med till Boka in och fakturan
@@ -1941,12 +1949,12 @@ export default function OneflowContractCreator() {
     // Fastighet bara för ROT, RUT har ingen fastighet (3.127.4)
     const medFastighet = rotMall === 'ROT'
     const klara: Array<{ text: string; koder: BristKod[] }> = [
-      { text: `Arbetstid med ${rotMall}`, koder: ['arbete', 'arbete_ej_avdrag'] },
+      { text: 'Arbetstid på Arbetskostnad', koder: ['arbete', 'arbete_ej_avdrag', 'arbete_fel_rad'] },
       { text: 'Alla interna kostnader ligger på en rad', koder: ['mappning'] },
       ...(medFastighet ? [{ text: f.brf ? 'Föreningens org.nr och lägenhetsnummer' : 'Fastighetsbeteckning ifylld', koder: ['fastighet'] as BristKod[] }] : []),
       { text: 'Personnummer ifyllt', koder: ['personnummer', 'privat'] },
     ]
-    const ovriga = rotTjansterBrister.filter(b => !['arbete', 'arbete_ej_avdrag', 'mappning', 'fastighet', 'personnummer', 'privat'].includes(b.kod))
+    const ovriga = rotTjansterBrister.filter(b => !['arbete', 'arbete_ej_avdrag', 'arbete_fel_rad', 'mappning', 'fastighet', 'personnummer', 'privat'].includes(b.kod))
     return (
       <div className={`${CARD_CLASS} p-4 sm:p-6 flex flex-col gap-5`}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
@@ -2046,6 +2054,17 @@ export default function OneflowContractCreator() {
           ))}
         </div>
 
+        {rotVarningar.length > 0 && (
+          <div className="grid gap-1">
+            {rotVarningar.map(t => (
+              <p key={t} className="flex items-start gap-2 text-sm text-amber-400">
+                <Icon name="rapport.avvikelse" className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{t}</span>
+              </p>
+            ))}
+          </div>
+        )}
+
         {rotVisning && (
           <p className="text-sm text-slate-300">
             {rotVisning.kolumnPris}: <strong className="text-white tabular-nums">{fmtSEK(rotVisning.summaPris)}</strong>.
@@ -2075,11 +2094,11 @@ export default function OneflowContractCreator() {
             <span className="col-span-4 py-2.5 border-t border-slate-700/60 text-red-400">Inga rader med pris</span>
           )}
           {/* Samma rader som i Oneflow: fullt pris och att betala efter avdraget, avdraget i arbetsradens beskrivning */}
-          {v.rader.map(r => (
-            <React.Fragment key={r.namn}>
+          {v.rader.map((r, idx) => (
+            <React.Fragment key={`${idx}-${r.namn}`}>
               <span className="py-2.5 border-t border-slate-700/60 flex flex-col gap-0.5 min-w-0">
                 <span className="text-white">{r.namn}</span>
-                <span className="text-[13px] text-slate-400">{r.beskrivning}</span>
+                {r.beskrivning && <span className="text-[13px] text-slate-400">{r.beskrivning}</span>}
               </span>
               <span className="py-2.5 border-t border-slate-700/60 text-right text-white tabular-nums">1</span>
               <span className="py-2.5 border-t border-slate-700/60 text-right text-white tabular-nums">{fmtSEK(r.belopp)}</span>

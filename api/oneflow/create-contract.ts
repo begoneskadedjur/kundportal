@@ -106,6 +106,12 @@ interface ContractRequestBody {
     discount_source_item_id?: string | null
     /** ROT/RUT-offert (3.127.0): servern räknar om timmarna själv, värdet ignoreras */
     house_work_hours?: number | null
+    /**
+     * ROT/RUT-offert (3.131.0): true = rubriken Avser (ärendets tjänst, 0 kr),
+     * false = egen prissatt rad utan avdrag (t.ex. Tippavgift). Utelämnad = Avser.
+     * Gäller bara rader utan roll; Avser med pris stoppas av rotRutBrister.
+     */
+    rot_avser?: boolean | null
   }>
   /** ROT/RUT-mall (3.127.0): fastigheten eller bostadsrätten */
   rotRut?: {
@@ -473,9 +479,11 @@ export default async function handler(
     }
   }
 
-  // ROT/RUT-mall (3.127.0): offerten byggs av fyra fasta kundrader (Arbetskostnad,
+  // ROT/RUT-mall (3.127.0): offerten byggs av kundraderna (Arbetskostnad,
   // Material och utrustning, Servicebil, Övriga kostnader) inkl. moms, ärendets
-  // tjänst är rubrik på 0 kr. Samma regler som wizarden (src/shared/rotRutOffert.ts).
+  // tjänst är rubrik på 0 kr. Sedan 3.131.0 blir tillagda tjänster egna rader
+  // utan avdrag (draftItems[].rot_avser === false) och omappade interna
+  // kostnader stoppar inte. Samma regler som wizarden (src/shared/rotRutOffert.ts).
   // Servern slår upp tjänsternas koder och artiklarnas kategorier själv och
   // räknar om belopp, avdrag och timmar; klientens produkter används inte.
   let rotRutPlan: {
@@ -484,6 +492,8 @@ export default async function handler(
     fastighet: { brf: boolean; fastighetsbeteckning: string | null; brfOrgNr: string | null; lagenhetsnummer: string | null }
     /** draft_id → kolumner som servern sätter på raden */
     radFalt: Map<string, { rot_rut_type: Avdrag | null; house_work_hours: number | null; fastighetsbeteckning: string | null; brf_org_number: string | null; apartment_number: string | null }>
+    /** draft_id → avdraget på en intern kostnad (mallens typ på Arbetstid som ligger på Arbetskostnad) */
+    artikelAvdrag: Map<string, Avdrag | null>
   } | null = null
   {
     const mallDb = createClient(process.env.VITE_SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!)
@@ -522,7 +532,7 @@ export default async function handler(
       }))
       const tjanster: OffertTjanstRad[] = serverTjanstRader(tjanstRader, id => kodFor.get(id))
       const arbetsIds = new Set(tjanster.filter(t => t.roll === 'arbete').map(t => t.id))
-      const timmar = timmarForArbete(artiklar, arbetsIds, mallTyp)
+      const timmar = timmarForArbete(artiklar, arbetsIds)
       const forstaArbete = tjanster.find(t => t.roll === 'arbete')
       if (forstaArbete) forstaArbete.house_work_hours = timmar
 
@@ -560,7 +570,11 @@ export default async function handler(
           apartment_number: t.roll === 'arbete' && fastighet.brf ? fastighet.lagenhetsnummer : null,
         })
       }
-      rotRutPlan = { typ: mallTyp, sammanstallning: sammanstallRotRut(tjanster, mallTyp), fastighet, radFalt }
+      // Interna kostnader: mallen ger avdraget på Arbetstid som ligger på Arbetskostnad (3.131.0)
+      const artikelAvdrag = new Map<string, Avdrag | null>(
+        artiklar.map(a => [a.id, a.category === 'Arbetstid' && !!a.mappadMot && arbetsIds.has(a.mappadMot) ? mallTyp : null])
+      )
+      rotRutPlan = { typ: mallTyp, sammanstallning: sammanstallRotRut(tjanster, mallTyp), fastighet, radFalt, artikelAvdrag }
     }
   }
 
@@ -1045,8 +1059,14 @@ export default async function handler(
 
         // Hjälp-funktion för att bygga en insert-rad, med override på mapped_service_id
         // ROT/RUT-mall: servern sätter avdrag, timmar och fastighet på tjänsteraderna
-        const rotRadFalt = (item: typeof validItems[number]) =>
-          rotRutPlan && item.item_type === 'service' && item.draft_id ? rotRutPlan.radFalt.get(item.draft_id) ?? null : null
+        const rotRadFalt = (item: typeof validItems[number]) => {
+          if (!rotRutPlan || !item.draft_id) return null
+          if (item.item_type === 'service') return rotRutPlan.radFalt.get(item.draft_id) ?? null
+          if (item.item_type === 'article' && rotRutPlan.artikelAvdrag.has(item.draft_id)) {
+            return { rot_rut_type: rotRutPlan.artikelAvdrag.get(item.draft_id) ?? null }
+          }
+          return null
+        }
         const buildRow = (item: typeof validItems[number], mappedServiceIdOverride: string | null) => ({
           ...buildRowBase(item, mappedServiceIdOverride),
           ...(rotRadFalt(item) ?? {}),

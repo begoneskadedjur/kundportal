@@ -18,7 +18,7 @@ export const ROT_RUT_GUIDE_SLUG_TEKNIKER = 'guide-rot-rut-offert-tekniker'
 export const ROT_RUT_GUIDE_TITEL = 'Skapa en ROT- eller RUT-offert'
 
 export const introText = (typ: Avdrag) =>
-  `Mallen har ${typ}-avdrag ${ROT_RUT_PROCENT[typ]} %. Raderna nedan har skapats åt dig. Lägg de interna kostnaderna på rätt rad, så räknar prisguiden ut priset.`
+  `Mallen har ${typ}-avdrag ${ROT_RUT_PROCENT[typ]} %. Raderna nedan har lagts till åt dig. Mappa alla interna kostnader i prisguiden, så föreslår den priset. Avdraget kommer från mallen. Du kan också skriva ett eget pris, ta bort rader du inte behöver och lägga till tjänster.`
 
 export const INTRO_HJALP: { rubrik: string; punkter: string[] } = {
   rubrik: 'ROT och RUT i korthet',
@@ -29,39 +29,40 @@ export const INTRO_HJALP: { rubrik: string; punkter: string[] } = {
     'Bara privatpersoner som äger eller bor i bostaden.',
     'Fastighetsbeteckning behövs bara för ROT. RUT har ingen fastighet.',
     'Kunden ser priset för arbetet men aldrig antalet timmar.',
+    'Tjänster du lägger till, till exempel Tippavgift, blir egna rader utan avdrag.',
   ],
 }
 
 export const AVSER_HJALP: HjalpText = {
   rubrik: 'Rubrik, inget pris',
-  text: 'Ärendets tjänst visar vad jobbet gäller. Den kostar 0 kr och står som rubrik överst i offerten och på fakturan. Den används också i statistiken, så byt den inte.',
+  text: 'Ärendets tjänst visar vad jobbet gäller. Den kostar 0 kr och står som rubrik överst i offerten och på fakturan. Den används också i statistiken, så byt den inte. Tjänster du lägger till efter raderna blir egna rader med pris.',
 }
 
 export const RAD_HJALP: Record<RadRoll, HjalpText> = {
   arbete: {
     rubrik: 'Bara arbetstid hör hit',
-    text: 'Lägg Arbetstid Privatperson här med de timmar du planerar. Välj ROT eller RUT. Resten sköts automatiskt. Kunden ser bara beloppet. Timmarna går till Skatteverket via Fortnox. Tid för inspektion eller bekämpning ger inget avdrag och läggs inte här.',
+    text: 'Mappa Arbetstid Privatperson hit i prisguiden med de timmar du planerar. Mallen ger avdraget, du väljer inget. Kunden ser bara beloppet, Arbetskostnad, 1 st. Raden kan inte tas bort. Timmarna går till Skatteverket via Fortnox. Bara arbetstid får ligga här, och arbetstid får inte ligga på någon annan rad.',
   },
   material: {
     rubrik: 'Det du använder på plats',
-    text: 'Fällor, preparat, tätningsmaterial och tillbehör. Interna kostnader i kategorierna Bekämpning, Tillbehör och Inspektion hamnar här av sig själva. Inget avdrag.',
+    text: 'Fällor, preparat, tätningsmaterial och tillbehör. Mappa interna kostnader i kategorierna Bekämpning, Tillbehör och Inspektion hit i prisguiden. Inget avdrag. Behövs raden inte kan du ta bort den.',
   },
   servicebil: {
-    rubrik: 'Skriv in priset själv',
-    text: 'Antal gånger bilen används och pris per gång, till exempel 1 × 500 kr. Används ingen bil, lämna 0 kr så syns raden inte för kunden. Inget avdrag.',
+    rubrik: 'Bilens kostnad',
+    text: 'Antal gånger bilen används och pris per gång, till exempel 1 × 500 kr. Används ingen bil, ta bort raden eller lämna 0 kr så syns den inte för kunden. Inget avdrag.',
   },
   ovrigt: {
     rubrik: 'Allt som inte är arbete eller material',
-    text: 'Hundsök, hyra av skylift eller högtryckstvätt och annat från underentreprenörer. Kategorierna Underentreprenör och Övrigt hamnar här av sig själva. Inget avdrag.',
+    text: 'Hundsök, hyra av skylift eller högtryckstvätt och annat från underentreprenörer. Mappa kategorierna Underentreprenör och Övrigt hit i prisguiden. Inget avdrag. Behövs raden inte kan du ta bort den.',
   },
 }
 
 /** Raden under radens namn i tjänsteväljaren */
 export const RAD_UNDERTEXT: Record<RadRoll, string> = {
   arbete: 'Skadedjurstekniker timpris · visas som "Arbetskostnad, 1 st"',
-  material: 'prisguiden räknar priset',
-  servicebil: 'Priset skrivs in för hand',
-  ovrigt: 'prisguiden räknar priset',
+  material: 'prisguiden föreslår priset, eget pris går också',
+  servicebil: 'pris per gång gånger antal',
+  ovrigt: 'prisguiden föreslår priset, eget pris går också',
 }
 
 export const FASTIGHET_HJALP: HjalpText = {

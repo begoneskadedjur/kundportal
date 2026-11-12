@@ -4,6 +4,7 @@ import {
   fastighetKlar, fastighetKravs, fastighetText, giltigFastighetsbeteckning, giltigtPersonnummer, inklMoms, kr, personnummer12,
   maskeratPersonnummer, namnerAndraTypen, prisText, rollForKategori, rollForKod, rotRutBrister,
   sammanstallRotRut, timmarTillFortnox, type RotRutKontrollIndata,
+  avserIds, rotRutVarningar, serverTjanstRader, wizardTjanstRader,
 } from './rotRutOffert'
 
 // Exemplet i skissen: arbete 12 000, material 2 000, servicebil 500 inkl. moms
@@ -71,6 +72,56 @@ describe('sammanstallRotRut', () => {
   it('utelämnar rader på 0 kr', () => {
     expect(sammanstallRotRut(rader, 'ROT').rader.some(r => r.roll === 'ovrigt')).toBe(false)
   })
+  it('egen rad (Tippavgift) kommer efter de fyra, utan avdrag och med i summorna', () => {
+    const s = sammanstallRotRut([...rader, { id: 'tipp', roll: null, egen: true, service_name: 'Tippavgift', total_price: 400 }], 'ROT')
+    expect(s.avser).toBe('Tätning gnagare')
+    expect(s.rader.map(r => [r.namn, r.belopp, r.avdrag])).toEqual([
+      ['Arbetskostnad', 12000, true], ['Material och utrustning', 2000, false], ['Servicebil', 500, false], ['Tippavgift', 500, false],
+    ])
+    expect(s.totaltInkl).toBe(15000)
+    expect(s.totaltExkl).toBe(12000)
+    expect(s.avdrag).toBe(3600)
+    expect(s.attBetala).toBe(11400)
+    const o = oneflowRader(s)
+    expect(o[3]).toEqual({ roll: null, namn: 'Tippavgift', beskrivning: '', belopp: 500, efterAvdrag: 500 })
+  })
+})
+
+describe('Avser eller egen rad (3.131.0)', () => {
+  const t = (s: number) => new Date(Date.UTC(2026, 10, 12, 10, 0, s)).toISOString()
+  it('bara tjänster som fanns innan raderna skapades är Avser', () => {
+    const ids = avserIds([
+      { id: 'tatning', roll: null, created_at: t(1) },
+      { id: 'arb', roll: 'arbete', created_at: t(2) },
+      { id: 'mat', roll: 'material', created_at: t(2) },
+      { id: 'tipp', roll: null, created_at: t(5) },
+    ])
+    expect(Array.from(ids)).toEqual(['tatning'])
+  })
+  it('utan rader med roll är alla tjänster Avser, och rader utan tid räknas som gamla', () => {
+    expect(Array.from(avserIds([{ id: 'a', roll: null, created_at: t(9) }, { id: 'b', roll: null }]))).toEqual(['a', 'b'])
+    expect(Array.from(avserIds([{ id: 'a', roll: null }, { id: 'arb', roll: 'arbete', created_at: t(1) }]))).toEqual(['a'])
+  })
+  it('wizarden och servern ger samma rader', () => {
+    const items = [
+      { id: 'tatning', service_code: '54', service_name: 'Tätning gnagare', total_price: 0, created_at: t(1) },
+      { id: 'arb', service_code: '135', service_name: 'Skadedjurstekniker timpris', total_price: 9600, created_at: t(2) },
+      { id: 'tipp', service_code: '900', service_name: 'Tippavgift', total_price: 400, created_at: t(3) },
+    ]
+    const w = wizardTjanstRader(items)
+    expect(w.map(r => [r.id, r.roll, r.egen])).toEqual([['tatning', null, false], ['arb', 'arbete', false], ['tipp', null, true]])
+    const avser = avserIds(w.map((r, i) => ({ id: r.id, roll: r.roll, created_at: items[i].created_at })))
+    const kod: Record<string, string> = { s54: '54', s135: '135', s900: '900' }
+    const server = serverTjanstRader(
+      items.map(i => ({ draft_id: i.id, service_id: `s${i.service_code}`, service_name: i.service_name, total_price: i.total_price, rot_avser: avser.has(i.id) })),
+      id => kod[id]
+    )
+    expect(server.map(r => [r.id, r.roll, r.egen])).toEqual(w.map(r => [r.id, r.roll, r.egen]))
+  })
+  it('servern: utan flagga (äldre klient) är tjänsten Avser som förut', () => {
+    const s = serverTjanstRader([{ draft_id: 'x', service_id: 's54', service_name: 'Tätning', total_price: 0 }], () => '54')
+    expect(s[0].egen).toBe(false)
+  })
 })
 
 describe('roller', () => {
@@ -126,8 +177,11 @@ describe('rotRutBrister', () => {
   it('komplett offert har inga brister', () => {
     expect(rotRutBrister(komplett)).toEqual([])
   })
-  it('kräver arbetstid med mallens typ', () => {
-    expect(koder({ ...komplett, artiklar: komplett.artiklar.map(a => ({ ...a, rot_rut_type: null })) })).toContain('arbete')
+  it('kräver arbetstid med timmar på Arbetskostnad', () => {
+    expect(koder({ ...komplett, artiklar: komplett.artiklar.map(a => a.id === 'a1' ? { ...a, quantity: 0 } : a) })).toEqual(['arbete'])
+  })
+  it('mallen ger avdraget: arbetstid utan vald typ räknas (3.131.0)', () => {
+    expect(rotRutBrister({ ...komplett, artiklar: komplett.artiklar.map(a => ({ ...a, rot_rut_type: null })) })).toEqual([])
   })
   it('kräver privatperson och personnummer', () => {
     expect(koder({ ...komplett, partTyp: 'company' })).toContain('privat')
@@ -154,16 +208,35 @@ describe('rotRutBrister', () => {
     expect(fastighetKravs('ROT')).toBe(true)
   })
   it('stoppar blandning av ROT och RUT', () => {
-    const d = { ...komplett, artiklar: [...komplett.artiklar, { id: 'a3', namn: 'Arbetstid', category: 'Arbetstid', mappadMot: 'arb', rot_rut_type: 'RUT' as const, quantity: 1 }] }
+    const d = { ...komplett, tjanster: komplett.tjanster.map(t => t.id === 'arb' ? { ...t, rot_rut_type: 'RUT' as const } : t) }
     expect(koder(d)).toContain('blandning')
+    const paMaterial = { ...komplett, tjanster: komplett.tjanster.map(t => t.id === 'mat' ? { ...t, rot_rut_type: 'ROT' as const } : t) }
+    expect(koder(paMaterial)).toContain('blandning')
   })
-  it('stoppar omappade interna kostnader', () => {
+  it('stoppar omappade interna kostnader och säger vilka (3.131.0)', () => {
     const d = { ...komplett, artiklar: [...komplett.artiklar, { id: 'a3', namn: 'Lim', category: 'Tillbehör', mappadMot: null, quantity: 1 }] }
-    expect(koder(d)).toContain('mappning')
+    expect(rotRutBrister(d)).toEqual([{ kod: 'mappning', text: 'Interna kostnader utan rad: Lim. Mappa dem i prisguiden' }])
+    const motAvser = { ...komplett, artiklar: [...komplett.artiklar, { id: 'a3', namn: 'Lim', category: 'Tillbehör', mappadMot: 'avser', quantity: 1 }] }
+    expect(koder(motAvser)).toEqual(['mappning'])
+    // En egen rad (Tippavgift) går att mappa mot
+    const motEgen = {
+      ...komplett,
+      tjanster: [...rader, { id: 'tipp', roll: null, egen: true, service_name: 'Tippavgift', total_price: 400 }],
+      artiklar: [...komplett.artiklar, { id: 'a3', namn: 'Tipp', category: 'Övrigt', mappadMot: 'tipp', quantity: 1 }],
+    }
+    expect(rotRutBrister(motEgen)).toEqual([])
   })
-  it('stoppar kostnad mappad mot ärendets tjänst', () => {
-    const d = { ...komplett, artiklar: [...komplett.artiklar, { id: 'a3', namn: 'Lim', category: 'Tillbehör', mappadMot: 'avser', quantity: 1 }] }
-    expect(koder(d)).toContain('mappning')
+  it('stoppar arbetstid på en annan rad än Arbetskostnad', () => {
+    const d = { ...komplett, artiklar: [...komplett.artiklar, { id: 'a3', namn: 'Arbetstid extra', category: 'Arbetstid', mappadMot: 'mat', rot_rut_type: null, quantity: 2 }] }
+    expect(rotRutBrister(d)).toEqual([{ kod: 'arbete_fel_rad', text: 'Arbetstid ska ligga på Arbetskostnad: Arbetstid extra. Mappa om i prisguiden' }])
+    const omappad = { ...komplett, artiklar: [...komplett.artiklar, { id: 'a3', namn: 'Arbetstid extra', category: 'Arbetstid', mappadMot: null, quantity: 2 }] }
+    expect(koder(omappad)).toEqual(['mappning'])
+  })
+  it('egen rad (tillagd tjänst) har pris, inget avdrag och stoppar inte', () => {
+    const d = { ...komplett, tjanster: [...rader, { id: 'tipp', roll: null, egen: true, service_name: 'Tippavgift', total_price: 400 }] }
+    expect(rotRutBrister(d)).toEqual([])
+    const noll = { ...komplett, tjanster: [...rader, { id: 'tipp', roll: null, egen: true, service_name: 'Tippavgift', total_price: 0 }] }
+    expect(rotRutVarningar(noll)).toEqual(['Tippavgift har 0 kr och syns inte i offerten.'])
   })
   it('bara arbetstid med avdrag på arbetsraden', () => {
     const d = { ...komplett, artiklar: [...komplett.artiklar, { id: 'a3', namn: 'Fälla', category: 'Bekämpning', mappadMot: 'arb', quantity: 1 }] }

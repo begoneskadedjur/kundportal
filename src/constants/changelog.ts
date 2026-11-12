@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.131.0',
+    date: '2026-11-12',
+    title: 'ROT- och RUT-offerten fungerar som vanligt',
+    items: [
+      { kind: 'andring', text: 'I en ROT- eller RUT-offert har varje rad nu pris, antal och papperskorg som i en vanlig offert. Prisguiden föreslår priset men du kan skriva ett eget. Material och utrustning, Servicebil och Övriga kostnader går att ta bort och kommer inte tillbaka. Arbetskostnad går inte att ta bort.' },
+      { kind: 'andring', text: 'Du mappar alla interna kostnader själv i prisguiden, ingenting flyttas automatiskt. Mallen ger avdraget på arbetstiden som ligger på Arbetskostnad, du väljer aldrig ROT eller RUT på raden. Arbetstid får bara ligga på Arbetskostnad och inget annat får ligga där.' },
+      { kind: 'nyhet', text: 'Tjänster du lägger till i en ROT- eller RUT-offert, till exempel Tippavgift, blir egna rader med pris och utan avdrag, i offerten, i Oneflow och på fakturan.' },
+      { kind: 'buggfix', text: 'Sifferfälten under Tjänster och i prisguiden går att tömma och skriva i fritt. Värdet sparas när du lämnar fältet eller trycker Enter, och komma fungerar som decimaltecken.' },
+    ],
+  },
+  {
     version: '3.130.1',
     date: '2026-11-11',
     title: 'Ärendetyp och stationer i Om ärendet',

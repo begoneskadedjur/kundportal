@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { mapBillingItemsToPrefillServices } from '../utils/billingPrefill'
 import type { CaseBillingItemWithRelations } from '../types/caseBilling'
 import {
-  oneflowProduktgrupp, rotRutBrister, rotRutForhandsvisning, rotRutForslagText, sammanstallRotRut,
+  arAvserRad, oneflowProduktgrupp, rotRutBrister, rotRutForhandsvisning, rotRutForslagText, sammanstallRotRut,
   serverTjanstRader, wizardTjanstRader, type Avdrag, type KontrollArtikel,
 } from './rotRutOffert'
 
@@ -57,7 +57,10 @@ function wizardSida(items: CaseBillingItemWithRelations[], typ: Avdrag) {
 
 /** Servern: prefillServices -> draftItems (som handleSubmit) -> serverTjanstRader */
 function serverSida(items: CaseBillingItemWithRelations[], typ: Avdrag) {
+  // Klienten skickar rot_avser per rad (handleSubmit), samma regel som wizarden
+  const avser = new Set(wizardTjanstRader(items).filter(arAvserRad).map(r => r.id))
   const draftItems = mapBillingItemsToPrefillServices(items).map(s => ({
+    rot_avser: avser.has(s.id),
     draft_id: s.id,
     service_id: s.service_id ?? null,
     service_name: s.service_name ?? null,
@@ -125,6 +128,27 @@ describe('förhandsvisningen mot create-contract', () => {
     expect(v.rader[0].beskrivning.endsWith('RUT-avdrag 50 %: 4 000 kr.')).toBe(true)
     expect(v.kolumnEfterAvdrag).toBe('Att betala efter RUT')
     expect(v.summaEfterAvdrag).toBe(10505 - 4000)
+  })
+
+  it('tillagd tjänst (Tippavgift) blir egen rad med katalogens namn, tom beskrivning och samma pris i båda kolumnerna', () => {
+    const tid = (s: number) => new Date(Date.UTC(2026, 10, 12, 9, 0, s)).toISOString()
+    const items = [
+      { ...rotArende[0], created_at: tid(1) },
+      ...rotArende.slice(1).filter(r => r.id !== 'r4').map(r => ({ ...r, created_at: tid(2) })),
+      rad({ id: 'r5', service_id: 'svc-tipp', service_name: 'Tippavgift', total_price: 400, created_at: tid(9) }),
+    ] as CaseBillingItemWithRelations[]
+    KATALOG['svc-tipp'] = '900'
+    const { v, g } = jamfor(items, 'ROT')
+    expect(v.rubrik).toBe('Avser: Tätning gnagare')
+    expect(v.rader.map(r => [r.namn, r.beskrivning, r.belopp, r.efterAvdrag])).toEqual([
+      ['Arbetskostnad', v.rader[0].beskrivning, 12346, 8643],
+      ['Material och utrustning', v.rader[1].beskrivning, 2000, 2000],
+      ['Servicebil', v.rader[2].beskrivning, 500, 500],
+      ['Tippavgift', '', 500, 500],
+    ])
+    expect(g.products[3]).toMatchObject({ name: 'Tippavgift', description: '' })
+    expect(v.summaPris).toBe(15346)
+    expect(v.summaEfterAvdrag).toBe(11643)
   })
 
   it('visar aldrig timmar, interna kostnader eller avdragsrad för kunden', () => {
