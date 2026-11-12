@@ -1,7 +1,7 @@
 // src/components/technician/ny/rapporter/SkickaTillKundArk.tsx
 // Bekräftelse innan en rapport skickas till kunden i nya arbetsvyn.
 // Bottenark i telefonen, ruta på datorn (samma mönster som SkapaArk).
-// Ligger i <Portal> så att arket hamnar över ärendemodalen; yttersta
+// Ligger i <Portal> med z-index över ärendemodalen (Modal.tsx använder 9999); yttersta
 // overlayn har pointer-events-auto eftersom #modal-root släpper igenom klick.
 //
 //   <SkickaTillKundArk oppen rapportNamn="Saneringsrapport" arendenummer="BE-1"
@@ -44,7 +44,7 @@ export function SkickaTillKundArk({ oppen, rapportNamn, arendenummer, epost, tid
 
   return (
     <Portal>
-      <div className="fixed inset-0 z-[60] pointer-events-auto flex items-end lg:items-center justify-center">
+      <div className="fixed inset-0 z-[10000] pointer-events-auto flex items-end lg:items-center justify-center">
         <div className="absolute inset-0 bg-slate-950/70" aria-hidden="true" onClick={() => { if (!skickar) onAvbryt() }} />
         <section
           role="dialog"

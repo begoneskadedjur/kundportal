@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.1',
+    date: '2026-11-12',
+    title: 'Frågan Skicka till kund syns i ärendet',
+    items: [
+      { kind: 'buggfix', text: 'Nya teknikervyn: frågan Skicka till kund? i steget Klart hamnade bakom ärendet och syntes inte. Nu visas den överst. Periodvalet på sidan Rapporter får också plats på en rad i telefonen.' },
+    ],
+  },
+  {
     version: '3.132.0',
     date: '2026-11-12',
     title: 'Rapporten direkt efter avslut och sidan Mina rapporter',

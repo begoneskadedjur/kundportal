@@ -109,7 +109,7 @@ export default function NyRapporter() {
                 type="button"
                 aria-pressed={period === p.id}
                 onClick={() => setPeriod(p.id)}
-                className={`h-9 px-3 rounded-lg text-sm transition-colors ${FOKUS} ${
+                className={`h-9 px-1 lg:px-3 whitespace-nowrap rounded-lg text-[13px] lg:text-sm transition-colors ${FOKUS} ${
                   period === p.id ? 'bg-slate-900 border border-slate-600 text-white font-semibold' : 'border border-transparent text-slate-300 hover:text-white font-medium'
                 }`}
               >
@@ -123,7 +123,7 @@ export default function NyRapporter() {
             <select
               value={typ}
               onChange={e => setTyp(e.target.value as RapportTypFilter)}
-              className={`h-11 max-w-[11rem] lg:max-w-none pl-3 pr-8 rounded-xl border bg-slate-900 text-sm font-semibold appearance-none ${FOKUS} ${
+              className={`h-11 max-w-[8.5rem] lg:max-w-none pl-3 pr-8 rounded-xl border bg-slate-900 text-sm font-semibold appearance-none ${FOKUS} ${
                 typ !== 'alla' ? 'border-[#20c58f]/60 text-white' : 'border-slate-700 text-slate-300'
               }`}
             >
@@ -338,7 +338,7 @@ function SkickaValArk({ rad, rapport, laddar, onStang }: {
   const VAL = `w-full flex items-center gap-3 px-2 py-3 min-h-[64px] rounded-xl text-left hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed ${FOKUS}`
   return (
     <Portal>
-      <div className="fixed inset-0 z-[60] pointer-events-auto flex items-end lg:items-center justify-center">
+      <div className="fixed inset-0 z-[10000] pointer-events-auto flex items-end lg:items-center justify-center">
         <div className="absolute inset-0 bg-slate-950/70" aria-hidden="true" onClick={onStang} />
         <section
           role="dialog"
