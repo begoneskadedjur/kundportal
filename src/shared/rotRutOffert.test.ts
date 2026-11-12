@@ -161,7 +161,11 @@ describe('identitet och fastighet', () => {
     expect(giltigFastighetsbeteckning('Exempelby 1:23')).toBe(true)
     expect(giltigFastighetsbeteckning('HÖRNINGSNÄS 1:1')).toBe(true)
     expect(giltigFastighetsbeteckning('Stockholm Gamla Stan 2:14')).toBe(true)
-    expect(giltigFastighetsbeteckning('Exempelby 123')).toBe(false)
+    expect(giltigFastighetsbeteckning('Exempelby 123')).toBe(true)
+    expect(giltigFastighetsbeteckning('STOCKHOLM FÄLTSKÄREN 8')).toBe(true)
+    expect(giltigFastighetsbeteckning('Exempelby 1:23A')).toBe(true)
+    expect(giltigFastighetsbeteckning('Radhus')).toBe(false)
+    expect(giltigFastighetsbeteckning('123')).toBe(false)
     expect(giltigFastighetsbeteckning('1:23')).toBe(false)
   })
   it('bostadsrätt kräver föreningens org.nr och lägenhetsnummer', () => {

@@ -224,7 +224,7 @@ export function rotOvningTryck(l: RotLage, id: string): { lage?: RotLage; svar: 
       return fel('Den mallen har inget avdrag. Välj ROT-mallen.')
     case 'tjanster':
       if (id === 'rot') return { lage: { ...l, rot: true }, svar: { typ: 'tips', titel: 'Arbetstiden ligger på Arbetskostnad', text: `Mallen ger ROT-avdraget, du väljer det aldrig. Prisguiden föreslår priset på Arbetskostnad från de ${ROT_TIMMAR} timmarna, du kan också skriva ett eget. Timmarna syns aldrig för kunden. Fyll i fastighetsbeteckningen.` } }
-      if (id === 'fastighet') return { lage: { ...l, fastighet: true }, svar: { typ: 'tips', titel: 'Fastigheten är ifylld', text: 'Exempelby 1:23, med kolon. Fyll i personnumret.' } }
+      if (id === 'fastighet') return { lage: { ...l, fastighet: true }, svar: { typ: 'tips', titel: 'Fastigheten är ifylld', text: 'Exempelby 1:23 är ifyllt. Fyll i personnumret.' } }
       if (id === 'pnr') return { lage: { ...l, pnr: true }, svar: { typ: 'tips', titel: 'Personnumret är ifyllt', text: 'Är listan grön kan du trycka Nästa.' } }
       if (id === 'nasta') {
         if (!klar(l)) return fel('Nästa går inte förrän listan Kvar innan du kan gå vidare är grön. Tryck på det som saknas.')

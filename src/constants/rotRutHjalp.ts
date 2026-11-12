@@ -67,7 +67,7 @@ export const RAD_UNDERTEXT: Record<RadRoll, string> = {
 
 export const FASTIGHET_HJALP: HjalpText = {
   rubrik: 'Var hittar jag den?',
-  text: 'Kommun, område och nummer, till exempel Exempelby 1:23. Kunden har den på lagfarten eller fastighetsskatten. Fråga kunden om du är osäker. Bor kunden i bostadsrätt? Kryssa Bostadsrätt och fyll i föreningens org.nr och lägenhetsnummer i stället.',
+  text: 'Kommun, område och nummer, till exempel Exempelby 1:23, eller bara nummer som Stockholm Fältskären 8. Kunden har den på lagfarten eller fastighetsskatten. Fråga kunden om du är osäker. Bor kunden i bostadsrätt? Kryssa Bostadsrätt och fyll i föreningens org.nr och lägenhetsnummer i stället.',
 }
 
 export const PERSONNUMMER_HJALP: HjalpText = {
@@ -76,7 +76,7 @@ export const PERSONNUMMER_HJALP: HjalpText = {
 }
 
 export const FALT_UNDERTEXT = {
-  fastighet: 'Skriv som Kommun område 1:23, med kolon.',
+  fastighet: 'Skriv som på lagfarten, till exempel Exempelby 1:23 eller Stockholm Fältskären 8.',
   brf: 'Föreningens org.nr och lägenhetsnumret, till exempel 1102.',
   personnummer: 'ÅÅÅÅMMDD-XXXX eller ÅÅMMDD-XXXX. Ett org.nr fungerar inte.',
 }

@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.131.2',
+    date: '2026-11-12',
+    title: 'Fastighetsbeteckning utan kolon godtas',
+    items: [
+      { kind: 'buggfix', text: 'ROT-offerten och fakturan godtar nu fastighetsbeteckningar med bara nummer, som STOCKHOLM FÄLTSKÄREN 8. Förut krävdes kolon, till exempel 1:23, och en giltig beteckning stoppades.' },
+    ],
+  },
+  {
     version: '3.131.1',
     date: '2026-11-12',
     title: 'Etablering av nytt avtal faktureras via avtalet',

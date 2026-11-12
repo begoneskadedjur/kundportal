@@ -537,10 +537,11 @@ export function maskeratPersonnummer(pnr: string | null | undefined): string {
   return pnr ? 'XXXXXX-XXXX' : ''
 }
 
-/** Fastighetsbeteckning med kolon, t.ex. "Exempelby 1:23". */
+/** Fastighetsbeteckning, t.ex. "Exempelby 1:23" eller "Stockholm Fältskären 8". */
 export function giltigFastighetsbeteckning(f: string | null | undefined): boolean {
-  // Ett namn (kommun och/eller område) följt av block:enhet, t.ex. "1:23" eller "1:23A"
-  return /[^\s\d:]\S*\s+\d+:\d+/.test(String(f ?? '').trim())
+  // Ett namn (kommun och/eller område) följt av nummer, med eller utan kolon:
+  // "Exempelby 1:23", "1:23A" eller Stockholms form "STOCKHOLM FÄLTSKÄREN 8" (3.131.1)
+  return /[A-Za-zÅÄÖåäöÉéÜü][^\d]*\s+\d+(:\d+)?\s?[A-Za-zÅÄÖåäö]?$/.test(String(f ?? '').trim())
 }
 
 export interface Fastighet {
