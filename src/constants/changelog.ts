@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.0',
+    date: '2026-11-12',
+    title: 'Rapporten direkt efter avslut och sidan Mina rapporter',
+    items: [
+      { kind: 'nyhet', text: 'Nya teknikervyn: när du stängt ett ärende visar steget Klart rutan Rapporten är klar. Där skickar du rapporten till kunden, laddar ned den, skickar den till dig själv eller väljer Skicka inte nu. Inget skickas av sig självt.' },
+      { kind: 'nyhet', text: 'Nya teknikervyn: ny sida Rapporter under Min dag (i Mer på telefonen). Den listar dina avslutade ärenden de senaste 30 dagarna, 90 dagarna eller 12 månaderna, med sök, typ och kundens e-post, så att du kan skicka eller ladda ned rapporten i efterhand.' },
+      { kind: 'andring', text: 'Nya teknikervyn: Skicka till kund frågar alltid först och visar adressen rapporten går till. Skicka till mig går till din egen e-post, inte till ansvarig tekniker.' },
+    ],
+  },
+  {
     version: '3.131.3',
     date: '2026-11-12',
     title: 'Alla stationsnummer syns på rapportkartan',

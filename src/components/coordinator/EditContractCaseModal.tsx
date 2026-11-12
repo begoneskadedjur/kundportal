@@ -80,6 +80,8 @@ import { useProvisionsgrans, underProvisionsgrans } from '../technician/ny/steg/
 import { StegRad, StegKnappar } from '../technician/ny/steg/StegFlode'
 import { ArendeVerktygArk, type ArendeVerktygGrupp } from '../technician/ny/steg/ArendeVerktygArk'
 import { KlartSteg } from '../technician/ny/steg/KlartSteg'
+import { franArbetsrapport, useMinEpost } from '../technician/ny/rapporter/rapportHandlingar'
+import { useKontrollRapport } from '../technician/ny/rapporter/useKontrollRapport'
 import { useStegForArende, stegTypForAvtalsarende, grannSteg, arAvtalsbesok, formateraKr, type StegId } from '../technician/ny/steg/stegKonfig'
 import { HjalpText } from '../technician/ny/hjalp/HjalpText'
 import { kontrolleraAvslut, kraverRapport, RAPPORT_SAKNAS_FEL, type AvslutsHinder } from '../../services/arendeAvslutService'
@@ -439,6 +441,7 @@ export default function EditContractCaseModal({
     recommendations: formData.recommendations,
   }
   
+  const arbetsrapport = useModernWorkReportGeneration(reportData)
   const {
     downloadReport,
     sendToTechnician,
@@ -451,7 +454,7 @@ export default function EditContractCaseModal({
     hasRecentReport,
     currentReport,
     getTimeSinceReport
-  } = useModernWorkReportGeneration(reportData)
+  } = arbetsrapport
 
   useEffect(() => {
     if (caseData && isOpen) {
@@ -1633,6 +1636,18 @@ export default function EditContractCaseModal({
   // ═══════════════════════════════════════════════════════════════════════════
   const { aktiv: nyArbetsvy } = useNyArbetsvy()
   const provisionsgrans = useProvisionsgrans(nyArbetsvy)
+  // Klart-stegets rapportruta. Stationskontrollens session läses om när kontrollen
+  // klarmarkerats (kontrollNyckel), så att kontrollrapporten finns direkt.
+  const { epost: minEpost, namn: minNamn } = useMinEpost()
+  const [kontrollNyckel, setKontrollNyckel] = useState(0)
+  const { rapport: kontrollRapport } = useKontrollRapport({
+    caseId: nyArbetsvy && isInspection && !isCustomerView ? caseData?.id ?? null : null,
+    arendenummer: formData.case_number || null,
+    reservEpost: customerData?.contact_email || formData.contact_email,
+    reservNamn: customerData?.contact_person || formData.contact_person,
+    minEpost,
+    uppdatera: kontrollNyckel,
+  })
   // 'steg' = stegflödet, 'flikar' = den vanliga flikvyn (Alla uppgifter)
   const [visning, setVisning] = useState<'steg' | 'flikar'>('steg')
   const stegLage = nyArbetsvy && visning === 'steg'
@@ -2932,6 +2947,7 @@ export default function EditContractCaseModal({
               caseNumber={formData.case_number}
               fallbackEmail={customerData?.contact_email || formData.contact_email}
               fallbackContactName={customerData?.contact_person || formData.contact_person}
+              uppdateraNyckel={kontrollNyckel}
             />
           ))}
 
@@ -3457,6 +3473,7 @@ export default function EditContractCaseModal({
                         // Klockan startade vid Framme: stoppa den så att tiden sparas på ärendet
                         if (isTimerRunning) await handleStopTimer()
                         await refreshCaseData()
+                        setKontrollNyckel(n => n + 1)
                         onSuccess?.()
                         gaTillSteg('klart')
                       }}
@@ -3538,6 +3555,14 @@ export default function EditContractCaseModal({
                     text: `Du avslutar etableringen med Färdig i utplaceringen, som du når från steget Arbetet. Där räknas tilläggsstationerna som satts ut, och de faktureras utöver avtalet. Det som ingår i avtalet faktureras inte.`,
                   } : undefined}
                   onHinderChange={setHinderSteg}
+                  rapport={isInspection ? kontrollRapport : franArbetsrapport(arbetsrapport, {
+                    sort: 'arende',
+                    arendenummer: formData.case_number || null,
+                    kundEpost: formData.contact_email,
+                    kundNamn: formData.contact_person || null,
+                    minEpost,
+                    minNamn,
+                  })}
                 />
               </div>
             )}

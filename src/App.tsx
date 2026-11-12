@@ -104,6 +104,7 @@ import { VyVaxel } from './components/technician/ny/VyVaxel';
 import NyIdag from './pages/technician/ny/NyIdag';
 import NyKarta from './pages/technician/ny/NyKarta';
 import NyMinaArenden from './pages/technician/ny/NyMinaArenden';
+import NyRapporter from './pages/technician/ny/NyRapporter';
 import NyMer from './pages/technician/ny/NyMer';
 import NySchema from './pages/technician/ny/NySchema';
 import NyProvision from './pages/technician/ny/NyProvision';
@@ -451,6 +452,7 @@ function App() {
               <Route path="commissions" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyProvision />} gammal={<TechnicianCommissionsPage />} /></ProtectedRoute>} />
               <Route path="cases" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyMinaArenden />} gammal={<TechnicianCases />} /></ProtectedRoute>} />
               {/* Bara nya arbetsvyn. Alla andra skickas till översikten som förut. */}
+              <Route path="rapporter" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyRapporter />} gammal={<Navigate to="/technician/dashboard" replace />} /></ProtectedRoute>} />
               <Route path="karta" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyKarta />} gammal={<Navigate to="/technician/dashboard" replace />} /></ProtectedRoute>} />
               <Route path="mer" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyMer />} gammal={<Navigate to="/technician/dashboard" replace />} /></ProtectedRoute>} />
               <Route path="schedule" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NySchema />} gammal={<TechnicianSchedule />} /></ProtectedRoute>} />

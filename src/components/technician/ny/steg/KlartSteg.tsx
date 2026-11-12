@@ -29,6 +29,7 @@
 //     arAvslutat={formData.status === 'Avslutat'}
 //     vadHander={['Ärendet får status Avslutat och avslutsdatum.', ...]}
 //     onHinderChange={setHinderSteg}
+//     rapport={rapportHandlingar}   // valfritt: rutan Rapporten är klar när ärendet är avslutat
 //   />
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -36,6 +37,8 @@ import { Icon, type IconName } from '../../../icons/Icon'
 import { HjalpText } from '../hjalp/HjalpText'
 import type { AvslutsHinder } from '../../../../services/arendeAvslutService'
 import type { StegDef, StegId } from './stegKonfig'
+import { KlartRapport } from '../rapporter/KlartRapport'
+import type { RapportHandlingar } from '../rapporter/rapportHandlingar'
 
 export interface KlartStegProps {
   /** Steget visas. När det blir aktivt körs kontrollen mot det som är sparat. */
@@ -87,6 +90,12 @@ export interface KlartStegProps {
    * text, eftersom besöket ingår i avtalet och inte faktureras.
    */
   helaArendetText?: string
+  /**
+   * Ärendets rapport med värdens befintliga rapportfunktioner. Visas som rutan
+   * Rapporten är klar när ärendet är avslutat. Utelämnad eller null: ingen ruta
+   * (till exempel egenkontroll, som saknar ärenderapport).
+   */
+  rapport?: RapportHandlingar | null
 }
 
 type Fas = 'vilar' | 'sparar' | 'kontrollerar' | 'stanger'
@@ -125,6 +134,7 @@ export function KlartSteg({
   onHinderChange,
   lasHelaArendet = false,
   helaArendetText = 'Ärendet avslutas, får avslutsdatum och stängs för fakturering.',
+  rapport,
 }: KlartStegProps) {
   const [fas, setFas] = useState<Fas>('vilar')
   const [hinder, setHinder] = useState<AvslutsHinder[] | null>(null)
@@ -247,6 +257,7 @@ export function KlartSteg({
             </p>
           </div>
         </div>
+        {rapport && <KlartRapport rapport={rapport} />}
         <button
           type="button"
           onClick={sparaBara}

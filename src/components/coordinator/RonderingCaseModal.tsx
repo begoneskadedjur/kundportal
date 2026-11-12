@@ -53,6 +53,7 @@ import { useProvisionsgrans, underProvisionsgrans } from '../technician/ny/steg/
 import { StegRad, StegKnappar } from '../technician/ny/steg/StegFlode'
 import { ArendeVerktygArk, type ArendeVerktygGrupp } from '../technician/ny/steg/ArendeVerktygArk'
 import { KlartSteg } from '../technician/ny/steg/KlartSteg'
+import { franArbetsrapport, useMinEpost } from '../technician/ny/rapporter/rapportHandlingar'
 import { useStegForArende, grannSteg, formateraKr, type StegId } from '../technician/ny/steg/stegKonfig'
 import { HjalpText } from '../technician/ny/hjalp/HjalpText'
 import { kontrolleraAvslut, RAPPORT_SAKNAS_FEL, type AvslutsHinder } from '../../services/arendeAvslutService'
@@ -492,11 +493,14 @@ export default function RonderingCaseModal({
     scheduled_start: formData.scheduled_start?.toISOString() ?? null,
   }
 
+  const arbetsrapport = useModernWorkReportGeneration(reportData)
   const {
     downloadReport, sendToTechnician, sendToContact,
     isGenerating, canGenerateReport,
     totalReports, hasRecentReport, currentReport, getTimeSinceReport
-  } = useModernWorkReportGeneration(reportData)
+  } = arbetsrapport
+  // Klart-stegets rapportruta: Skicka till mig går till den inloggade teknikern
+  const { epost: minEpost, namn: minNamn } = useMinEpost()
 
   // ═══════════════════════════════════════════════════════════════════════════
   // NYA ARBETSVYN: stegflödet. Gäller bara när useNyArbetsvy().aktiv är true
@@ -1943,6 +1947,14 @@ export default function RonderingCaseModal({
                       vadHander={vadHanderVidStang}
                       helaArendetText={`Ronderingen avslutas och får avslutsdatum. Den ingår i kundens avtal och faktureras inte.${utoverAvtaletKr > 0 ? ` ${formateraKr(utoverAvtaletKr)} faktureras utöver avtalet.` : ''}`}
                       onHinderChange={setHinderSteg}
+                      rapport={franArbetsrapport(arbetsrapport, {
+                        sort: 'arende',
+                        arendenummer: formData.case_number || null,
+                        kundEpost: formData.contact_email,
+                        kundNamn: formData.contact_person || null,
+                        minEpost,
+                        minNamn,
+                      })}
                     />
                   </div>
                 )}

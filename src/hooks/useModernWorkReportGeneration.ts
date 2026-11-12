@@ -48,6 +48,16 @@ interface TechnicianCase {
   invoice_marking?: string | null;
 }
 
+/**
+ * Egen mottagare för sendToTechnician och sendToContact. Nya arbetsvyn skickar
+ * Skicka till mig till den inloggade teknikern och Skicka till kund till adressen
+ * som teknikern bekräftat. Utelämnad: samma mottagare som förut (gamla vyn oförändrad).
+ */
+export interface RapportMottagare {
+  email: string
+  namn?: string | null
+}
+
 export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
   const [isGenerating, setIsGenerating] = useState(false)
   const [existingReports, setExistingReports] = useState<SanitationReport[]>([])
@@ -371,7 +381,7 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
   }
 
   // Skicka modern rapport till ansvarig tekniker
-  const sendToTechnician = async (skipWarning = false) => {
+  const sendToTechnician = async (skipWarning = false, mottagare?: RapportMottagare) => {
     // Varna om rapport nyligen skickats
     if (!skipWarning && reportHistory.current?.sent_to_technician) {
       const timeSince = reportHistory.current.sent_to_technician_at 
@@ -388,8 +398,8 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
     }
 
     // Hämta tekniker-email från primary_assignee_id om assignee_email inte finns
-    let technicianEmail = caseData.assignee_email
-    let technicianName = caseData.assignee_name
+    let technicianEmail = mottagare?.email || caseData.assignee_email
+    let technicianName = mottagare ? (mottagare.namn || undefined) : caseData.assignee_name
 
     if (!technicianEmail && caseData.primary_assignee_id) {
       try {
@@ -480,7 +490,7 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
   }
 
   // Skicka modern rapport till kontaktperson
-  const sendToContact = async (skipWarning = false) => {
+  const sendToContact = async (skipWarning = false, mottagare?: RapportMottagare) => {
     // Varna om rapport nyligen skickats till kund
     if (!skipWarning && reportHistory.current?.sent_to_customer) {
       const timeSince = reportHistory.current.sent_to_customer_at 
@@ -496,7 +506,9 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       }
     }
 
-    if (!caseData.e_post_kontaktperson) {
+    const kontaktEpost = mottagare?.email || caseData.e_post_kontaktperson
+    const kontaktNamn = mottagare ? (mottagare.namn ?? caseData.kontaktperson) : caseData.kontaktperson
+    if (!kontaktEpost) {
       toast.error('Ingen email-adress för kontaktperson')
       return
     }
@@ -535,8 +547,8 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
           pdf: pdfData.pdf,
           filename: pdfData.filename,
           recipientType: 'contact',
-          recipientEmail: caseData.e_post_kontaktperson,
-          recipientName: caseData.kontaktperson,
+          recipientEmail: kontaktEpost,
+          recipientName: kontaktNamn,
           caseData: modernCaseData,
           customerData
         })

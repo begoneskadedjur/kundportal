@@ -22,6 +22,8 @@ interface InspectionReportSectionProps {
   /** Används om kundkortet saknar kontakt-e-post */
   fallbackEmail?: string
   fallbackContactName?: string
+  /** Ändras när sessionen ska läsas om, till exempel efter att kontrollen klarmarkerats (nya arbetsvyn) */
+  uppdateraNyckel?: number
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -36,7 +38,8 @@ export default function InspectionReportSection({
   caseId,
   caseNumber,
   fallbackEmail,
-  fallbackContactName
+  fallbackContactName,
+  uppdateraNyckel = 0
 }: InspectionReportSectionProps) {
   const [session, setSession] = useState<InspectionSessionWithRelations | null>(null)
   const [downloading, setDownloading] = useState<'pdf' | 'excel' | null>(null)
@@ -47,12 +50,14 @@ export default function InspectionReportSection({
 
   useEffect(() => {
     let cancelled = false
-    setSession(null)
     getInspectionSessionByCaseId(caseId).then(result => {
       if (!cancelled) setSession(result)
     })
     return () => { cancelled = true }
-  }, [caseId])
+  }, [caseId, uppdateraNyckel])
+
+  // Nytt ärende: töm sessionen (en omläsning av samma ärende behåller den som visas)
+  useEffect(() => { setSession(null) }, [caseId])
 
   const customerEmail = session?.customer?.contact_email || fallbackEmail || ''
   const contactName = session?.customer?.contact_person || fallbackContactName || ''

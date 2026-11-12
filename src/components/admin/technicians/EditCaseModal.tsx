@@ -97,6 +97,7 @@ import { useNyArbetsvy } from '../../../hooks/useNyArbetsvy'
 import { StegRad, StegKnappar } from '../../technician/ny/steg/StegFlode'
 import { ArendeVerktygArk, type ArendeVerktygGrupp } from '../../technician/ny/steg/ArendeVerktygArk'
 import { KlartSteg } from '../../technician/ny/steg/KlartSteg'
+import { franArbetsrapport, useMinEpost } from '../../technician/ny/rapporter/rapportHandlingar'
 import { useStegForArende, grannSteg, type StegId } from '../../technician/ny/steg/stegKonfig'
 import { HjalpText } from '../../technician/ny/hjalp/HjalpText'
 import { kontrolleraAvslut, RAPPORT_SAKNAS_FEL, type AvslutsHinder } from '../../../services/arendeAvslutService'
@@ -1623,6 +1624,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   // något annat sätt. Mönstret är detsamma som i EditContractCaseModal.
   // ═══════════════════════════════════════════════════════════════════════════
   const { aktiv: nyArbetsvy } = useNyArbetsvy()
+  // Klart-stegets rapportruta: Skicka till mig går till den inloggade teknikern
+  const { epost: minEpost, namn: minNamn } = useMinEpost()
   // 'steg' = stegflödet, 'flikar' = den vanliga flikvyn (Alla uppgifter)
   const [visning, setVisning] = useState<'steg' | 'flikar'>('steg')
   const stegLage = nyArbetsvy && visning === 'steg'
@@ -3047,6 +3050,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   vadHander={vadHanderVidStang}
                   vadHanderBesok={vadHanderVidBesok}
                   onHinderChange={setHinderSteg}
+                  rapport={franArbetsrapport(reportGeneration, {
+                    sort: 'sanering',
+                    arendenummer: currentCase.case_number || null,
+                    kundEpost: currentCase.e_post_kontaktperson,
+                    minEpost,
+                    minNamn,
+                  })}
                 />
               </div>
 
