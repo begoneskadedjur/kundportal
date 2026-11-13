@@ -827,8 +827,8 @@ export default function CaseServiceSelector({
     const unitPrice = isDosage
       ? Math.round(calculatePricePerDosageUnit(item.effective_price, item.article.total_content!) * 100) / 100
       : item.effective_price
-    // Default-kvantitet: för dosage startar vi på 1 visningsenhet (1 kg / 1 l / 1 m)
-    // istället för 1 grundenhet (1 g / 1 ml), så användaren ser ett rimligt värde direkt.
+    // Default-kvantitet: för dosage startar vi på 1 visningsenhet (1 g / 1 ml / 1 m)
+    // Teknikern skriver sedan in den mängd som faktiskt gick åt.
     const defaultQty = isDosage && item.article.dosage_unit
       ? getDosageDisplayUnit(item.article.dosage_unit).factor
       : 1
@@ -2744,7 +2744,7 @@ export default function CaseServiceSelector({
                 {articleItems.map(item => {
                   const isDosage = !!(item.article?.is_dosage_product && item.article?.dosage_unit)
                   const dosageUnit = item.article?.dosage_unit
-                  // Visningsenhet: g → kg, ml → l, m → m. Lagras alltid i grundenheten.
+                  // Visningsenhet: g, ml och m, samma som grundenheten den lagras i.
                   const display = isDosage && dosageUnit ? getDosageDisplayUnit(dosageUnit) : null
                   const unitLabel = display ? display.unit : (isDosage ? dosageUnit! : 'st')
                   const displayQty = display ? item.quantity / display.factor : item.quantity
@@ -2959,7 +2959,7 @@ export default function CaseServiceSelector({
                             {catArticles.map(item => {
                               const isDosage = !!(item.article.is_dosage_product && item.article.total_content && item.article.dosage_unit)
                               const display = isDosage && item.article.dosage_unit ? getDosageDisplayUnit(item.article.dosage_unit) : null
-                              // Pris per visningsenhet (t.ex. kr/kg) – mer läsbart än kr/g
+                              // Pris per enhet teknikern anger (kr/ml, kr/g, kr/m)
                               const displayPrice = isDosage && display
                                 ? calculatePricePerDosageUnit(item.effective_price, item.article.total_content!) * display.factor
                                 : null
@@ -2982,7 +2982,7 @@ export default function CaseServiceSelector({
                                   </div>
                                   <span className="text-xs text-slate-400 whitespace-nowrap ml-2">
                                     {isDosage && display
-                                      ? `${formatPrice(Math.round(displayPrice!))}/${display.unit}`
+                                      ? `${displayPrice!.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr/${display.unit} · ${formatPrice(item.effective_price)}/fp`
                                       : formatPrice(item.effective_price)}
                                   </span>
                                 </button>

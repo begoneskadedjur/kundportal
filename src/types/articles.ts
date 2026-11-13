@@ -479,19 +479,19 @@ export const calculatePricePerDosageUnit = (
 }
 
 /**
- * För doseringsprodukter: välj användarvänlig visningsenhet.
- * g → kg, ml → l, m → m (m är redan bra).
- * Returnerar { unit: 'kg'|'l'|'m', factor: antal grundenheter per visningsenhet }
- * Exempel: g → { unit: 'kg', factor: 1000 } innebär att 1 kg = 1000 g.
+ * För doseringsprodukter: enheten teknikern anger mängden i.
+ * g och ml anges i grundenheten (teknikern använder några ml eller g, inte
+ * liter). Visning i kg/l gav startvärdet 1 l = 1 000 ml, som sällan ändrades.
+ * Returnerar { unit, factor: antal grundenheter per visningsenhet }.
  */
 export const getDosageDisplayUnit = (
   dosageUnit: DosageUnit
 ): { unit: string; factor: number; step: number; min: number } => {
   switch (dosageUnit) {
     case 'g':
-      return { unit: 'kg', factor: 1000, step: 0.01, min: 0.01 }
+      return { unit: 'g', factor: 1, step: 1, min: 1 }
     case 'ml':
-      return { unit: 'l', factor: 1000, step: 0.01, min: 0.01 }
+      return { unit: 'ml', factor: 1, step: 1, min: 1 }
     case 'm':
       return { unit: 'm', factor: 1, step: 0.1, min: 0.1 }
   }

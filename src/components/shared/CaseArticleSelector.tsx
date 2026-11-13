@@ -215,7 +215,7 @@ export default function CaseArticleSelector({
     const unitPrice = isDosage
       ? Math.round(calculatePricePerDosageUnit(articleWithPrice.effective_price, article.total_content!) * 100) / 100
       : articleWithPrice.effective_price
-    // Default-kvantitet: för dosage startar vi på 1 visningsenhet (1 kg / 1 l / 1 m)
+    // Default-kvantitet: för dosage startar vi på 1 visningsenhet (1 g / 1 ml / 1 m)
     const defaultQty = isDosage && article.dosage_unit
       ? getDosageDisplayUnit(article.dosage_unit).factor
       : 1
@@ -773,7 +773,7 @@ export default function CaseArticleSelector({
                                   return (
                                   <>
                                     <span className="text-[#20c58f] text-sm font-medium">
-                                      {formatPrice(Math.round(pricePerDisplay))}
+                                      {pricePerDisplay.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr
                                     </span>
                                     <span className="text-[10px] text-slate-500">
                                       / {disp.unit}

@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.4',
+    date: '2026-11-13',
+    title: 'Medel anges i ml och g',
+    items: [
+      { kind: 'buggfix', text: 'Medel som K-Othrine och betesblock lades in som 1 liter eller 1 kilo om du inte ändrade mängden, så materialkostnaden blev flera tusen kronor för fel. Nu anger du mängden i ml eller g och raden startar på 1. Skriv in det du faktiskt använde.' },
+      { kind: 'andring', text: 'Artikellistan visar medlets pris per ml eller g och vad förpackningen kostar, till exempel 3,63 kr/ml · 871 kr/fp.' },
+    ],
+  },
+  {
     version: '3.132.3',
     date: '2026-11-13',
     title: 'Pris på tjänster utan fast pris går att ändra',
