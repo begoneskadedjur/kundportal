@@ -8,7 +8,8 @@
 //    rapportknapparna Ladda ned / Skicka till <namn>, Jag är framme (startaTidVidFramme),
 //    Ärendets verktyg (verktygGrupper) och Alla uppgifter (flikvyn Ärende, Utförande, Ekonomi).
 //  - KlartSteg.tsx: Kontrollera innan du stänger, Vad är klart?, Hela ärendet, Bara besöket,
-//    Det här händer när du stänger, Stäng hela ärendet, Spara utan att stänga.
+//    Det här händer när du stänger, Stäng hela ärendet, Spara utan att stänga. Avslutat ärende:
+//    Ärendet är avslutat och rutan Rapporten är klar (KlartRapport, se _rapporter.tsx, 3.132.0).
 //  - CaseServiceSelector.tsx: Tjänster & fakturarader, Prisguide, Lägg till tilläggstjänst,
 //    Dela upp för ROT/RUT, Interna kostnader. CommissionSection.tsx: Provision.
 //  - RevisitModal.tsx: Boka återbesök, Datum för återbesök *, Besökslängd, Visa förslag →,
@@ -21,6 +22,7 @@ import { Icon, type IconName } from '../../../../components/icons/Icon'
 import type { StegId } from '../../../../components/technician/ny/steg/stegKonfig'
 import { Markor, Notis, type MarkorProps } from '../skarmkit'
 import { NyArende, NyGrupp, NyHjalp, NyRad, NySkarm, useGuideEnhet, type NyMarkor } from '../skarmkit/nyvy'
+import { RapportKlarRuta, type RutaLage } from './_rapporter'
 
 export type Enhet = 'mobil' | 'dator'
 
@@ -482,6 +484,8 @@ export interface KlartLage {
   utanBesok?: boolean
   /** Egen provisionsrad i Det här händer när du stänger (standard: exemplet under gränsen) */
   provisionText?: string
+  /** Rutan Rapporten är klar när ärendet är avslutat (KlartRapport). Utelämnad: val. */
+  rapport?: RutaLage
 }
 
 export function KlartInnehall({ k, markera, nr, tryck }: { k: KlartLage; markera?: string; nr: number; tryck: (id: string) => void }) {
@@ -496,6 +500,8 @@ export function KlartInnehall({ k, markera, nr, tryck }: { k: KlartLage; markera
             <p className="text-[10.5px] text-slate-300">Status Avslutat, avslutsdatum 2026-10-26. Ändringar du gör nu sparar du med knappen nedan.</p>
           </div>
         </div>
+        <RapportKlarRuta lage={k.rapport ?? 'val'} rapportNamn="Saneringsrapport" kundEpost="familjen@exempel.se" minEpost="anna@exempel.se"
+          mk={id => mk(markera, id, nr)} tryck={tryck} />
         <StegKnapp ikon="allman.bock" onClick={() => tryck('spara')}>Spara ändringar</StegKnapp>
       </>
     )

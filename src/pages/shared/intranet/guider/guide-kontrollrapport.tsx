@@ -1,13 +1,16 @@
 // src/pages/shared/intranet/guider/guide-kontrollrapport.tsx
 // Guidemodul: Skicka kontrollrapporten till kunden (tekniker, nya arbetsvyn, telefon och dator).
-// Etiketterna följer EditContractCaseModal i stegflödet (steget Rapport för service_type
-// inspection med HjalpText Rapport, Arbetsrapport, InspectionReportSection) och
-// InspectionReportSection (Kontrollrapport, Kontrollrunda avslutad, PDF, Excel, Skicka
-// till kund, Mottagare, Skicka, Skicka kontrollrapporten som PDF till X?, Avbryt,
-// Bekräfta och skicka, Rapporten skickas från noreply@begone.se med svar till
-// info@begone.se. Bilagor över 8 MB skickas inte., toasten Kontrollrapporten skickad
-// till X). Kunden: CustomerPortalLayout Rapporter, SanitationReports fliken
-// Kontrollrapporter. Kontrollerat 2026-10-24. Påhittad kund.
+// Två vägar, båda i EditContractCaseModal i stegflödet för service_type inspection:
+//  1. Steget Klart när kontrollen är klarmarkerad: rutan Rapporten är klar (KlartRapport med
+//     useKontrollRapport, 3.132.0): Skicka till kund med kundens adress, frågan Skicka till kund?
+//     (SkickaTillKundArk: Avbryt, Skicka), toasten Kontrollrapporten skickad till X, och rutan
+//     Kontrollrapporten är skickad / Skickad till X. Skärmdelarna ligger i _rapporter.tsx.
+//  2. Steget Rapport, kortet Kontrollrapport (InspectionReportSection: Kontrollrunda avslutad,
+//     PDF, Excel, Skicka till kund, Mottagare, Skicka, Skicka kontrollrapporten som PDF till X?,
+//     Avbryt, Bekräfta och skicka, Rapporten skickas från noreply@begone.se med svar till
+//     info@begone.se. Bilagor över 8 MB skickas inte.). Här går adressen att ändra.
+// Kunden: CustomerPortalLayout Rapporter, SanitationReports fliken Kontrollrapporter.
+// Kontrollerat 2026-10-24, Klart-rutan 2026-11-13. Påhittad kund.
 
 import { useState } from 'react'
 import { Icon } from '../../../../components/icons/Icon'
@@ -16,12 +19,19 @@ import { NyArende, NyGrupp, NyRad, NySkarm, useGuideEnhet } from '../skarmkit/ny
 import type { StegId } from '../../../../components/technician/ny/steg/stegKonfig'
 import type { GuideModul } from './registry'
 import { Hjalp, KlartAvslutat, Toast, mk } from './_nyvy_stationer'
+import { RapportKlarRuta, SkickaKundArk, type RutaLage } from './_rapporter'
 
 const KUND_EPOST = 'info@exempelgarden.se'
 const FORVALTARE = 'forvaltning@exempelgarden.se'
+const MIN_EPOST = 'anna@exempel.se'
+const NR = 'BE-0004620'
 
 interface Lage {
   steg: StegId
+  /** Rutan i Klart */
+  ruta: RutaLage
+  /** Frågan Skicka till kund? från rutan i Klart */
+  ark: boolean
   skicka: boolean
   mottagare: string
   bekrafta: boolean
@@ -89,16 +99,22 @@ function Rapport({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => vo
 
 function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void; markera?: string; nr: number }) {
   const ramMal = markera && (markera.startsWith('steg:') || markera === 'nasta') ? { pa: true, nr, mal: markera } : undefined
+  const m = (id: string) => mk(markera, id, nr)
   return (
     <NySkarm sida="arenden" titel="Mina ärenden" under="3 att ta hand om nu" onRam={tryck}
       over={<>
-        <NyArende typ="inspection" aktivt={l.steg} nr="BE-0004620" status="Avslutat" statusFarg="bg-[#20c58f]"
+        <NyArende typ="inspection" aktivt={l.steg} nr={NR} status="Avslutat" statusFarg="bg-[#20c58f]"
           kund="Brf Exempelgården, Exempelvägen 3, Gävle" onNasta={() => tryck('nasta')} onTillbaka={() => tryck('tillbaka')}
           onSteg={id => tryck(`steg:${id}`)} onIkon={tryck} markor={ramMal}>
-          {l.steg === 'klart' && <KlartAvslutat />}
+          {l.steg === 'klart' && (
+            <KlartAvslutat>
+              <RapportKlarRuta lage={l.ruta} rapportNamn="Kontrollrapport" kundEpost={KUND_EPOST} minEpost={MIN_EPOST} excel mk={m} tryck={tryck} />
+            </KlartAvslutat>
+          )}
           {l.steg === 'rapport' && <Rapport l={l} tryck={tryck} markera={markera} nr={nr} />}
-          {l.steg !== 'klart' && l.steg !== 'rapport' && <p className="text-[11px] text-slate-400">Gå till steget Rapport.</p>}
+          {l.steg !== 'klart' && l.steg !== 'rapport' && <p className="text-[11px] text-slate-400">Gå till steget Rapport eller Klart.</p>}
         </NyArende>
+        {l.ark && <SkickaKundArk rapportNamn="Kontrollrapport" arendeNr={NR} epost={KUND_EPOST} mk={m} tryck={tryck} />}
         {l.toast && <Toast text={l.toast} />}
       </>}>
       <NyGrupp titel="Den här veckan" antal={2}>
@@ -111,14 +127,15 @@ function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void
 
 // ─── Visning ───
 
-const BAS: Lage = { steg: 'klart', skicka: false, mottagare: KUND_EPOST, bekrafta: false, toast: null }
+const BAS: Lage = { steg: 'klart', ruta: 'val', ark: false, skicka: false, mottagare: KUND_EPOST, bekrafta: false, toast: null }
 const VISNING: { lage: Lage; markera: string }[] = [
-  { lage: BAS, markera: 'steg:rapport' },
-  { lage: { ...BAS, steg: 'rapport' }, markera: 'pdf' },
-  { lage: { ...BAS, steg: 'rapport', toast: 'PDF nedladdad' }, markera: 'skicka-kund' },
+  { lage: BAS, markera: 'rk-kund' },
+  { lage: { ...BAS, ark: true }, markera: 'ark-skicka' },
+  { lage: { ...BAS, ruta: 'skickad', toast: `Kontrollrapporten skickad till ${KUND_EPOST}` }, markera: 'steg:rapport' },
+  { lage: { ...BAS, steg: 'rapport' }, markera: 'skicka-kund' },
   { lage: { ...BAS, steg: 'rapport', skicka: true }, markera: 'mottagare' },
-  { lage: { ...BAS, steg: 'rapport', skicka: true }, markera: 'skicka' },
-  { lage: { ...BAS, steg: 'rapport', skicka: true, bekrafta: true }, markera: 'bekrafta' },
+  { lage: { ...BAS, steg: 'rapport', skicka: true, mottagare: FORVALTARE }, markera: 'skicka' },
+  { lage: { ...BAS, steg: 'rapport', skicka: true, mottagare: FORVALTARE, bekrafta: true }, markera: 'bekrafta' },
 ]
 
 function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
@@ -128,7 +145,16 @@ function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
 
 // ─── Övning: skicka till förvaltaren ───
 
-const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Kontrollen hos Brf Exempelgården är klarmarkerad och du står i steget Klart. Leta upp kontrollrapporten.' }
+const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Kontrollen hos Brf Exempelgården är klarmarkerad och du står i steget Klart. Kunden vill att förvaltaren får kontrollrapporten, inte kundens vanliga adress.' }
+
+const KLART_TIPS: Record<string, string> = {
+  'rk-kund': `Skicka till kund går alltid till kundens adress, ${KUND_EPOST}. Adressen går inte att ändra här. Förvaltaren skickar du till från kortet Kontrollrapport i steget Rapport.`,
+  'rk-mig': 'Skicka till mig går till din egen e-post. Förvaltaren ska ha rapporten.',
+  'rk-pdf': 'Bra att ha, men uppdraget var att mejla rapporten till förvaltaren.',
+  'rk-excel': 'Bra att ha, men uppdraget var att mejla rapporten till förvaltaren.',
+  'rk-intenu': 'Skicka inte nu fäller bara ihop rutan. Förvaltaren ska ha rapporten nu.',
+  'rk-ga': 'Under Rapporter på datorn kan du skriva en annan adress, men nu står du redan i ärendet. Gå till steget Rapport.',
+}
 
 function Ovning() {
   const enhet = useGuideEnhet()
@@ -142,9 +168,18 @@ function Ovning() {
 
   const tryck = (id: string) => {
     if (klar) return
+    if (l.ark) {
+      setL({ ...l, ark: false })
+      if (id === 'ark-skicka') miss(`Då hade rapporten gått till ${KUND_EPOST}. Tryck Avbryt nästa gång och gå till steget Rapport, där du kan skriva förvaltarens adress.`)
+      else tips('Avbrutet', 'Inget skickades. Förvaltarens adress skriver du i steget Rapport.')
+      return
+    }
     if (l.steg !== 'rapport') {
-      if (id === 'steg:rapport') { setL({ ...l, steg: 'rapport', toast: null }); tips('Rätt steg', 'Kortet Kontrollrapport finns här. Skicka den till förvaltaren.') }
-      else miss('Kontrollrapporten ligger i steget Rapport. Tryck på dess ikon i stegraden överst, den tredje från vänster.')
+      if (id === 'steg:rapport') { setL({ ...l, steg: 'rapport', toast: null }); tips('Rätt steg', 'Kortet Kontrollrapport finns här. Där kan du ändra mottagaren.') }
+      else if (id === 'rk-kund') { setL({ ...l, ark: true }); miss(KLART_TIPS['rk-kund']) }
+      else if (id === 'rk-visaval') setL({ ...l, ruta: 'val' })
+      else if (id === 'rk-intenu') { setL({ ...l, ruta: 'inte-nu' }); miss(KLART_TIPS['rk-intenu']) }
+      else miss(KLART_TIPS[id] ?? 'Förvaltarens adress skriver du i kortet Kontrollrapport i steget Rapport. Tryck på dess ikon i stegraden, den tredje från vänster.')
       return
     }
     if (id === 'pdf' || id === 'excel') { setL({ ...l, toast: id === 'pdf' ? 'PDF nedladdad' : 'Excel nedladdad' }); tips('Nedladdad', 'Bra att ha, men uppdraget var att mejla rapporten. Tryck Skicka till kund.'); return }

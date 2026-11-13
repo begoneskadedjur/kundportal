@@ -94,10 +94,10 @@ const pa = (m: NyMarkor | undefined, mal: string): MarkorProps | undefined => (m
 // ─── Ramen: sidhuvud, bottenmeny, sidomeny ────────
 
 export type NySida = 'idag' | 'karta' | 'arenden' | 'mer' | 'schema' | 'tickets' | 'stationer' | 'specialrapporter'
-  | 'avtal' | 'dokumentsignering' | 'kundresa' | 'leads' | 'provision' | 'intranat' | 'konto' | 'tillbud' | 'ingen'
+  | 'avtal' | 'dokumentsignering' | 'kundresa' | 'leads' | 'provision' | 'intranat' | 'konto' | 'tillbud' | 'rapporter' | 'ingen'
 
 const SIDA_TILL_MENY: Partial<Record<NySida, string>> = {
-  idag: 'Idag', karta: 'Karta', schema: 'Schema', arenden: 'Mina ärenden', tickets: 'Tickets',
+  idag: 'Idag', karta: 'Karta', schema: 'Schema', arenden: 'Mina ärenden', rapporter: 'Rapporter', tickets: 'Tickets',
   stationer: 'Stationer', specialrapporter: 'Specialrapporter', avtal: 'Skapa avtal eller offert',
   dokumentsignering: 'Dokumentsignering', kundresa: 'Min kundresa', leads: 'Leads och tips',
   provision: 'Provision', intranat: 'Intranät och guider',

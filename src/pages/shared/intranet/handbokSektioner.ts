@@ -31,10 +31,10 @@ export const HANDBOK_SEKTIONER: HandbokSektion[] = [
   {
     id: 'arenden',
     titel: 'Ärenden och besök',
-    text: 'Dina ärenden och schemat, ett besök steg för steg, stänga ärendet, nästa besök, nytt skadedjur hos samma kund och när kunden avbokar.',
+    text: 'Dina ärenden och schemat, ett besök steg för steg, stänga ärendet, skicka rapporten i efterhand, nästa besök, nytt skadedjur hos samma kund och när kunden avbokar.',
     ikon: 'arende.arende',
     slugs: [
-      'guide-mina-arenden', 'guide-schema-tekniker', 'guide-utfora-arende', 'guide-fakturering',
+      'guide-mina-arenden', 'guide-schema-tekniker', 'guide-utfora-arende', 'guide-fakturering', 'guide-skicka-rapport-efterhand',
       'guide-skapa-arenden', 'guide-schemavyn',
       'guide-aterbesok', 'guide-aterbesok-kontor',
       'guide-foljearenden', 'guide-foljearenden-kontor',

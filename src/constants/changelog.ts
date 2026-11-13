@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.2',
+    date: '2026-11-13',
+    title: 'Guiderna om rapporten efter avslut',
+    items: [
+      { kind: 'nyhet', text: 'Handboken: ny guide för tekniker, Skicka en rapport i efterhand. Den visar hur du hittar ett avslutat ärende under Rapporter och skickar eller laddar ned rapporten, med övning i telefonen och på datorn.' },
+      { kind: 'andring', text: 'Handboken: guiderna Stäng ärendet eller bara besöket, Skicka kontrollrapporten till kunden, Gör en stationskontroll, Gör ett besök steg för steg och Hitta rätt i nya arbetsvyn visar nu rutan Rapporten är klar i steget Klart och menyvalet Rapporter.' },
+    ],
+  },
+  {
     version: '3.132.1',
     date: '2026-11-12',
     title: 'Frågan Skicka till kund syns i ärendet',

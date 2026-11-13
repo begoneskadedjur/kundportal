@@ -7,17 +7,21 @@
 // Stäng hela ärendet: Sparar ärendet..., Kontrollerar ärendet..., Stänger ärendet...
 // Exemplet 3 750 kr inkl. moms ger ingen provision (under 4 000 kr exkl. moms), därför
 // toasten "Ärendet avslutat och faktura genererad!".
+// Efter stängningen: rutan Rapporten är klar (KlartRapport, 3.132.0) med Skicka till kund,
+// frågan Skicka till kund? (SkickaTillKundArk) och toasten "Rapport skickad till Familjen Exempel!"
+// (useWorkReportGeneration.sendToContact). Skärmdelarna för rapporten ligger i _rapporter.tsx.
 
 import { useState } from 'react'
 import { OvningRam, type OvningSvar } from '../skarmkit'
 import { useGuideEnhet } from '../skarmkit/nyvy'
 import { ArendeRam, KlartInnehall, Notis, PrisInnehall, type KlartLage, type PrisLage } from './_nyvy_arendet'
+import { SkickaKundArk, type RutaLage } from './_rapporter'
 import type { GuideModul } from './registry'
 
 const HINDER = { text: 'Fastighetsbeteckning krävs för ROT på: Skadedjurstekniker timpris.', steg: 'Pris och fakturering' }
 
 type Vy = 'pris' | 'klart' | 'avslutat'
-interface Lage { vy: Vy; fastighet: boolean; fel: boolean; val: 'hela' | 'besok'; notis?: string }
+interface Lage { vy: Vy; fastighet: boolean; fel: boolean; val: 'hela' | 'besok'; notis?: string; rapport?: RutaLage; ark?: boolean }
 
 function prisLage(l: Lage): PrisLage {
   return {
@@ -30,11 +34,17 @@ function prisLage(l: Lage): PrisLage {
 }
 
 function Skarm({ l, markera, nr, tryck }: { l: Lage; markera?: string; nr: number; tryck: (id: string) => void }) {
-  const k: KlartLage = { hinder: l.fastighet ? [] : [HINDER], val: l.val, avslutat: l.vy === 'avslutat' }
+  const k: KlartLage = { hinder: l.fastighet ? [] : [HINDER], val: l.val, avslutat: l.vy === 'avslutat', rapport: l.rapport }
   return (
     <ArendeRam aktivt={l.vy === 'pris' ? 'pris' : 'klart'} markera={markera} nr={nr} tryck={tryck}
       status={l.vy === 'avslutat' ? 'Avslutat' : 'Bokad'} statusFarg={l.vy === 'avslutat' ? 'bg-[#20c58f]' : undefined}
-      over={l.notis ? <Notis text={l.notis} /> : undefined}>
+      over={<>
+        {l.ark && (
+          <SkickaKundArk rapportNamn="Saneringsrapport" arendeNr="BE-0001234" epost="familjen@exempel.se"
+            mk={id => (markera === id ? { pa: true, nr } : undefined)} tryck={tryck} />
+        )}
+        {l.notis && <Notis text={l.notis} />}
+      </>}>
       {l.vy === 'pris'
         ? <PrisInnehall l={prisLage(l)} markera={markera} nr={nr} tryck={tryck} />
         : <KlartInnehall k={k} markera={markera} nr={nr} tryck={tryck} />}
@@ -51,6 +61,7 @@ const VISNING: { l: Lage; markera: string }[] = [
   { l: { vy: 'pris', fastighet: true, fel: true, val: 'hela' }, markera: 'steg:klart' },
   { l: { vy: 'klart', fastighet: true, fel: false, val: 'hela' }, markera: 'hela' },
   { l: { vy: 'klart', fastighet: true, fel: false, val: 'hela' }, markera: 'stang-hela' },
+  { l: { vy: 'avslutat', fastighet: true, fel: false, val: 'hela' }, markera: 'rk-kund' },
 ]
 
 function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
@@ -61,7 +72,7 @@ function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
 // ─── Övning ───
 
 const START: Lage = { vy: 'pris', fastighet: false, fel: false, val: 'hela' }
-const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Jobbet hos Familjen Exempel är klart och raderna är ifyllda. Gå till steget där du stänger ärendet.' }
+const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Jobbet hos Familjen Exempel är klart och raderna är ifyllda. Stäng ärendet och skicka sedan rapporten till kunden. Gå först till steget där du stänger ärendet.' }
 
 const TIPS: Record<string, string> = {
   besok: 'Bara besöket är för när du ska tillbaka. Jobbet är klart, så hela ärendet ska stängas.',
@@ -75,6 +86,12 @@ const TIPS: Record<string, string> = {
   prisguide: 'Priset är rätt. Det som saknas är fastighetsbeteckningen.',
 }
 
+const RAPPORT_TIPS: Record<string, string> = {
+  'rk-pdf': 'Ladda ned PDF ger dig filen, men kunden får inget. Tryck Skicka till kund.',
+  'rk-mig': 'Skicka till mig går till din egen e-post. Kunden ska ha rapporten, tryck Skicka till kund.',
+  'rk-ga': 'Gå till Rapporter tar dig till listan med dina avslutade ärenden. Du kan skicka direkt här, tryck Skicka till kund.',
+}
+
 function Ovning() {
   const enhet = useGuideEnhet()
   const [l, setL] = useState<Lage>(START)
@@ -84,8 +101,23 @@ function Ovning() {
   const miss = (text: string) => { setFel(f => f + 1); setSvar({ typ: 'fel', titel: 'Inte där', text }) }
   const tips = (titel: string, text: string) => setSvar({ typ: 'tips', titel, text })
 
+  const tryckAvslutat = (id: string) => {
+    if (l.rapport === 'skickad') return
+    if (l.ark) {
+      if (id === 'ark-skicka') {
+        setL({ ...l, ark: false, rapport: 'skickad', notis: 'Rapport skickad till Familjen Exempel!' })
+        setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Ärendet är avslutat och fakturan på 3 750 kr går vidare till godkännande och Fortnox. Saneringsrapporten är skickad till familjen@exempel.se. Ingen provision, underlaget 3 000 kr exkl. moms är under 4 000 kr.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'}.` : ''}` })
+      } else if (id === 'ark-avbryt') { setL({ ...l, ark: false }); tips('Avbrutet', 'Inget skickades. Tryck Skicka till kund igen när du är redo.') }
+      return
+    }
+    if (id === 'rk-kund') { setL({ ...l, ark: true, notis: undefined }); tips('Skicka till kund?', 'Kontrollera adressen. Stämmer den: tryck Skicka.') }
+    else if (id === 'rk-visaval') { setL({ ...l, rapport: 'val' }); tips('Valen är tillbaka', 'Tryck Skicka till kund.') }
+    else if (id === 'rk-intenu') { setL({ ...l, rapport: 'inte-nu' }); miss('Skicka inte nu fäller ihop rutan och rapporten finns kvar under Rapporter. Kunden ska få den nu, tryck Visa val.') }
+    else miss(RAPPORT_TIPS[id] ?? 'Rapporten skickar du i rutan Rapporten är klar. Tryck Skicka till kund.')
+  }
+
   const tryck = (id: string) => {
-    if (l.vy === 'avslutat') return
+    if (l.vy === 'avslutat') { tryckAvslutat(id); return }
     if (l.vy === 'pris') {
       if (id === 'steg:klart' || id === 'nasta') {
         setL({ ...l, vy: 'klart', fel: false }); setBesokt(true)
@@ -103,16 +135,16 @@ function Ovning() {
       if (!l.fastighet) miss('1 sak saknas innan ärendet kan stängas. Knappen sparar och kontrollerar, men stänger inte förrän fastighetsbeteckningen finns.')
       else if (l.val !== 'hela') miss('Välj Hela ärendet först.')
       else {
-        setL({ ...l, vy: 'avslutat', notis: 'Ärendet avslutat och faktura genererad!' })
-        setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Ärendet är avslutat med avslutsdatum. Fakturan på 3 750 kr går vidare till godkännande och Fortnox, kunden får inget direkt. Ingen provision, underlaget 3 000 kr exkl. moms är under 4 000 kr.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'}.` : ''}` })
+        setL({ ...l, vy: 'avslutat', rapport: 'val', notis: 'Ärendet avslutat och faktura genererad!' })
+        tips('Ärendet är avslutat', 'Fakturan går vidare till godkännande och Fortnox, kunden får inget direkt. Klart visar nu rutan Rapporten är klar. Skicka rapporten till kunden.')
       }
     } else if (id === 'besok') { setL({ ...l, val: 'besok' }); miss(TIPS.besok) }
     else miss(TIPS[id] ?? 'Läs Kontrollera innan du stänger överst i steget.')
   }
 
-  const framsteg = l.vy === 'avslutat' ? 4 : l.fastighet ? (l.vy === 'klart' ? 3 : 2) : besokt ? 1 : 0
+  const framsteg = l.vy === 'avslutat' ? (l.rapport === 'skickad' ? 6 : l.ark ? 5 : 4) : l.fastighet ? (l.vy === 'klart' ? 3 : 2) : besokt ? 1 : 0
   return (
-    <OvningRam framsteg={framsteg} totalt={4} svar={svar} onBorjaOm={() => { setL(START); setBesokt(false); setSvar(BORJA); setFel(0) }} bred={enhet === 'dator'}>
+    <OvningRam framsteg={framsteg} totalt={6} svar={svar} onBorjaOm={() => { setL(START); setBesokt(false); setSvar(BORJA); setFel(0) }} bred={enhet === 'dator'}>
       <Skarm l={l} nr={0} tryck={tryck} />
     </OvningRam>
   )

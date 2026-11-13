@@ -445,17 +445,18 @@ export function Klarmarkera({ klara, totalt, tryck, markera, nr }: { klara: numb
   )
 }
 
-/** Steget Klart när ärendet är avslutat */
-export function KlartAvslutat() {
+/** Steget Klart när ärendet är avslutat. children = rutan Rapporten är klar (RapportKlarRuta i _rapporter.tsx). */
+export function KlartAvslutat({ children }: { children?: ReactNode }) {
   return (
     <div className="grid gap-2">
-      <div className="flex items-start gap-2 rounded-xl border border-[#20c58f]/40 bg-[#20c58f]/10 p-2.5">
+      <div className="flex items-start gap-2 rounded-xl border border-[#20c58f]/40 bg-[#20c58f]/10 p-2">
         <Icon name="falt.klart" size={20} className="flex-none text-[#20c58f]" />
         <div>
           <p className="text-[12.5px] font-semibold text-white">Ärendet är avslutat</p>
           <p className="text-[10.5px] text-slate-300">Status Avslutat, avslutsdatum 2026-10-26. Ändringar du gör nu sparar du med knappen nedan.</p>
         </div>
       </div>
+      {children}
       <span className={`${SEK} h-9 text-[12px]`}>Spara ändringar</span>
     </div>
   )

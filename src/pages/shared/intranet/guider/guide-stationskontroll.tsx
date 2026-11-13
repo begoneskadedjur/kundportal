@@ -9,14 +9,17 @@
 // som OK?, stationsarket med Flytta, Byt typ, Historik, Förbrukning (g), Minska/Öka
 // med 5, Varning: 10, Kritisk: 25, Preparat (valfritt), Foto, Anteckning, Spara,
 // Klarmarkera ärende?, Du har inte inspekterat alla stationer ännu., Ja, klarmarkera)
-// och KlartSteg (Ärendet är avslutat). Vidare till rapport är vit medan kontrollen
-// pågår (nastaSekundar). Kontrollerat 2026-10-28. Påhittad kund.
+// och KlartSteg (Ärendet är avslutat, rutan Rapporten är klar med kontrollrapporten sedan
+// 3.132.0). Vidare till rapport är vit medan kontrollen pågår (nastaSekundar).
+// Kontrollerat 2026-10-28, rapportrutan 2026-11-13. Påhittad kund.
 
 import { useState } from 'react'
 import { OvningRam, type OvningSvar } from '../skarmkit'
 import { NyArende, NyGrupp, NyRad, NySkarm, useGuideEnhet } from '../skarmkit/nyvy'
 import type { StegId } from '../../../../components/technician/ny/steg/stegKonfig'
 import type { GuideModul } from './registry'
+import { RapportKlarRuta } from './_rapporter'
+import { ingenMk } from './_nyvy_salja'
 import {
   FrammeSteg, Hjalp, KlartAvslutat, Klarmarkera, KontrollRunda, SEX, SnabbOk, StationsArk, TYPER, Toast,
   matningFor, type Stn,
@@ -56,7 +59,11 @@ function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void
               <KontrollRunda r={l} tryck={tryck} markera={markera} nr={nr} />
             </div>
           )}
-          {l.steg === 'klart' && <KlartAvslutat />}
+          {l.steg === 'klart' && (
+            <KlartAvslutat>
+              <RapportKlarRuta rapportNamn="Kontrollrapport" kundEpost="info@exempel.se" minEpost="anna@exempel.se" excel mk={ingenMk} tryck={tryck} />
+            </KlartAvslutat>
+          )}
         </NyArende>
         {ark && <StationsArk s={ark} varde={l.varde} tryck={tryck} markera={markera} nr={nr} />}
         {l.fraga?.typ === 'ok' && <SnabbOk stn={l.fraga.stn} tryck={tryck} markera={markera} nr={nr} />}
@@ -149,7 +156,7 @@ function Ovning() {
       if (id === 'klar-ja') {
         if (l.kontrollerade.size < l.stationer.length) { miss('Ja, klarmarkera går inte att trycka på förrän alla stationer är kontrollerade. Tryck Avbryt och kontrollera resten.'); return }
         setL({ ...l, steg: 'klart', fraga: null, toast: 'Inspektion avslutad!' })
-        setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Besöket är klarmarkerat och har status Avslutat. Station 2 sparades med 15 gram, de andra som OK. Kontrollrapporten finns nu i steget Rapport.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
+        setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Besöket är klarmarkerat och har status Avslutat. Station 2 sparades med 15 gram, de andra som OK. Rutan Rapporten är klar i steget Klart skickar kontrollrapporten till kunden när du väljer det.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
       } else if (id === 'klar-avbryt') setL({ ...l, fraga: null })
       return
     }

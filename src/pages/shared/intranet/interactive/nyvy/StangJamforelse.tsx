@@ -15,7 +15,7 @@ const RADER: { rubrik: string; hela: string; besok: string }[] = [
   { rubrik: 'Fakturan', hela: 'Raderna blir en faktura som går vidare till godkännande och Fortnox. 0 kr ger ingen faktura.', besok: 'Ingen faktura, om du inte kryssar i Skapa delfaktura för nuvarande tjänster.' },
   { rubrik: 'Raderna', hela: 'Faktureras. Ärendet är klart.', besok: 'Ligger kvar till nästa gång, eller blir delfaktura om du kryssar i.' },
   { rubrik: 'Provisionen', hela: 'Registreras om ärendet är provisionsgrundande och underlaget är minst 4 000 kr exkl. moms.', besok: 'Registreras först när ärendet stängs.' },
-  { rubrik: 'Rapporten', hela: 'Skickas inte av sig själv. Skicka den i steget Rapport.', besok: 'Skickas inte av sig själv. Skicka den i steget Rapport.' },
+  { rubrik: 'Rapporten', hela: 'Skickas inte av sig själv. När ärendet är stängt visar Klart rutan Rapporten är klar, där du skickar eller laddar ned den. Du kan också skicka den i steget Rapport.', besok:'Skickas inte av sig själv. Skicka den i steget Rapport.' },
 ]
 
 const FALL: { text: string; ratt: Val | 'spara'; forklaring: string }[] = [
