@@ -385,22 +385,35 @@ export class AddonStationBillingService {
    * Avtalet som kundens öppna etableringsärende är bokat för (cases.contract_id),
    * med namn. Stationerna i en sådan etablering ingår i avtalet: formuläret
    * förväljer aldrig "Tillägg utöver avtal" då. null utan sådant ärende.
+   *
+   * Avropsavtal omfattar inga stationer, där är allt som sätts ut tillägg.
+   * avrop = etableringen gäller ett avropsavtal. endaAvtal = kunden har inget
+   * annat aktivt avtal; bara då förväljs tillägg per år (Lugnet i Falun,
+   * 2026-11-13). Uppslaget går via get_contract_candidates (security definer)
+   * eftersom tekniker inte får läsa contracts direkt.
    */
-  static async findEstablishmentContract(customerId: string): Promise<{ id: string; label: string } | null> {
+  static async findEstablishmentContract(
+    customerId: string
+  ): Promise<{ id: string; label: string; avrop: boolean; endaAvtal: boolean } | null> {
     const { case: openCase } = await this.findOpenEstablishmentCase(customerId)
     if (!openCase?.contract_id) return null
-    const { data } = await supabase
-      .from('contracts')
-      .select('id, display_name, label, contract_type, status')
-      .eq('id', openCase.contract_id)
-      .maybeSingle()
-    const c = data as { id: string; display_name: string | null; label: string | null; contract_type: string | null; status: string | null } | null
-    if (!c || !['signed', 'active'].includes(c.status ?? '')) return null
-    return { id: c.id, label: c.display_name?.trim() || c.label || c.contract_type || 'avtalet' }
+    const { data, error } = await supabase.rpc('get_contract_candidates', { p_customer_id: customerId })
+    if (error || !Array.isArray(data)) return null
+    const rows = data as Array<{ id: string; label: string | null; contract_type: string | null }>
+    const c = rows.find(r => r.id === openCase.contract_id)
+    if (!c) return null
+    return {
+      id: c.id,
+      label: c.label?.trim() || c.contract_type || 'avtalet',
+      avrop: /^avrop/i.test(c.contract_type?.trim() ?? ''),
+      endaAvtal: rows.every(r => r.id === c.id),
+    }
   }
 
   /** Som findEstablishmentContract, för inomhusstationer (planritningens kund). */
-  static async findEstablishmentContractForFloorPlan(floorPlanId: string): Promise<{ id: string; label: string } | null> {
+  static async findEstablishmentContractForFloorPlan(
+    floorPlanId: string
+  ): Promise<{ id: string; label: string; avrop: boolean; endaAvtal: boolean } | null> {
     const { data } = await supabase.from('floor_plans').select('customer_id').eq('id', floorPlanId).maybeSingle()
     const customerId = (data as { customer_id: string | null } | null)?.customer_id
     return customerId ? this.findEstablishmentContract(customerId) : null

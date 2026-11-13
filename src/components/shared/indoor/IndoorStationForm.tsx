@@ -151,7 +151,9 @@ export function IndoorStationForm({
   // Etablering av ett bokat avtal: stationerna ingår i avtalet. "Tillägg utöver
   // avtal" förväljs aldrig och följer inte med från föregående station; bara
   // teknikerns eget kryss gäller (Heimstaden Maria 5, 2026-11-09).
-  const [etableringsAvtal, setEtableringsAvtal] = useState<string | null>(null)
+  // Avropsavtal omfattar inga stationer: är det kundens enda avtal förväljs
+  // tillägg per år. Har kunden andra avtal rörs krysset inte och ingen text visas.
+  const [etableringsAvtal, setEtableringsAvtal] = useState<{ label: string; avrop: boolean; endaAvtal: boolean } | null>(null)
   const addonValtAvTekniker = useRef(false)
   useEffect(() => {
     if (isEditing || !floorPlanId) { setEtableringsAvtal(null); return }
@@ -159,10 +161,14 @@ export function IndoorStationForm({
     AddonStationBillingService.findEstablishmentContractForFloorPlan(floorPlanId)
       .then(avtal => {
         if (cancelled) return
-        setEtableringsAvtal(avtal?.label ?? null)
-        if (avtal && !addonValtAvTekniker.current) {
+        setEtableringsAvtal(avtal)
+        if (!avtal || addonValtAvTekniker.current) return
+        if (!avtal.avrop) {
           setIsAddon(false)
           setAddonBillingModel(null)
+        } else if (avtal.endaAvtal) {
+          setIsAddon(true)
+          setAddonBillingModel('per_year')
         }
       })
       .catch(() => { if (!cancelled) setEtableringsAvtal(null) })
@@ -622,9 +628,14 @@ export function IndoorStationForm({
           <span className="block text-xs text-slate-400 mt-0.5">
             Stationen ingår inte i avtalets årspremie. Välj hur den betalas: priserna kommer från kundens prislista.
           </span>
-          {etableringsAvtal && (
+          {etableringsAvtal && !etableringsAvtal.avrop && (
             <span className={`block text-xs mt-1.5 ${isAddon ? 'text-amber-400' : 'text-slate-400'}`}>
-              Etableringen gäller {etableringsAvtal}. Stationerna i avtalet ingår i premien. Kryssa bara i för stationer som kunden beställt utöver avtalet.
+              Etableringen gäller {etableringsAvtal.label}. Stationerna i avtalet ingår i premien. Kryssa bara i för stationer som kunden beställt utöver avtalet.
+            </span>
+          )}
+          {etableringsAvtal?.avrop && etableringsAvtal.endaAvtal && (
+            <span className={`block text-xs mt-1.5 ${isAddon ? 'text-slate-400' : 'text-amber-400'}`}>
+              Avropsavtalet omfattar inga stationer, alla stationer är tillägg.
             </span>
           )}
           {isAddon && (

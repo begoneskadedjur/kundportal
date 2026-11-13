@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.6',
+    date: '2026-11-13',
+    title: 'Stationer på avropsavtal blir tillägg',
+    items: [
+      { kind: 'buggfix', text: 'Stationer som sattes ut på en etablering för ett avropsavtal räknades som en del av avtalet och fakturerades aldrig, om ingen kryssade i Tillägg utöver avtal. Nu är Tillägg utöver avtal med Per år förvalt när avropsavtalet är kundens enda avtal, med texten Avropsavtalet omfattar inga stationer, alla stationer är tillägg.' },
+      { kind: 'buggfix', text: 'Texten om att stationerna ingår i premien vid etablering av ett vanligt avtal syns nu även för tekniker, och Tillägg utöver avtal förväljs inte där.' },
+    ],
+  },
+  {
     version: '3.132.5',
     date: '2026-11-13',
     title: 'Radens summa på tjänster',
