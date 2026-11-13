@@ -2088,6 +2088,13 @@ export default function CaseServiceSelector({
             </button>
           )}
         </div>
+        {/* Radens summa när antalet är fler än ett (à-pris × antal, efter rabatt) */}
+        {!readOnly && splitTotalExkl == null && Number(item.quantity) > 1 && (
+          <p className="text-xs text-slate-400 mt-1 text-right">
+            {Number(item.quantity).toLocaleString('sv-SE')} st, totalt{' '}
+            <span className="font-semibold text-slate-200">{formatPrice(Number(item.total_price || 0) * priceMultiplier)}</span>
+          </p>
+        )}
         {rotLage && (
           <p className="text-xs text-slate-500 mt-1">
             {rotRoll ? RAD_UNDERTEXT[rotRoll] : 'Egen rad, inget avdrag'}

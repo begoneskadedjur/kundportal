@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.5',
+    date: '2026-11-13',
+    title: 'Radens summa på tjänster',
+    items: [
+      { kind: 'andring', text: 'En tjänst med antal över ett visar radens summa under priset, till exempel 2 st, totalt 1 064 kr.' },
+    ],
+  },
+  {
     version: '3.132.4',
     date: '2026-11-13',
     title: 'Medel anges i ml och g',
