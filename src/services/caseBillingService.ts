@@ -49,8 +49,8 @@ export class CaseBillingService {
    * effective_price är ALLTID inköpspriset (articles.default_price) - det som
    * räknas som intern kostnad i marginalen. Har kunden artikeln i sin prislista
    * (custom_price eller mängdrabatt) läggs det som customer_price bredvid:
-   * ett avtalat pris som låser tjänsten artikeln mappas mot och skrivs som
-   * specifikation på fakturaraden. Tidigare skrev kundpriset ÖVER inköpspriset
+   * ett avtalat pris som prisguiden räknar med på tjänsten artikeln mappas
+   * mot. Fakturan visar bara tjänsten. Tidigare skrev kundpriset ÖVER inköpspriset
    * här, vilket gjorde att marginalen räknades mot fel siffra.
    */
   static async getArticlesWithPrices(customerId?: string | null, articleGroupId?: string | null): Promise<ArticleWithEffectivePrice[]> {

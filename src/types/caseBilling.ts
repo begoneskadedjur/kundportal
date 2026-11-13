@@ -545,40 +545,6 @@ export function hasCustomerPrice(
   return item.item_type === 'article' && item.customer_unit_price != null
 }
 
-type SpecItem = Pick<CaseBillingItem, 'id' | 'item_type' | 'customer_unit_price' | 'mapped_service_id' | 'quantity' | 'article_name'> & {
-  status?: string | null
-  article?: { is_dosage_product?: boolean | null; dosage_unit?: string | null } | null
-}
-
-const specNumber = (n: number) =>
-  new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 2 }).format(n)
-
-/**
- * Specifikation för fakturaraden: "20 st Myrdosa à 18 kr" av de artiklar med
- * kundpris som är mappade mot tjänsteraden. Artiklar UTAN kundpris nämns
- * aldrig (interna produkter är inte kundens sak). Tom sträng = ingen spec.
- */
-export function buildCustomerArticleSpec(serviceItemId: string, items: SpecItem[]): string {
-  const parts: string[] = []
-  for (const a of items) {
-    if (a.item_type !== 'article' || a.customer_unit_price == null) continue
-    if (a.mapped_service_id !== serviceItemId) continue
-    if (a.status === 'cancelled') continue
-    const unit = a.article?.is_dosage_product && a.article?.dosage_unit ? a.article.dosage_unit : null
-    if (unit) {
-      // Dosering lagras i grundenhet (g/ml/m); visa i kg/l/m när det blir läsbart
-      const big = unit === 'g' ? { u: 'kg', f: 1000 } : unit === 'ml' ? { u: 'l', f: 1000 } : { u: unit, f: 1 }
-      const qty = a.quantity / big.f
-      const price = a.customer_unit_price * big.f
-      parts.push(`${specNumber(qty)} ${big.u} ${a.article_name} à ${specNumber(price)} kr/${big.u}`)
-    } else {
-      parts.push(`${a.quantity} st ${a.article_name} à ${specNumber(a.customer_unit_price)} kr`)
-    }
-  }
-  return parts.join(', ')
-}
-
-/** Radtext med specifikation: "Myrbekämpning, 20 st Myrdosa à 18 kr" */
-export function appendCustomerArticleSpec(name: string, spec: string): string {
-  return spec ? `${name}, ${spec}` : name
-}
+// Fakturaraden bär bara tjänstens namn. Specifikationen av mappade artiklar
+// med kundpris ("20 st Myrdosa à 18 kr") togs bort 2026-11-13: artiklarna är
+// intern uppföljning och visas aldrig för kunden.

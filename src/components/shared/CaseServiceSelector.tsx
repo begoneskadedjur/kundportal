@@ -2742,7 +2742,7 @@ export default function CaseServiceSelector({
           <div className="mt-3 space-y-3">
             <p className="text-xs text-slate-500">
               Interna kostnader visas <strong>inte</strong> på fakturan – de används bara för att beräkna inköpskostnad och marginal.
-              Artiklar med kundpris i kundens prislista är undantaget: de låser priset på tjänsten de mappas mot och skrivs ut som specifikation på fakturaraden.
+              Det gäller även artiklar med kundpris i kundens prislista: prisguiden räknar med kundpriset, fakturan visar bara tjänsten.
             </p>
 
             {/* Befintliga artikelrader */}
@@ -2773,7 +2773,7 @@ export default function CaseServiceSelector({
                       {item.customer_unit_price != null && (
                         <span
                           className="text-[10px] font-medium text-[#20c58f]"
-                          title="Avtalat kundpris från prislistan: låser priset på den tjänst artikeln mappas mot och skrivs som specifikation på fakturaraden"
+                          title="Avtalat kundpris från prislistan: prisguiden räknar med det på tjänsten artikeln mappas mot. Fakturan visar bara tjänsten."
                         >
                           kundpris {formatPrice(item.customer_unit_price)}/{isDosage ? dosageUnit : 'st'}
                         </span>
@@ -2789,7 +2789,7 @@ export default function CaseServiceSelector({
                       {item.customer_unit_price != null && !item.mapped_service_id && !priceAssignments[item.id] && (
                         <span
                           className="text-[10px] font-medium text-amber-400"
-                          title="Mappa artikeln mot en tjänst i prisguiden, annars faktureras inte det avtalade priset"
+                          title="Mappa artikeln mot en tjänst i prisguiden, annars räknas det avtalade priset inte in i tjänstens pris"
                         >
                           ej mappad mot tjänst
                         </span>

@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.7',
+    date: '2026-11-13',
+    title: 'Fakturan visar bara tjänsten',
+    items: [
+      { kind: 'andring', text: 'Artiklar med kundpris, till exempel silverfiskfällor på ett LOU-avtal, skrivs inte längre ut på fakturaraden. Fakturan visar bara tjänsten. Artiklarna mappas fortfarande i prisguiden och syns i marginalen.' },
+    ],
+  },
+  {
     version: '3.132.6',
     date: '2026-11-13',
     title: 'Stationer på avropsavtal blir tillägg',
