@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.3',
+    date: '2026-11-13',
+    title: 'Pris på tjänster utan fast pris går att ändra',
+    items: [
+      { kind: 'buggfix', text: 'Prisguiden räknade doseringsprodukter som K-Othrine med flaskans pris per ml, så en sanering kunde bli över en miljon kronor. Nu räknas priset per ml, samma som i interna kostnader.' },
+      { kind: 'andring', text: 'En tjänst utan fast pris i kundens prislista låses inte längre när en artikel med kundpris kopplas till den. Du kan sätta priset själv. Tjänster med fast pris är låsta som förut.' },
+    ],
+  },
+  {
     version: '3.132.2',
     date: '2026-11-13',
     title: 'Guiderna om rapporten efter avslut',

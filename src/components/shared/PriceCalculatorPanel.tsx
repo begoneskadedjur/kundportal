@@ -26,13 +26,11 @@ interface ArticleItem {
   article_name: string
   article_code?: string | null
   quantity: number
-  /** Inköpspris per enhet på raden (articles.default_price, ev. per doseringsenhet) */
+  /** Inköpspris per enhet på raden (per ml/g för doseringsprodukter) */
   unit_price: number
   /** Kundens avtalade pris per enhet, ögonblicksbild från prislistan (null = inget kundpris) */
   customer_unit_price?: number | null
   total_price: number
-  /** Artikelns grunddata-pris (articles.default_price) — den verkliga inköpskostnaden. */
-  default_price?: number | null
   /** Artikelns ROT/RUT-berättigande — styr om tjänsten kan bli ROT/RUT-fakturerad. */
   rot_eligible?: boolean
   rut_eligible?: boolean
@@ -206,15 +204,18 @@ export default function PriceCalculatorPanel({
     return cp.custom_price
   }
 
-  /** Verklig inköpskostnad per enhet = articles.default_price (oberoende av kundavtal) */
-  const purchaseUnitCost = (a: ArticleItem): number =>
-    a.default_price != null ? a.default_price : a.unit_price
+  /**
+   * Verklig inköpskostnad per enhet = radens unit_price (oberoende av kundavtal).
+   * För doseringsprodukter är den per ml/g, som antalet. Artikelns default_price
+   * är förpackningspriset och får aldrig multipliceras med antal ml.
+   */
+  const purchaseUnitCost = (a: ArticleItem): number => a.unit_price
 
   const hasCustomerPrice = (a: ArticleItem): boolean => customerUnitPrice(a) !== null
 
   /**
    * Total verklig inköpskostnad (används för marginalkalkyl).
-   * = sum(default_price * qty) för alla tilldelade artiklar, oavsett om kunden har avtalspris.
+   * = sum(unit_price * qty) för alla tilldelade artiklar, oavsett om kunden har avtalspris.
    */
   const purchaseCostByService = (serviceId: string) =>
     articleItems
@@ -232,7 +233,7 @@ export default function PriceCalculatorPanel({
 
   /**
    * Bas-kostnad för artiklar UTAN kundavtal (markup-able).
-   * Här använder vi verklig inköpskostnad (default_price) så markup räknas på rätt bas.
+   * Här använder vi verklig inköpskostnad (radens unit_price) så markup räknas på rätt bas.
    */
   const markupableCostByService = (serviceId: string) =>
     articleItems
@@ -479,7 +480,7 @@ export default function PriceCalculatorPanel({
                       {showPricing && (
                         <div className="p-3 space-y-4">
                           {serviceItems.map(si => {
-                            const cost = purchaseCostByService(si.id)                 // verklig inköpskostnad (default_price × qty)
+                            const cost = purchaseCostByService(si.id)                 // verklig inköpskostnad (unit_price × qty)
                             const customerPriced = customerPricedByService(si.id)      // låst kund-intäkt (tier × qty)
                             const markupable = markupableCostByService(si.id)          // bas-kostnad för artiklar som får markup
                             const markup = markups[si.id] ?? settings.recommended_markup_percent
@@ -523,7 +524,7 @@ export default function PriceCalculatorPanel({
                                     {locked && !fixed && (
                                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium">
                                         <CheckCircle className="w-3 h-3" />
-                                        Låst av avtal
+                                        Avtalspris på artiklar
                                       </span>
                                     )}
                                   </div>
@@ -550,13 +551,13 @@ export default function PriceCalculatorPanel({
                                     const totalDisplay = Math.round((customerPriced + markupPriceExkl) * priceMultiplier)
                                     return (
                                       <div className="space-y-2">
-                                        {/* Block 1: Låst av avtal */}
+                                        {/* Block 1: artiklar med kundens avtalspris */}
                                         {lockedItems.length > 0 && (
                                           <div className="p-2.5 rounded-lg bg-[#20c58f]/5 border border-[#20c58f]/20">
                                             <div className="flex items-center gap-1.5 mb-1.5">
                                               <CheckCircle className="w-3 h-3 text-[#20c58f]" />
                                               <span className="text-[11px] font-semibold uppercase tracking-wide text-[#20c58f]">
-                                                Låst av avtal
+                                                Kundens avtalspris
                                               </span>
                                             </div>
                                             <div className="space-y-0.5">
@@ -575,7 +576,7 @@ export default function PriceCalculatorPanel({
                                               ))}
                                             </div>
                                             <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-[#20c58f]/20 text-xs">
-                                              <span className="text-slate-400">Summa låst pris</span>
+                                              <span className="text-slate-400">Summa avtalspris</span>
                                               <span className="text-[#20c58f] font-semibold">{fmt(customerPricedDisplay)}</span>
                                             </div>
                                           </div>

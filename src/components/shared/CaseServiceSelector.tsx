@@ -495,19 +495,6 @@ export default function CaseServiceSelector({
   const marginPercent = marginBreakdown.headline_percent
   const marginOk = marginPercent === null || marginPercent >= pricingSettings.min_margin_percent
 
-  // Tjänsterader vars pris härleds ur mappade artiklar med kundpris (avtalat
-  // pris, t.ex. LOU-prisbilaga). Priset är låst: prisguiden räknar
-  // kundpris × antal och påslag bara på övriga artiklar. Fast tjänstepris i
-  // prislistan har företräde och hanteras av hasFixedPrice.
-  const derivedLockedServiceIds = new Set(
-    ownServiceItems
-      .filter(si => !(si.service_id && customerServicePrices[si.service_id] !== undefined))
-      .filter(si => articleItems.some(a =>
-        a.customer_unit_price != null && (a.mapped_service_id || priceAssignments[a.id] || null) === si.id
-      ))
-      .map(si => si.id)
-  )
-
   /**
    * Radens listpris totalt (exkl. moms) så som prisguiden räknar det: kundpris
    * på mappade artiklar med avtalspris, inköp + påslag på övriga. Utan mappade
@@ -520,7 +507,9 @@ export default function CaseServiceSelector({
       const markup = priceMarkups[item.id] ?? pricingSettings.recommended_markup_percent
       return mapped.reduce((sum, a) => {
         if (a.customer_unit_price != null) return sum + a.customer_unit_price * a.quantity
-        const cost = (a.article?.default_price ?? a.unit_price) * a.quantity
+        // Radens inköpspris per enhet (per ml/g för doseringsprodukter),
+        // aldrig artikelns förpackningspris
+        const cost = a.unit_price * a.quantity
         return sum + cost * (1 + markup / 100)
       }, 0)
     }
@@ -1009,8 +998,9 @@ export default function CaseServiceSelector({
     const parsedExkl = isPrivate ? parsed / (1 + VAT_RATE) : parsed
     const item = allItems.find(i => i.id === id)
     if (!item) return
-    // Skydd: kundprislista-låsta och härlett låsta tjänster får inte ändras här
-    if ((item.service_id && customerServicePrices[item.service_id] !== undefined) || derivedLockedServiceIds.has(id)) {
+    // Skydd: tjänster med fast pris i kundens prislista får inte ändras här.
+    // Utan fast pris sätts priset fritt, även när kopplade artiklar har kundpris.
+    if (item.service_id && customerServicePrices[item.service_id] !== undefined) {
       return
     }
     // Uppdelad tjänst: rutan bär radens TOTALPRIS (tjänsterad + arbetsrad,
@@ -1959,7 +1949,6 @@ export default function CaseServiceSelector({
       && (tillat.rot || tillat.rut)
       && item.total_price > 0
       && !(item.service_id && customerServicePrices[item.service_id] !== undefined)
-      && !derivedLockedServiceIds.has(item.id)
     const canSplit = splittable
       && !laborChild
       && !!laborService
@@ -1969,7 +1958,6 @@ export default function CaseServiceSelector({
     const rotPct = getEffectiveRotPercent(svc)
     const rutPct = getEffectiveRutPercent(svc)
     const hasFixedPrice = !!item.service_id && customerServicePrices[item.service_id] !== undefined
-    const isDerivedLocked = !hasFixedPrice && derivedLockedServiceIds.has(item.id)
     // Etableringskostnad på 0 kr: ingår i avtalet, inget "Fast pris"-märke
     const isIncludedEstablishmentRow = isEstablishment && Number(item.total_price) === 0
     return (
@@ -2007,15 +1995,6 @@ export default function CaseServiceSelector({
               Fast pris
             </span>
           )}
-          {isDerivedLocked && (
-            <span
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium"
-              title="Priset härleds ur kundens avtalade artikelpriser (kundpris × antal) och kan inte ändras här"
-            >
-              <Icon name="allman.las" className="w-3 h-3" />
-              Låst av avtal
-            </span>
-          )}
           {item.covered_by_contract && (
             <span
               className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium"
@@ -2028,7 +2007,7 @@ export default function CaseServiceSelector({
           {/* Avtalstillägg: endast avtalskundärenden med sparade rader.
               Aldrig "Lägg till i avtalet" på etableringar (tilläggen
               ligger bredvid avtalet), en redan markerad rad visas ändå. */}
-          {caseType === 'contract' && customerId && caseId && !draftMode && !isDerivedLocked && (
+          {caseType === 'contract' && customerId && caseId && !draftMode && (
             item.contract_addition_annual != null ? (
               <button
                 type="button"
@@ -2078,15 +2057,13 @@ export default function CaseServiceSelector({
             <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-auto">
               {formatPrice((splitTotalExkl ?? item.total_price) * priceMultiplier)}
             </span>
-          ) : hasFixedPrice || isDerivedLocked || item.covered_by_contract ? (
+          ) : hasFixedPrice || item.covered_by_contract ? (
             <div className="flex items-center gap-1 ml-auto">
               <span
                 className="w-24 px-2 py-0.5 text-sm text-right bg-[#20c58f]/10 border border-[#20c58f]/30 rounded text-[#20c58f] font-medium cursor-not-allowed"
                 title={item.covered_by_contract
                   ? 'Ingår i avtalet och faktureras via avtalet – priset kan inte ändras här'
-                  : hasFixedPrice
-                  ? 'Fast pris från kundens prislista – kan inte ändras här'
-                  : 'Låst av avtal: kundpris × antal på mappade artiklar – ändra antal eller mappning i stället'}
+                  : 'Fast pris från kundens prislista – kan inte ändras här'}
               >
                 {displayUnitPrice}
               </span>
@@ -3037,7 +3014,6 @@ export default function CaseServiceSelector({
           unit_price: i.unit_price,
           total_price: i.total_price,
           customer_unit_price: i.customer_unit_price ?? null,
-          default_price: i.article?.default_price ?? null,
           rot_eligible: !!i.article?.rot_eligible,
           rut_eligible: !!i.article?.rut_eligible,
         }))}
