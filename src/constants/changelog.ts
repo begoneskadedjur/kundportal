@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.9',
+    date: '2026-11-16',
+    title: 'Frånvaro i schemat går att öppna',
+    items: [
+      { kind: 'buggfix', text: 'De randiga rutorna i dagens schema, till exempel Admin, Möte och Kundbesök, går att trycka på. De fälls ut med tid, typ och anteckning, och ett kundbesök med adress får knappen Navigera.' },
+    ],
+  },
+  {
     version: '3.132.8',
     date: '2026-11-16',
     title: 'Schema åt en kollega',

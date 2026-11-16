@@ -3,19 +3,19 @@
 // ("Ledigt 10:30 till 13:00") och frånvaro. I telefonen fälls valt besök ut med
 // Navigera, Ring och Öppna. På datorn markeras det och visas i sidopanelen.
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Icon } from '../../../icons/Icon'
 import { BesokKnappar, StatusPunkt } from '../besokUi'
 import { TYP_IKON } from '../besokTyp'
 import type { WorkSchedule } from '../../../../types/database'
 import type { Restid } from '../../../../services/restidService'
-import { TYP_ETIKETT, klockslag, ortUrAdress, type DagBesok } from '../../../../services/teknikerDagService'
+import { TYP_ETIKETT, klockslag, navigeraUrl, ortUrAdress, type DagBesok } from '../../../../services/teknikerDagService'
 import {
   arbetstid, dagRubrik, franvaroForDag, kollegor, luckor, schemaStatus, varaktighet, visaStationer, type Franvaro,
 } from './schemaLogik'
 import { ArbetsTid, VISA_ARBETSTID } from './SchemaDelar'
 import { kortidText } from './useKortid'
-import { franvaroTyp } from '../../../../utils/franvaroTyper'
+import { FRANVARO_GRUPP_TEXT, franvaroTyp } from '../../../../utils/franvaroTyper'
 
 interface Props {
   dag: string
@@ -43,7 +43,9 @@ interface Props {
 type Rad =
   | { slag: 'besok'; t: number; b: DagBesok }
   | { slag: 'lucka'; t: number; start: Date; slut: Date }
-  | { slag: 'franvaro'; t: number; start: Date; slut: Date; orsak: string | null; rubrik: string | null }
+  | { slag: 'franvaro'; t: number; id: string; start: Date; slut: Date; orsak: string | null; rubrik: string | null; anteckning: string | null }
+
+const RANDIG = 'bg-[repeating-linear-gradient(135deg,var(--color-slate-800)_0,var(--color-slate-800)_6px,var(--color-slate-700)_6px,var(--color-slate-700)_7px)]'
 
 /** "Solna, 18 stationer, arbetat 52 min" */
 function Underrad({ b, antal }: { b: DagBesok; antal?: number }) {
@@ -72,6 +74,8 @@ function TidKolumn({ b, svag }: { b: DagBesok; svag: boolean }) {
 }
 
 export function DagTidslinje(p: Props) {
+  // Utfälld frånvaro (Admin, Kundbesök, Möte ...): visar typ, tid och anteckning
+  const [oppenFranvaro, setOppenFranvaro] = useState<string | null>(null)
   const at = arbetstid(p.dag, p.ws)
   const fv = franvaroForDag(p.dag, p.franvaro, p.ws)
   const passerad = p.dag < p.idag
@@ -84,7 +88,7 @@ export function DagTidslinje(p: Props) {
     }
   }
   if (!fv.heldag) {
-    for (const f of fv.block) rader.push({ slag: 'franvaro', t: f.start.getTime(), start: f.start, slut: f.slut, orsak: f.orsak, rubrik: f.rubrik })
+    for (const f of fv.block) rader.push({ slag: 'franvaro', t: f.start.getTime(), ...f })
   }
   // Vid samma starttid kommer frånvaro och lucka före besöket
   const ordning = { franvaro: 0, lucka: 1, besok: 2 }
@@ -133,15 +137,61 @@ export function DagTidslinje(p: Props) {
             )
           }
           if (r.slag === 'franvaro') {
+            const typ = franvaroTyp(r.orsak)
+            const nyckel = `${r.id}-${r.t}`
+            const oppen = oppenFranvaro === nyckel
+            // Kundbesök utan ärende har adressen i anteckningen
+            const adress = r.orsak === 'Kundbesök' ? r.anteckning : null
             return (
-              <li key={`f${r.t}`} className="grid grid-cols-[48px_1fr] gap-2.5">
+              <li key={`f${nyckel}`} className="grid grid-cols-[48px_1fr] gap-2.5">
                 <span className="pt-3 font-mono text-[13px] text-slate-500">{klockslag(r.start)}</span>
-                <div className="px-3.5 py-3 flex items-center gap-2.5 rounded-2xl border border-slate-700 bg-[repeating-linear-gradient(135deg,var(--color-slate-800)_0,var(--color-slate-800)_6px,var(--color-slate-700)_6px,var(--color-slate-700)_7px)] text-slate-300">
-                  <span className="flex-shrink-0" style={{ color: franvaroTyp(r.orsak).farg }}><Icon name={r.orsak ? franvaroTyp(r.orsak).ikon : 'allman.kalender'} size={20} /></span>
-                  <span className="flex flex-col">
-                    <span className="text-sm font-semibold">{r.rubrik || 'Frånvaro'} {klockslag(r.start)} till {klockslag(r.slut)}</span>
-                    {r.orsak && <span className="text-[13px] text-slate-400">{franvaroTyp(r.orsak).kort}</span>}
-                  </span>
+                <div className={`rounded-2xl border text-slate-300 ${oppen ? 'border-2 border-slate-500' : 'border-slate-700'} ${RANDIG}`}>
+                  <button
+                    type="button"
+                    aria-expanded={oppen}
+                    onClick={() => setOppenFranvaro(oppen ? null : nyckel)}
+                    className="w-full text-left px-3.5 py-3 flex items-center gap-2.5 rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+                  >
+                    <span className="flex-shrink-0" style={{ color: typ.farg }}><Icon name={r.orsak ? typ.ikon : 'allman.kalender'} size={20} /></span>
+                    <span className="flex flex-col">
+                      <span className="text-sm font-semibold">{r.rubrik || 'Frånvaro'} {klockslag(r.start)} till {klockslag(r.slut)}</span>
+                      {r.orsak && <span className="text-[13px] text-slate-400">{typ.kort}</span>}
+                    </span>
+                  </button>
+                  {oppen && (
+                    <div className="px-3.5 pb-3.5 space-y-2.5">
+                      <ul className="space-y-1.5 text-[13px] text-slate-300">
+                        <li className="flex items-center gap-2">
+                          <Icon name="allman.klocka" size={16} className="text-slate-400" />
+                          {klockslag(r.start)} till {klockslag(r.slut)}, {varaktighet((r.slut.getTime() - r.start.getTime()) / 60_000)}
+                        </li>
+                        {r.orsak && (
+                          <li className="flex items-center gap-2">
+                            <span style={{ color: typ.farg }}><Icon name={typ.ikon} size={16} /></span>
+                            {typ.kort}, {FRANVARO_GRUPP_TEXT[typ.grupp].toLowerCase()}
+                          </li>
+                        )}
+                        {r.anteckning && (
+                          <li className="flex items-start gap-2">
+                            <Icon name="arende.arende" size={16} className="text-slate-400 mt-0.5 flex-shrink-0" />
+                            <span className="whitespace-pre-line">{r.anteckning}</span>
+                          </li>
+                        )}
+                      </ul>
+                      {adress && (
+                        <a
+                          href={navigeraUrl(adress)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="h-[52px] flex items-center justify-center gap-2 rounded-xl text-[15px] font-semibold bg-[#20c58f] text-[#04281c] hover:bg-[#1bb07f] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+                        >
+                          <Icon name="falt.navigera" size={20} />
+                          Navigera
+                        </a>
+                      )}
+                      <p className="text-xs text-slate-500">Inget ärende hör till tiden. Koordinatorn lägger in och ändrar den.</p>
+                    </div>
+                  )}
                 </div>
               </li>
             )

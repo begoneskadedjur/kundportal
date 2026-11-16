@@ -170,7 +170,7 @@ export interface FranvaroDag {
   /** Frånvaron täcker hela arbetsdagen */
   heldag: boolean
   /** Frånvaron inom dagen, klippt till kalenderdagen */
-  block: { start: Date; slut: Date; orsak: string | null; rubrik: string | null }[]
+  block: { id: string; start: Date; slut: Date; orsak: string | null; rubrik: string | null; anteckning: string | null }[]
 }
 
 export function franvaroForDag(dag: string, franvaro: Franvaro[], ws: WorkSchedule | null): FranvaroDag {
@@ -188,10 +188,12 @@ export function franvaroForDag(dag: string, franvaro: Franvaro[], ws: WorkSchedu
     if (aStart >= dagSlut || aSlut < dagStart) continue
     if (aStart <= arbStart && aSlut >= arbSlut) heldag = true
     block.push({
+      id: a.id,
       start: aStart < dagStart ? dagStart : aStart,
       slut: aSlut > dagSlut ? dagSlut : aSlut,
       orsak: a.reason ?? null,
       rubrik: a.title?.trim() || null,
+      anteckning: a.notes?.trim() || null,
     })
   }
   return { heldag, block }
