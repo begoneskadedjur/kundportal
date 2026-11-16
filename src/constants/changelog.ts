@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.8',
+    date: '2026-11-16',
+    title: 'Schema åt en kollega',
+    items: [
+      { kind: 'buggfix', text: 'En tekniker som lägger upp eller ändrar ett kontrollschema där en kollega är ansvarig tekniker får nu besöken skapade. Tidigare stoppades varje besök och schemat stod med 0 kvar.' },
+    ],
+  },
+  {
     version: '3.132.7',
     date: '2026-11-13',
     title: 'Fakturan visar bara tjänsten',

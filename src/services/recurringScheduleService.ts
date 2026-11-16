@@ -722,6 +722,9 @@ interface SessionCreationContext {
   serviceId: string | null
   /** Betalningsspärr (3.128.0): schemat skapar ärenden ändå, märkta created_despite_payment_block */
   paymentBlocked: boolean
+  /** Inloggad tekniker som skapar ärendena (null för admin/koordinator) */
+  creatorTechnicianId: string | null
+  creatorTechnicianName: string | null
 }
 
 // Tjänst som schemaskapade ärenden kopplas till (alla ärendetyper i
@@ -774,6 +777,17 @@ async function fetchSessionCreationContext(
       )
   ])
 
+  // RLS: en tekniker som lägger schema åt en kollega måste få läsa tillbaka
+  // ärendet (.select('id') efter insert kräver SELECT-policy på nya raden)
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: creatorProfile } = user
+    ? await supabase
+        .from('profiles')
+        .select('technician_id, display_name')
+        .eq('user_id', user.id)
+        .maybeSingle()
+    : { data: null }
+
   return {
     schedule,
     technicianName: techData?.name || null,
@@ -783,6 +797,8 @@ async function fetchSessionCreationContext(
     service_type,
     serviceId: serviceData?.id ?? null,
     paymentBlocked: (await PaymentBlockService.getStatusSafe(schedule.customer_id)).blocked,
+    creatorTechnicianId: creatorProfile?.technician_id ?? null,
+    creatorTechnicianName: creatorProfile?.technician_id ? creatorProfile.display_name ?? null : null,
   }
 }
 
@@ -810,6 +826,8 @@ async function createCaseAndSession(
       scheduled_end: d.endDate.toISOString(),
       primary_technician_id: schedule.technician_id,
       primary_technician_name: technicianName,
+      created_by_technician_id: ctx.creatorTechnicianId,
+      created_by_technician_name: ctx.creatorTechnicianName,
       case_number: caseNumber,
       price: null,
       contact_person: customerData?.contact_person || null,
