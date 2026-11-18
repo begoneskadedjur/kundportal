@@ -2,7 +2,7 @@
 // Puppeteer-baserad PDF-generering för kontrollrapporter (inspektionssessioner)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import puppeteer from 'puppeteer-core'
+import puppeteer, { type Browser, type Page } from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 import { createClient } from '@supabase/supabase-js'
 import { numberStations } from '../src/shared/stationNumbering'
@@ -198,6 +198,55 @@ async function renderFloorPlanScreenshot(
     console.error('[FloorPlanScreenshot] Error:', err)
     if (page) await page.close().catch(() => {})
     return null
+  }
+}
+
+// Chromium bäddar bara in JPEG som den är. PNG och WebP packas upp till okomprimerade
+// pixlar i PDF:en: satellitkartan och planritningarna (PNG i dubbel upplösning) och
+// foton (WebP) gav kontrollrapporter på 15 MB som inte gick att mejla. Samma lösning
+// som specialrapporten (3.128.4): alla inbäddade PNG/WebP görs om till JPEG först.
+const PDF_IMAGE_MAX_DIMENSION = 1800
+const PDF_IMAGE_QUALITY = 0.82
+
+async function compressHtmlImages(browser: Browser, html: string): Promise<string> {
+  const uris = [...new Set(html.match(/data:image\/(?:png|webp);base64,[A-Za-z0-9+/=]+/g) ?? [])]
+  // Små bilder (ikoner, logga) lönar sig inte att göra om
+  const large = uris.filter(u => u.length > 50_000)
+  if (large.length === 0) return html
+
+  let page: Page | null = null
+  try {
+    page = await browser.newPage()
+    let out = html
+    for (const src of large) {
+      try {
+        const jpeg: string | null = await page.evaluate(async (s: string, maxDim: number, quality: number) => {
+          const el = new Image()
+          el.src = s
+          await el.decode()
+          const scale = Math.min(1, maxDim / Math.max(el.naturalWidth, el.naturalHeight))
+          const canvas = document.createElement('canvas')
+          canvas.width = Math.max(1, Math.round(el.naturalWidth * scale))
+          canvas.height = Math.max(1, Math.round(el.naturalHeight * scale))
+          const ctx = canvas.getContext('2d')
+          if (!ctx) return null
+          // Vit bakgrund, annars blir genomskinliga delar svarta i JPEG
+          ctx.fillStyle = '#ffffff'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+          ctx.drawImage(el, 0, 0, canvas.width, canvas.height)
+          return canvas.toDataURL('image/jpeg', quality)
+        }, src, PDF_IMAGE_MAX_DIMENSION, PDF_IMAGE_QUALITY)
+        if (jpeg && jpeg.length < src.length) out = out.split(src).join(jpeg)
+      } catch (err) {
+        console.error('[inspection-report-pdf] Bilden kunde inte komprimeras:', err)
+      }
+    }
+    return out
+  } catch (err) {
+    console.error('[inspection-report-pdf] Bildkomprimeringen kunde inte starta:', err)
+    return html
+  } finally {
+    if (page) await page.close().catch(() => {})
   }
 }
 
@@ -1055,7 +1104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const page = await browser.newPage()
 
-    await page.setContent(html, {
+    await page.setContent(await compressHtmlImages(browser, html), {
       waitUntil: 'networkidle0'
     })
 

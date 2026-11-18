@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.10',
+    date: '2026-11-18',
+    title: 'Kontrollrapporten går att mejla igen',
+    items: [
+      { kind: 'buggfix', text: 'Kontrollrapportens satellitkarta, planritningar och foton komprimeras innan PDF:en skapas. Rapporter som blev över 8 MB och stoppades vid utskick blir nu en bråkdel så stora.' },
+    ],
+  },
+  {
     version: '3.132.9',
     date: '2026-11-16',
     title: 'Frånvaro i schemat går att öppna',
