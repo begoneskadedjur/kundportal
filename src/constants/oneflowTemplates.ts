@@ -8,6 +8,11 @@ export interface OneflowTemplate {
   popular?: boolean
   /** Avdraget mallens text söker (oneflow_templates.deduction_type). Saknas = inget avdrag. */
   deduction?: 'ROT' | 'RUT'
+  /**
+   * Mallen skriver "Pris (inkl moms)" under summan: den synliga priskolumnen
+   * (price_2) skickas inkl. moms, den dolda (price_1) exkl. moms som portalens värde.
+   */
+  prisInklMoms?: boolean
 }
 
 // Offert-mallar som vi använder
@@ -22,7 +27,8 @@ export const OFFER_TEMPLATES: OneflowTemplate[] = [
     id: '8919037', 
     name: 'Offertförslag – Inkl moms (Privatperson)',
     type: 'offer',
-    category: 'individual'
+    category: 'individual',
+    prisInklMoms: true
   },
   { 
     id: '8919012', 

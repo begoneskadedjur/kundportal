@@ -234,7 +234,9 @@ type OneflowPrice = {
 
 function convertProductsToOneflow(
   selectedProducts: ContractRequestBody['selectedProducts'],
-  partyType: 'company' | 'individual'
+  partyType: 'company' | 'individual',
+  /** Mallen visar priset inkl. moms (prisInklMoms): price_2 inkl., price_1 exkl. */
+  prisInklMoms = false
 ): Array<{
   name: string
   description: string
@@ -294,15 +296,28 @@ function convertProductsToOneflow(
         ? Math.min(100, Math.round(rawPercent * 1000) / 1000)
         : 0
 
-      const price: OneflowPrice = discountPercent > 0
-        ? { base_amount: { amount: listPrice.toString() }, discount_percent: discountPercent.toString() }
-        : { base_amount: { amount: listPrice.toString() }, discount_amount: { amount: '0' } }
+      const prisFor = (lista: number): OneflowPrice => discountPercent > 0
+        ? { base_amount: { amount: lista.toString() }, discount_percent: discountPercent.toString() }
+        : { base_amount: { amount: lista.toString() }, discount_amount: { amount: '0' } }
+      const price = prisFor(listPrice)
+
+      // Mallen Inkl moms (Privatperson) skriver "Pris (inkl moms)" under den
+      // synliga kolumnen (price_2). Den får listpriset inkl. moms, rabatten
+      // räknas på det. price_1 är dold och förblir exkl. moms: portalens värde
+      // (wizardProductsValue) läser den. Offert 16929526 gick ut med 8 000 i
+      // stället för 10 000; Sofia rättade 16929058 för hand på samma sätt.
+      // vatRate är en andel (0.25); ett procenttal (25) räknas om
+      const satsIn = Number(pricing?.vatRate ?? product.pricing?.company?.vatRate ?? 0.25)
+      const momssats = !Number.isFinite(satsIn) || satsIn < 0 ? 0.25 : satsIn > 1 ? satsIn / 100 : satsIn
+      const price2 = prisInklMoms
+        ? prisFor(Math.round(listPrice * (1 + momssats)))
+        : { ...price }
 
       return {
         name: product.name,
         description: product.description,
         price_1: price,
-        price_2: { ...price },
+        price_2: price2,
         quantity: {
           type: oneflowQuantityType,
           amount: quantity
@@ -730,7 +745,11 @@ export default async function handler(
     // rader (rotRutForhandsvisning), testat i src/shared/rotRutForhandsvisning.test.ts.
     productGroups = [oneflowProduktgrupp(rotRutPlan.sammanstallning)]
   } else if (selectedProducts && selectedProducts.length > 0) {
-    const oneflowProducts = convertProductsToOneflow(selectedProducts, partyType)
+    const oneflowProducts = convertProductsToOneflow(
+      selectedProducts,
+      partyType,
+      documentType === 'offer' && getTemplateById(String(templateId ?? ''))?.prisInklMoms === true
+    )
     if (oneflowProducts.length > 0) {
       // Kolumnerna sätts här och gäller före mallens inställning (3.103.0).
       // Mallarnas price_1-kolumn summeras utan antal i fyra avtalsmallar

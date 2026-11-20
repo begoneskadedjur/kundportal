@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.12',
+    date: '2026-11-20',
+    title: 'Offerter till privatpersoner visar priset inkl. moms',
+    items: [
+      { kind: 'buggfix', text: 'En offert på mallen Inkl moms (Privatperson) visar nu priserna inkl. moms i Oneflow. Tidigare stod priset exkl. moms under rubriken inkl. moms, så priset blev 20 % för lågt. Priset behöver inte längre rättas för hand i Oneflow.' },
+      { kind: 'andring', text: 'Sidokortet i guiden visar både summan exkl. moms och det kunden ser inkl. moms.' },
+    ],
+  },
+  {
     version: '3.132.10',
     date: '2026-11-18',
     title: 'Kontrollrapporten går att mejla igen',

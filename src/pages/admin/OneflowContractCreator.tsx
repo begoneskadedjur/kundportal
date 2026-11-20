@@ -1288,6 +1288,20 @@ export default function OneflowContractCreator() {
   const rotSammanstallning = rotMall ? sammanstallRotRut(rotTjanstRader, rotMall) : null
   // Det Oneflow visar: rubrik, rader, båda kolumnerna och deras summor
   const rotVisning = rotSammanstallning ? rotRutForhandsvisning(rotSammanstallning) : null
+  // Mallen Inkl moms (Privatperson): kunden ser priset inkl. moms. Samma
+  // avrundning som create-contract (listpriset inkl. moms per enhet, sedan
+  // rabatt och antal), så att sidokortet visar summan i Oneflow.
+  const offertInklMoms = wizardData.documentType === 'offer' && getTemplateById(wizardData.selectedTemplate)?.prisInklMoms === true
+    ? ((wizardData.case_id && wizardData.prefillServices?.length
+        ? wizardData.prefillServices
+        : wizardData.draftItems.filter(i => i.item_type === 'service')
+      ) as Array<{ unit_price: number; quantity: number; vat_rate?: number | null; discount_percent?: number | null }>)
+        .reduce((sum, r) => {
+          const lista = Math.round(Math.round(Number(r.unit_price) || 0) * (1 + (r.vat_rate ?? 25) / 100))
+          const rabatt = Math.min(100, Math.max(0, Number(r.discount_percent) || 0))
+          return sum + lista * (1 - rabatt / 100) * (Number(r.quantity) || 0)
+        }, 0)
+    : null
   const uppdateraRotFastighet = (patch: Partial<RotFastighet>) =>
     setWizardData(prev => ({ ...prev, rotFastighet: { ...prev.rotFastighet, ...patch } }))
 
@@ -3008,7 +3022,9 @@ export default function OneflowContractCreator() {
         }
       : {
           namn: isContract ? 'Årspremie' : 'Pris',
-          text: `${fmtSEK(prisData.serviceTotal)} exkl. moms`,
+          text: offertInklMoms !== null
+            ? `${fmtSEK(prisData.serviceTotal)} exkl. moms, ${fmtSEK(Math.round(offertInklMoms))} inkl. moms i offerten`
+            : `${fmtSEK(prisData.serviceTotal)} exkl. moms`,
           klar: prisData.serviceTotal > 0,
         },
     {
