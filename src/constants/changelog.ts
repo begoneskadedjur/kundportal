@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.14',
+    date: '2026-11-23',
+    title: 'Avslut av kontroller och borttagning av fakturerade ärenden',
+    items: [
+      { kind: 'buggfix', text: 'Som tekniker avslutar du en kontroll med Klarmarkera kontrollen och en etablering med Färdig med etablering. Statusen Avslutat går inte att välja för dem längre, så stationerna blir kontrollerade och rapporten skriven.' },
+      { kind: 'buggfix', text: 'Ett ärende vars faktura redan är skickad till Fortnox går inte att ta bort. Rutan Ta bort ärende säger det direkt, innan du väljer anledning.' },
+    ],
+  },
+  {
     version: '3.132.13',
     date: '2026-11-23',
     title: 'Rätt kontrolldatum och säkrare schemaändringar',

@@ -84,7 +84,7 @@ import { franArbetsrapport, useMinEpost } from '../technician/ny/rapporter/rappo
 import { useKontrollRapport } from '../technician/ny/rapporter/useKontrollRapport'
 import { useStegForArende, stegTypForAvtalsarende, grannSteg, arAvtalsbesok, formateraKr, type StegId } from '../technician/ny/steg/stegKonfig'
 import { HjalpText } from '../technician/ny/hjalp/HjalpText'
-import { kontrolleraAvslut, kraverRapport, RAPPORT_SAKNAS_FEL, type AvslutsHinder } from '../../services/arendeAvslutService'
+import { kontrolleraAvslut, kraverRapport, RAPPORT_SAKNAS_FEL, statusAvslutSparr, type AvslutsHinder } from '../../services/arendeAvslutService'
 const StationInspectionPanel = lazy(() => import('../technician/inspection/StationInspectionPanel'))
 
 // Registrera svensk lokalisering för DatePicker
@@ -1235,6 +1235,12 @@ export default function EditContractCaseModal({
     // skrivningar (statusändring, ad-hoc-fakturering, provision, avtalstillägg).
     // Avtalstilläggsrader räknas inte som rabatt (exkluderas i servicen).
     if (formData.status === 'Avslutat' && localCaseData.status !== 'Avslutat') {
+      // SPÄRR: tekniker avslutar kontroller och etableringar bara den riktiga vägen
+      const avslutsvag = statusAvslutSparr({ serviceType: localCaseData.service_type, profil: profile, nyArbetsvy })
+      if (avslutsvag) {
+        toast.error(avslutsvag, { id: 'avslut-via-status', duration: 8000 })
+        return
+      }
       // SPÄRR: arbetsrapporten ska vara skriven, utom för kontroller och etableringar
       if (kraverRapport('cases', localCaseData.service_type) && !formData.work_report?.trim()) {
         toast.error(RAPPORT_SAKNAS_FEL, { duration: 8000 })
@@ -2463,7 +2469,17 @@ export default function EditContractCaseModal({
       <CaseStatusStepper
         status={formData.status}
         statuses={statusOptions}
-        onChange={(s) => setFormData(prev => ({ ...prev, status: s }))}
+        onChange={(s) => {
+          // Samma spärr som spara: beskedet direkt när teknikern väljer Avslutat
+          const avslutsvag = s === 'Avslutat' && localCaseData?.status !== 'Avslutat'
+            ? statusAvslutSparr({ serviceType: localCaseData?.service_type ?? caseData?.service_type, profil: profile, nyArbetsvy })
+            : null
+          if (avslutsvag) {
+            toast.error(avslutsvag, { id: 'avslut-via-status', duration: 8000 })
+            return
+          }
+          setFormData(prev => ({ ...prev, status: s }))
+        }}
         disabled={isCustomerView}
         stepDates={[
           caseData?.created_at || caseData?.created_date,

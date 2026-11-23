@@ -1,9 +1,9 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Select from '../../ui/Select'
-import { deleteCase, type DeleteableCaseType } from '../../../services/caseDeleteService'
+import { deleteCase, taBortSparr, type DeleteableCaseType } from '../../../services/caseDeleteService'
 import toast from 'react-hot-toast'
 import type { TechnicianCase } from '../../../pages/technician/TechnicianCases'
 
@@ -33,9 +33,32 @@ export default function CloseCaseModal({
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Spärren (skickad faktura) kontrolleras när rutan öppnas, innan anledningen
+  // väljs. deleteCase kör samma spärr igen vid borttagningen.
+  const [sparrar, setSparrar] = useState<{ id: string; title: string; text: string }[]>([])
+  const [kontrollerar, setKontrollerar] = useState(false)
+  const caseKey = cases.map(c => c.id).join(',')
+  useEffect(() => {
+    if (!isOpen || cases.length === 0) return
+    let avbruten = false
+    setSparrar([])
+    setKontrollerar(true)
+    Promise.all(cases.map(async c => {
+      const text = await taBortSparr(c.id, c.case_type as DeleteableCaseType)
+      return text ? { id: c.id, title: c.title, text } : null
+    })).then(res => {
+      if (avbruten) return
+      setSparrar(res.filter((r): r is { id: string; title: string; text: string } => !!r))
+      setKontrollerar(false)
+    })
+    return () => { avbruten = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, caseKey])
+  const allaSparrade = cases.length > 0 && sparrar.length === cases.length
+
   const isBatch = cases.length > 1
   const needsNotes = reason === 'ovrigt'
-  const canSave = reason && (!needsNotes || notes.trim())
+  const canSave = !kontrollerar && !allaSparrade && reason && (!needsNotes || notes.trim())
 
   const handleSave = async () => {
     if (!canSave) return
@@ -51,24 +74,29 @@ export default function CloseCaseModal({
         technicianName: technicianName || null,
       }
 
+      // Ärenden med skickad faktura skickas inte vidare (deleteCase stoppar dem ändå)
+      const sparradeIds = new Set(sparrar.map(s => s.id))
+      const attTaBort = cases.filter(c => !sparradeIds.has(c.id))
       const results = await Promise.allSettled(
-        cases.map(c =>
+        attTaBort.map(c =>
           deleteCase(c.id, c.case_type as DeleteableCaseType, technicianId, technicianName, closeReason)
         )
       )
 
       const succeeded = results
-        .map((r, i) => r.status === 'fulfilled' && r.value.success ? cases[i].id : null)
+        .map((r, i) => r.status === 'fulfilled' && r.value.success ? attTaBort[i].id : null)
         .filter(Boolean) as string[]
 
-      const failed = cases.length - succeeded.length
+      const failed = attTaBort.length - succeeded.length
 
       if (succeeded.length > 0) {
         onSuccess(succeeded)
         toast.success(`${succeeded.length} ärende${succeeded.length > 1 ? 'n' : ''} borttaget`)
       }
       if (failed > 0) {
-        toast.error(`${failed} ärende${failed > 1 ? 'n' : ''} kunde inte tas bort`)
+        const forstaFel = results.find(r => r.status === 'fulfilled' && !r.value.success)
+        const felText = forstaFel?.status === 'fulfilled' ? forstaFel.value.error : undefined
+        toast.error(failed === 1 && felText ? felText : `${failed} ärende${failed > 1 ? 'n' : ''} kunde inte tas bort`)
       }
 
       setReason('')
@@ -126,6 +154,24 @@ export default function CloseCaseModal({
           Ärendet markeras som borttaget och döljs från alla vyer. All data behålls.
         </p>
 
+        {sparrar.length > 0 && (
+          <div className="bg-red-500/20 border border-red-500/40 p-3 rounded-lg space-y-1">
+            {!isBatch ? (
+              <p className="text-red-400 text-sm">{sparrar[0].text}</p>
+            ) : (
+              <>
+                <p className="text-red-400 text-sm">
+                  {allaSparrade ? 'Inget av ärendena går att ta bort:' : 'Ärendena nedan tas inte bort, de andra går att ta bort:'}
+                </p>
+                {sparrar.map(s => (
+                  <p key={s.id} className="text-red-400 text-sm">{s.title}: {s.text}</p>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+
+        {!allaSparrade && (
         <div>
           <label className="text-xs font-medium text-slate-400 mb-1 block">
             Anledning <span className="text-red-400">*</span>
@@ -137,8 +183,9 @@ export default function CloseCaseModal({
             options={CLOSE_REASONS.map(r => ({ value: r.value, label: r.label }))}
           />
         </div>
+        )}
 
-        {needsNotes && (
+        {!allaSparrade && needsNotes && (
           <div>
             <label className="text-xs font-medium text-slate-400 mb-1 block">
               Anteckningar <span className="text-red-400">*</span>
@@ -153,7 +200,7 @@ export default function CloseCaseModal({
           </div>
         )}
 
-        {reason && !needsNotes && (
+        {!allaSparrade && reason && !needsNotes && (
           <div>
             <label className="text-xs font-medium text-slate-400 mb-1 block">
               Anteckningar (valfritt)

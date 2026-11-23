@@ -1,9 +1,9 @@
 // src/components/shared/DeleteCaseConfirmDialog.tsx
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import { deleteCase, ORSAKER_TA_BORT, type DeleteableCaseType } from '../../services/caseDeleteService';
+import { deleteCase, taBortSparr, ORSAKER_TA_BORT, type DeleteableCaseType } from '../../services/caseDeleteService';
 import Select from '../ui/Select';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -32,7 +32,23 @@ export default function DeleteCaseConfirmDialog({
   const [anledning, setAnledning] = useState('');
   const [anteckning, setAnteckning] = useState('');
   const kravAnteckning = anledning === 'ovrigt';
-  const kanTaBort = !!anledning && (!kravAnteckning || !!anteckning.trim());
+  // Spärren (skickad faktura) kontrolleras när dialogen öppnas, innan anledningen
+  // skrivs. deleteCase kör samma spärr igen vid borttagningen.
+  const [sparr, setSparr] = useState<string | null>(null);
+  const [kontrollerar, setKontrollerar] = useState(false);
+  useEffect(() => {
+    if (!isOpen || !caseId) return;
+    let avbruten = false;
+    setSparr(null);
+    setKontrollerar(true);
+    taBortSparr(caseId, caseType).then(text => {
+      if (avbruten) return;
+      setSparr(text);
+      setKontrollerar(false);
+    });
+    return () => { avbruten = true; };
+  }, [isOpen, caseId, caseType]);
+  const kanTaBort = !sparr && !kontrollerar && !!anledning && (!kravAnteckning || !!anteckning.trim());
 
   const handleDelete = async () => {
     if (!profile || !kanTaBort) return;
@@ -85,6 +101,13 @@ export default function DeleteCaseConfirmDialog({
           </div>
         </div>
 
+        {sparr && (
+          <div className="bg-red-500/20 border border-red-500/40 p-3 rounded-lg">
+            <p className="text-red-400 text-sm">{sparr}</p>
+          </div>
+        )}
+
+        {!sparr && (
         <div>
           <label className="text-xs font-medium text-slate-400 mb-1 block">
             Anledning <span className="text-red-400">*</span>
@@ -96,7 +119,8 @@ export default function DeleteCaseConfirmDialog({
             options={ORSAKER_TA_BORT.map(r => ({ value: r.value, label: r.label }))}
           />
         </div>
-        {anledning && (
+        )}
+        {!sparr && anledning && (
           <div>
             <label className="text-xs font-medium text-slate-400 mb-1 block">
               Kommentar {kravAnteckning ? <span className="text-red-400">*</span> : <span className="text-slate-500">(valfritt)</span>}

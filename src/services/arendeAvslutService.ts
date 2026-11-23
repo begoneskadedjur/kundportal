@@ -87,6 +87,51 @@ export function kraverRapport(kalla: ArendeKalla, serviceType: string | null | u
 
 export const RAPPORT_SAKNAS_FEL = 'Skriv rapporten innan ärendet avslutas. Beskriv vad du gjorde.'
 
+/** Det ur profilen som avgör om spärren nedan gäller (AuthContext Profile) */
+export interface AvslutsProfil {
+  role?: string | null
+  is_admin?: boolean | null
+  is_koordinator?: boolean | null
+  extra_roles?: string[] | null
+}
+
+/** Tekniker utan admin- eller koordinatorrätt i någon form */
+function arBaraTekniker(profil: AvslutsProfil | null | undefined): boolean {
+  if (!profil || profil.role !== 'technician') return false
+  if (profil.is_admin || profil.is_koordinator) return false
+  return !(profil.extra_roles || []).some(r => r === 'admin' || r === 'koordinator')
+}
+
+/**
+ * Spärr för statusen Avslutat (2026-11-23). En tekniker avslutar kontroller
+ * och etableringar bara den riktiga vägen: Klarmarkera kontrollen
+ * (StationInspectionPanel/StationInspectionModule, kräver alla stationer och
+ * skriver arbetsrapporten) och Färdig med etablering (useEtableringsflode,
+ * kräver Kommentar från tekniker och skriver arbetsrapporten). De vägarna
+ * skriver status direkt och går inte via modalens spara, så spärren stoppar
+ * bara statusväljaren och spara. Admin och koordinator påverkas inte.
+ * Returnerar beskedet som ska visas, eller null om statusen får väljas.
+ */
+export function statusAvslutSparr(args: {
+  serviceType: string | null | undefined
+  profil: AvslutsProfil | null | undefined
+  nyArbetsvy: boolean
+}): string | null {
+  const { serviceType, profil, nyArbetsvy } = args
+  if (!arBaraTekniker(profil)) return null
+  if (serviceType === 'inspection') {
+    return nyArbetsvy
+      ? 'Kontrollen avslutas inte med statusen. Klarmarkera kontrollen i steget Arbetet.'
+      : 'Kontrollen avslutas inte med statusen. Tryck Gå till inspektion och sedan Klarmarkera kontrollen.'
+  }
+  if (serviceType === 'establishment') {
+    return nyArbetsvy
+      ? 'Etableringen avslutas inte med statusen. Tryck Gå till utplacering i steget Arbetet och avsluta med Färdig med etablering.'
+      : 'Etableringen avslutas inte med statusen. Tryck Gå till utplacering och avsluta med Färdig med etablering.'
+  }
+  return null
+}
+
 /**
  * Stationskontrollen (delsystem A): alla kundens stationer ska vara
  * kontrollerade i rundan. Samma regel som klarmarkeringsdialogen i

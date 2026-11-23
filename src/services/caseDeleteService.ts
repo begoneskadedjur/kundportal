@@ -54,6 +54,88 @@ function getTableName(caseType: DeleteableCaseType): string {
 }
 
 /**
+ * Fakturastatusar som betyder att fakturan har lämnat portalen: bokförd och
+ * skickad i Fortnox, förfallen eller betald. overdue lagras inte på invoices
+ * (härleds i UI) men finns på contract_billing_items. En faktura med
+ * fortnox_document_number räknas också som skickad, oavsett status.
+ */
+export const SKICKADE_FAKTURASTATUSAR = ['booked', 'sent', 'overdue', 'paid'];
+
+export interface SkickadFaktura {
+  nummer: string | null;
+  status: string;
+}
+
+type FakturaRad = { invoice_number: string | null; status: string; fortnox_document_number: string | null };
+
+function forstaSkickade(rader: FakturaRad[] | null): SkickadFaktura | null {
+  const rad = (rader || []).find(
+    r => !!r.fortnox_document_number || SKICKADE_FAKTURASTATUSAR.includes(r.status)
+  );
+  return rad ? { nummer: rad.invoice_number || rad.fortnox_document_number || null, status: rad.status } : null;
+}
+
+/**
+ * Spärren mot att ta bort ärenden med skickad faktura (2026-11-23).
+ * Letar på två ställen:
+ * 1. invoices.case_id = ärendet. Privat- och företagsfakturor (även delfakturor)
+ *    och avtalsärendens merförsäljning per ärende. Merförsäljningen har
+ *    case_type null, därför filtreras inte på case_type.
+ * 2. Avtalsärenden: merförsäljningens rader i contract_billing_items. Månadens
+ *    samlade merförsäljningsfaktura har inget case_id, raderna pekar på den
+ *    via invoice_id.
+ * Kan kontrollen inte göras kastas ett fel, så att ärendet inte tas bort i blindo.
+ */
+export async function hittaSkickadFaktura(
+  caseId: string,
+  caseType: DeleteableCaseType
+): Promise<SkickadFaktura | null> {
+  const { data: direkta, error } = await supabase
+    .from('invoices')
+    .select('invoice_number, status, fortnox_document_number')
+    .eq('case_id', caseId);
+  if (error) throw new Error(`Kunde inte kontrollera ärendets fakturor: ${error.message}`);
+  const direkt = forstaSkickade(direkta as FakturaRad[] | null);
+  if (direkt || caseType !== 'contract') return direkt;
+
+  const { data: rader, error: raderFel } = await supabase
+    .from('contract_billing_items')
+    .select('status, invoice_id')
+    .eq('case_id', caseId);
+  if (raderFel) throw new Error(`Kunde inte kontrollera ärendets fakturarader: ${raderFel.message}`);
+  const skickadRad = (rader || []).find(r => SKICKADE_FAKTURASTATUSAR.includes(r.status as string));
+  if (skickadRad) return { nummer: null, status: skickadRad.status as string };
+
+  const fakturaIds = [...new Set((rader || []).map(r => r.invoice_id as string | null).filter((id): id is string => !!id))];
+  if (fakturaIds.length === 0) return null;
+  const { data: samlade, error: samladeFel } = await supabase
+    .from('invoices')
+    .select('invoice_number, status, fortnox_document_number')
+    .in('id', fakturaIds);
+  if (samladeFel) throw new Error(`Kunde inte kontrollera ärendets fakturor: ${samladeFel.message}`);
+  return forstaSkickade(samlade as FakturaRad[] | null);
+}
+
+/** Beskedet när ärendet inte får tas bort för att fakturan är skickad */
+export function skickadFakturaText(faktura: SkickadFaktura): string {
+  return `Ärendet går inte att ta bort eftersom fakturan${faktura.nummer ? ` ${faktura.nummer}` : ''} redan är skickad till Fortnox.`;
+}
+
+/**
+ * Kör spärren och returnerar beskedet om ärendet inte får tas bort, annars null.
+ * Kunde kontrollen inte göras returneras det felet, så att ingen tar bort i blindo.
+ */
+export async function taBortSparr(caseId: string, caseType: DeleteableCaseType): Promise<string | null> {
+  try {
+    const faktura = await hittaSkickadFaktura(caseId, caseType);
+    return faktura ? skickadFakturaText(faktura) : null;
+  } catch (error) {
+    const text = error instanceof Error && error.message ? error.message : 'Kunde inte kontrollera ärendets fakturor';
+    return `${text}. Försök igen om en stund.`;
+  }
+}
+
+/**
  * Kontrollera om ärendet kan raderas och hämta information om relaterad data
  */
 export async function getCaseDeleteInfo(
@@ -174,16 +256,7 @@ export async function getCaseDeleteInfo(
   );
 
   // Kolla om någon faktura är exporterad/skickad till Fortnox
-  const { data: invoiceRows } = await supabase
-    .from('invoices')
-    .select('status, fortnox_document_number')
-    .eq('case_id', caseId)
-    .eq('case_type', caseType);
-  const lockedInvoice = (invoiceRows || []).find(
-    (r: { status: string; fortnox_document_number: string | null }) =>
-      !!r.fortnox_document_number ||
-      ['sent', 'booked', 'paid'].includes(r.status)
-  );
+  const lockedInvoice = await hittaSkickadFaktura(caseId, caseType);
 
   // Bestäm om ärendet kan raderas
   let canDelete = childCasesCount === 0;
@@ -193,7 +266,7 @@ export async function getCaseDeleteInfo(
 
   if (canDelete && lockedInvoice) {
     canDelete = false;
-    blockReason = `Ärendet har en faktura som är skickad till Fortnox (status: ${lockedInvoice.status}). Makulera fakturan först om ärendet ska raderas.`;
+    blockReason = skickadFakturaText(lockedInvoice);
   } else if (canDelete && lockedCommission) {
     canDelete = false;
     blockReason = `Ärendet har provisionsposter som är på väg till utbetalning (status: ${lockedCommission.status}). Återställ provisionen först.`;
@@ -258,6 +331,10 @@ export async function deleteCase(
   closeReason?: CaseCloseReason
 ): Promise<{ success: boolean; error?: string }> {
   const tableName = getTableName(caseType);
+
+  // SPÄRR: ärende med skickad faktura tas aldrig bort, oavsett roll och ingång
+  const sparr = await taBortSparr(caseId, caseType);
+  if (sparr) return { success: false, error: sparr };
 
   const update: Record<string, unknown> = { status: 'Borttaget' };
   if (closeReason) {
