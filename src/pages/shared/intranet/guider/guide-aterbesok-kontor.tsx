@@ -19,8 +19,7 @@ interface Lage {
   delfaktura: boolean
 }
 
-// Delfakturan visar radernas belopp exkl. moms. Ekonomi-fliken visar privatärenden inkl. moms.
-const RADER: FRad[] = [['Vägglusbekämpning, första behandlingen', '3 200 kr'], ['Värmebehandling, tillägg', '1 400 kr']]
+// Privatärende: delfakturan i Boka återbesök visar beloppen inkl. moms, som Ekonomi-fliken (3.132.19).
 const RADER_INKL: FRad[] = [['Vägglusbekämpning, första behandlingen', '4 000 kr'], ['Värmebehandling, tillägg', '1 750 kr']]
 const TIDER: Tid[] = [
   { id: 't1', tid: '09:00 till 10:00', tekniker: 'Anna Exempel' },
@@ -92,7 +91,7 @@ function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void
       {l.vy === 'val' && <ValArk tryck={tryck} markera={markera} nr={nr} />}
       {l.vy === 'steg1' && <RevisitSteg1 datum={l.datum} datumText="onsdag 21 okt 2026" tryck={tryck} markera={markera} nr={nr} />}
       {l.vy === 'steg2' && (
-        <RevisitSteg2 under="Förslag · onsdag 21 oktober" tider={TIDER} tid={l.tid} delfaktura={l.delfaktura} rader={RADER} total="4 600 kr" tryck={tryck} markera={markera} nr={nr} />
+        <RevisitSteg2 under="Förslag · onsdag 21 oktober" tider={TIDER} tid={l.tid} delfaktura={l.delfaktura} rader={RADER_INKL} total="5 750 kr" privat tryck={tryck} markera={markera} nr={nr} />
       )}
       {klar && <Notis text={l.delfaktura ? 'Återbesök bokat och delfaktura INV-202610-0043 skapad!' : 'Återbesök bokat!'} />}
     </Dator>
@@ -172,7 +171,7 @@ function Ovning() {
       } else if (id === 'delfaktura') {
         const pa = !l.delfaktura
         setL({ ...l, delfaktura: pa })
-        tips(pa ? 'Delfakturan är med' : 'Delfakturan är bortkryssad', pa ? (l.tid ? 'Du ser raderna och 4 600 kr exkl. moms. Tryck Boka återbesök.' : 'Välj också en tid.') : 'Uppdraget var att fakturera första behandlingen nu.')
+        tips(pa ? 'Delfakturan är med' : 'Delfakturan är bortkryssad', pa ? (l.tid ? 'Du ser raderna och 5 750 kr inkl. moms. Tryck Boka återbesök.' : 'Välj också en tid.') : 'Uppdraget var att fakturera första behandlingen nu.')
       } else if (id === 'boka') {
         if (!l.tid) miss('Välj en tid först. Knappen fungerar först då.')
         else if (!l.delfaktura) miss('Kunden ska betala första behandlingen nu. Kryssa i Skapa delfaktura först.')
@@ -181,7 +180,7 @@ function Ovning() {
           setSvar({
             typ: 'ok',
             titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-            text: `Återbesöket är bokat onsdag 2026-10-21 och ärendet har status Återbesök. Delfakturan på 4 600 kr exkl. moms ligger under Fakturering › Privat & Företag. Raderna är borta från ärendet, så nästa besök börjar från noll.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
+            text: `Återbesöket är bokat onsdag 2026-10-21 och ärendet har status Återbesök. Delfakturan på 5 750 kr inkl. moms ligger under Fakturering › Privat & Företag. Raderna är borta från ärendet, så nästa besök börjar från noll.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
           })
         }
       } else miss(TIPS[id] ?? 'Välj en förmiddagstid, kryssa i delfakturan och boka.')

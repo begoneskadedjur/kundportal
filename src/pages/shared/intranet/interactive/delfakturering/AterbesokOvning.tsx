@@ -12,9 +12,11 @@ import { Aterkoppling, ETIKETT, Knapp, Ram, SEKTION } from '../leads/leadsShared
 
 type Lage = 'arende' | 'val' | 'steg1' | 'steg2' | 'klart'
 
+// Privatärende (Familjen Exempel): rutan visar beloppen inkl. moms, som Pris
+// och fakturering (3.132.19). Lagrat 1 800 och 950 kr exkl. moms.
 const RADER = [
-  { namn: 'Råttbekämpning, första besöket', belopp: 1800 },
-  { namn: 'Tätning av ventil', belopp: 950 },
+  { namn: 'Råttbekämpning, första besöket', belopp: 2250 },
+  { namn: 'Tätning av ventil', belopp: 1188 },
 ]
 const SUMMA = RADER.reduce((s, r) => s + r.belopp, 0)
 
@@ -178,7 +180,7 @@ export default function AterbesokOvning() {
                   </div>
                 ))}
                 <div className="flex items-center justify-between border-t border-slate-700/50 pt-1 text-xs">
-                  <span className="text-slate-400">Totalt (exkl. moms)</span>
+                  <span className="text-slate-400">Totalt (inkl. moms)</span>
                   <span className="font-semibold text-[#20c58f]">{kr(SUMMA)}</span>
                 </div>
                 <p className="mt-1 text-xs text-amber-400/80">Tjänsterna markeras som fakturerade och tas bort från ärendet.</p>
@@ -204,7 +206,7 @@ export default function AterbesokOvning() {
               <li className="flex gap-2"><Icon name="allman.bock" className="mt-0.5 flex-none text-[#20c58f]" />Det gjorda besöket sparades i ärendets besökshistorik.</li>
               <li className="flex gap-2"><Icon name="allman.bock" className="mt-0.5 flex-none text-[#20c58f]" />Ärendet fick den nya tiden och status Återbesök. Det är samma ärende som förut.</li>
               {delfaktura ? (
-                <li className="flex gap-2"><Icon name="allman.bock" className="mt-0.5 flex-none text-[#20c58f]" />En delfaktura på {kr(SUMMA)} exkl. moms skapades och väntar under Fakturering › Privat &amp; Företag. Raderna försvann från ärendet, så nästa besök börjar från noll.</li>
+                <li className="flex gap-2"><Icon name="allman.bock" className="mt-0.5 flex-none text-[#20c58f]" />En delfaktura på {kr(SUMMA)} inkl. moms skapades och väntar under Fakturering › Privat &amp; Företag. Raderna försvann från ärendet, så nästa besök börjar från noll.</li>
               ) : (
                 <li className="flex gap-2"><Icon name="allman.chevron" className="mt-0.5 flex-none text-slate-500" />Ingen delfaktura. Raderna på {kr(SUMMA)} ligger kvar på ärendet och följer med nästa delfaktura eller slutfakturan.</li>
               )}

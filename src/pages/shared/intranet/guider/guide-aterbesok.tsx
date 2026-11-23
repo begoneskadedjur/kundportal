@@ -15,7 +15,7 @@ import type { GuideModul } from './registry'
 type Vy = 'rapport' | 'klart' | 'dialog' | 'bokat'
 interface Lage { vy: Vy; val: 'hela' | 'besok'; a: AterbesokLage }
 
-const A0: AterbesokLage = { steg: 1, datum: false, langd: 60, manuellt: false, tid: null, anteckning: false, delfaktura: false, rader: [['Råttor, sanering', 3500]] }
+const A0: AterbesokLage = { steg: 1, datum: false, langd: 60, manuellt: false, tid: null, anteckning: false, delfaktura: false, rader: [['Råttor, sanering', 3500]], privat: true }
 
 function Skarm({ l, markera, nr, tryck }: { l: Lage; markera?: string; nr: number; tryck: (id: string) => void }) {
   const bokat = l.vy === 'bokat'

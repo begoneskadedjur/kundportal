@@ -23,6 +23,7 @@ import type { StegId } from '../../../../components/technician/ny/steg/stegKonfi
 import { Markor, Notis, type MarkorProps } from '../skarmkit'
 import { NyArende, NyGrupp, NyHjalp, NyRad, NySkarm, useGuideEnhet, type NyMarkor } from '../skarmkit/nyvy'
 import { RapportKlarRuta, type RutaLage } from './_rapporter'
+import { kundprisFaktor } from '../../../../utils/kundprisVisning'
 
 export type Enhet = 'mobil' | 'dator'
 
@@ -725,6 +726,8 @@ export interface AterbesokLage {
   anpassatPris?: boolean
   /** Rader på delfakturan, exkl. moms */
   rader?: [string, number][]
+  /** Privatärende: rutan visar beloppen inkl. moms, som Pris och fakturering (3.132.19) */
+  privat?: boolean
 }
 
 export const TIDER = ['08:00', '10:30', '13:30']
@@ -732,7 +735,8 @@ const LANGD_TEXT: Record<number, string> = { 30: '30 min', 60: '1 tim', 90: '1.5
 
 export function AterbesokRuta({ a, markera, nr, tryck }: { a: AterbesokLage; markera?: string; nr: number; tryck: (id: string) => void }) {
   const enhet = useGuideEnhet()
-  const rader = a.rader ?? []
+  const faktor = kundprisFaktor(a.privat ? 'private' : 'business')
+  const rader = (a.rader ?? []).map(([namn, belopp]) => [namn, belopp * faktor] as [string, number])
   const summa = rader.reduce((s, r) => s + r[1], 0)
   const slut = (start: string) => {
     const [h, m] = start.split(':').map(Number)
@@ -812,7 +816,7 @@ export function AterbesokRuta({ a, markera, nr, tryck }: { a: AterbesokLage; mar
                     {a.delfaktura && !a.anpassatPris && (
                       <div className="ml-5 grid gap-0.5 text-[10px]">
                         {rader.map(r => <p key={r[0]} className="flex justify-between text-slate-400"><span>{r[0]}</span><span className="font-medium text-white">{kr(r[1])}</span></p>)}
-                        <p className="flex justify-between border-t border-slate-700/50 pt-0.5"><span className="text-slate-400">Totalt (exkl. moms)</span><span className="font-semibold text-[#20c58f]">{kr(summa)}</span></p>
+                        <p className="flex justify-between border-t border-slate-700/50 pt-0.5"><span className="text-slate-400">Totalt ({a.privat ? 'inkl. moms' : 'exkl. moms'})</span><span className="font-semibold text-[#20c58f]">{kr(summa)}</span></p>
                         <p className="text-amber-400/80">Tjänsterna markeras som fakturerade och tas bort från ärendet.</p>
                       </div>
                     )}

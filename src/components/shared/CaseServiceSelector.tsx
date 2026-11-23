@@ -35,6 +35,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { DiscountNotificationService } from '../../services/discountNotificationService'
 import { getEffectiveRotPercent, getEffectiveRutPercent, calculateRotRutSummary } from '../../utils/rotRutConstants'
+import { VISNING_MOMSSATS, kundprisFaktor, kundprisEtikett, formateraKundpris } from '../../utils/kundprisVisning'
 import ContractAdditionModal from './ContractAdditionModal'
 import AddonBillingTimeline from './AddonBillingTimeline'
 import {
@@ -100,13 +101,7 @@ interface CaseServiceSelectorProps {
   allowedDeduction?: MallAvdrag
 }
 
-const formatPrice = (price: number) =>
-  new Intl.NumberFormat('sv-SE', {
-    style: 'currency',
-    currency: 'SEK',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(price)
+const formatPrice = formateraKundpris
 
 // Beräkna CaseBillingSummary lokalt (för service-items)
 function buildBillingSummary(items: CaseBillingItemWithRelations[]): CaseBillingSummary {
@@ -445,10 +440,11 @@ export default function CaseServiceSelector({
   const isEstablishment = caseServiceType === 'establishment'
 
   // Privat = pris inkl. moms i UI. Företag/avtal = exkl. moms.
-  const VAT_RATE = 0.25
+  // Samma visning som återbesöksrutan (src/utils/kundprisVisning.ts)
+  const VAT_RATE = VISNING_MOMSSATS
   const isPrivate = caseType === 'private'
-  const priceMultiplier = isPrivate ? 1 + VAT_RATE : 1
-  const priceLabel = isPrivate ? 'Inkl. moms' : 'Exkl. moms'
+  const priceMultiplier = kundprisFaktor(caseType)
+  const priceLabel = kundprisEtikett(caseType)
 
   // Arbetstidstjänsten i katalogen (t.ex. "135 Skadedjurstekniker timpris").
   // ROT/RUT-avdrag får bara ligga på sådana tjänster — avdraget beräknas på

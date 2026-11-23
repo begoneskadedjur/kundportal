@@ -7,7 +7,7 @@
 // - Vad vill du göra?: EditCaseModal (privat/företag) och EditContractCaseModal (avtal)
 // - Boka återbesök i två steg: RevisitModal (Datum för återbesök *, Besökslängd,
 //   Visa förslag →, Ange tid manuellt, Skapa delfaktura för nuvarande tjänster,
-//   Totalt (exkl. moms), Tjänsterna markeras som fakturerade och tas bort från ärendet.,
+//   Totalt (inkl. moms) för privat och Totalt (exkl. moms) för företag, Tjänsterna markeras som fakturerade och tas bort från ärendet.,
 //   Inga ofakturerade tjänster på ärendet, ← Byt datum, Boka återbesök)
 // - Tjänster & fakturarader, Inga tjänster tillagda än, Inkl. moms / Exkl. moms: CaseServiceSelector
 
@@ -85,8 +85,10 @@ export interface Tid {
 }
 
 /** Steg 2 i RevisitModal: förslagen, delfakturan och Boka återbesök */
-export function RevisitSteg2({ under, tider, tid, delfaktura, rader, total, tryck, markera, nr }: Bas & {
+export function RevisitSteg2({ under, tider, tid, delfaktura, rader, total, privat, tryck, markera, nr }: Bas & {
   under: string
+  /** Privatärende: beloppen visas inkl. moms, som i Pris och fakturering (3.132.19) */
+  privat?: boolean
   tider: Tid[]
   tid: string | null
   delfaktura: boolean
@@ -108,7 +110,7 @@ export function RevisitSteg2({ under, tider, tid, delfaktura, rader, total, tryc
             <Kryssruta pa={delfaktura} text="Skapa delfaktura för nuvarande tjänster" onClick={() => tryck('delfaktura')} markor={mk(markera, 'delfaktura', nr)} />
             {delfaktura && <>
               {rader.map((r, i) => <Rad key={i} v={r[0]} h={r[1]} />)}
-              <Rad v="Totalt (exkl. moms)" h={<span className="text-[#20c58f]">{total}</span>} />
+              <Rad v={privat ? 'Totalt (inkl. moms)' : 'Totalt (exkl. moms)'} h={<span className="text-[#20c58f]">{total}</span>} />
               <p className="text-[11px] text-amber-400/80">Tjänsterna markeras som fakturerade och tas bort från ärendet.</p>
             </>}
           </>

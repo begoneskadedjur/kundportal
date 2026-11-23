@@ -32,6 +32,7 @@ import { CaseCustomerService } from '../../../services/caseCustomerService'
 import { VisitService } from '../../../services/visitService'
 import toast from 'react-hot-toast'
 import { warnIfPaymentBlocked } from '../../../utils/paymentBlockWarning'
+import { kundprisFaktor, kundprisEtikett, formateraKundpris } from '../../../utils/kundprisVisning'
 import "react-datepicker/dist/react-datepicker.css"
 
 registerLocale('sv', sv)
@@ -717,13 +718,14 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
                           {pendingBillingItems.map((item: any) => (
                             <div key={item.id} className="flex items-center justify-between text-xs text-slate-400">
                               <span>{item.service_name || item.article_name}</span>
-                              <span className="text-white font-medium">{Number(item.total_price).toLocaleString('sv-SE')} kr</span>
+                              <span className="text-white font-medium">{formateraKundpris(Number(item.total_price) * kundprisFaktor(caseData.case_type))}</span>
                             </div>
                           ))}
+                          {/* Samma visning som Pris och fakturering: inkl. moms för privat, exkl. för företag */}
                           <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-700/50">
-                            <span className="text-slate-400">Totalt (exkl. moms)</span>
+                            <span className="text-slate-400">Totalt ({kundprisEtikett(caseData.case_type).toLowerCase()})</span>
                             <span className="text-[#20c58f] font-semibold">
-                              {pendingBillingItems.reduce((sum: number, i: any) => sum + Number(i.total_price), 0).toLocaleString('sv-SE')} kr
+                              {formateraKundpris(pendingBillingItems.reduce((sum: number, i: any) => sum + Number(i.total_price), 0) * kundprisFaktor(caseData.case_type))}
                             </span>
                           </div>
                           <p className="text-xs text-amber-400/80 mt-1">Tjänsterna markeras som fakturerade och tas bort från ärendet.</p>

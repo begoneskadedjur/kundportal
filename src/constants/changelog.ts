@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.19',
+    date: '2026-11-23',
+    title: 'Delfakturan visar samma pris som ärendet',
+    items: [
+      { kind: 'buggfix', text: 'När du bokar återbesök och skapar en delfaktura för en privatperson visas beloppen nu inklusive moms, samma som under Pris och fakturering. Företag visas som förut utan moms.' },
+    ],
+  },
+  {
     version: '3.132.18',
     date: '2026-11-23',
     title: 'Besked syns ovanpå ärendet',
