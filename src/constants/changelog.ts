@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.17',
+    date: '2026-11-23',
+    title: 'Ta bort ärende säger vad som händer',
+    items: [
+      { kind: 'andring', text: 'Rutan Ta bort ärende säger nu vad som händer: provision som väntar på faktura stryks, ett kontrollbesök som inte är gjort ställs in, och rapporter, bilder och historik ligger kvar.' },
+    ],
+  },
+  {
     version: '3.132.16',
     date: '2026-11-23',
     title: 'Borttagna ärenden lämnar ingen provision eller kontroll kvar',

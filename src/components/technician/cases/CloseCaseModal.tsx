@@ -3,7 +3,7 @@ import { Trash2 } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Select from '../../ui/Select'
-import { deleteCase, taBortSparr, type DeleteableCaseType } from '../../../services/caseDeleteService'
+import { deleteCase, taBortSparr, taBortInfoText, type DeleteableCaseType } from '../../../services/caseDeleteService'
 import toast from 'react-hot-toast'
 import type { TechnicianCase } from '../../../pages/technician/TechnicianCases'
 
@@ -151,7 +151,7 @@ export default function CloseCaseModal({
         )}
 
         <p className="text-xs text-slate-500">
-          Ärendet markeras som borttaget och döljs från alla vyer. All data behålls.
+          {taBortInfoText(cases.map(c => c.case_type as DeleteableCaseType))}
         </p>
 
         {sparrar.length > 0 && (

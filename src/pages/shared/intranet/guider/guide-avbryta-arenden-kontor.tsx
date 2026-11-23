@@ -115,7 +115,7 @@ function Ovning() {
       if (id === 'komm') { setL({ ...l, vy: 'komm' }); tips('Kommunikation', l.skickad ? 'Kommentaren finns redan. Stäng panelen.' : 'Tryck i fältet längst ner och skriv varför ärendet avbryts.') }
       else if (id === 'radera') {
         if (!l.skickad) miss('Skriv först varför ärendet avbryts, i pratbubblan uppe till höger. Kommentaren finns kvar efteråt.')
-        else { setL({ ...l, vy: 'tabort' }); tips('Rutan Ta bort ärende', 'All data behålls. Tryck Ta bort.') }
+        else { setL({ ...l, vy: 'tabort' }); tips('Rutan Ta bort ärende', 'Rapporter, bilder och ärendets historik ligger kvar. Tryck Ta bort.') }
       } else miss(TIPS[id] ?? (l.skickad ? 'Radera finns längst ner till vänster.' : 'Leta efter pratbubblan uppe till höger.'))
     } else {
       if (id === 'tabort') {

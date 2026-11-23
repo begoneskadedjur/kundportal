@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import { deleteCase, taBortSparr, ORSAKER_TA_BORT, type DeleteableCaseType } from '../../services/caseDeleteService';
+import { deleteCase, taBortSparr, taBortInfoText, ORSAKER_TA_BORT, type DeleteableCaseType } from '../../services/caseDeleteService';
 import Select from '../ui/Select';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -96,7 +96,7 @@ export default function DeleteCaseConfirmDialog({
           <div>
             <p className="text-white font-medium">{caseTitle}</p>
             <p className="text-sm text-slate-400 mt-1">
-              Ärendet markeras som borttaget och döljs från alla vyer. All data behålls.
+              {taBortInfoText([caseType])}
             </p>
           </div>
         </div>

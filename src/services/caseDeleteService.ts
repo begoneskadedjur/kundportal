@@ -313,10 +313,26 @@ export interface CaseCloseReason {
 
 /**
  * Soft-delete: sätter status = 'Borttaget' och döljer ärendet ur alla vyer.
- * Ärendet och all relaterad data behålls i databasen.
+ * Ärendet och relaterad data behålls i databasen, utom provision som väntar
+ * på faktura (raderas) och ogenomförda kontrollrundor (ställs in), se taBortInfoText.
  * Den enda vägen för att ta bort ärenden: Radera i ärendemodalen och
  * teknikerns papperskorg (med closeReason) går båda hit.
  */
+/**
+ * Vad som händer när ärendet tas bort, för rutorna Ta bort ärende och
+ * papperskorgen (3.132.17). deleteCase sätter bara status Borttaget; databasens
+ * triggrar (20261123_stryk_vantande_provision_vid_borttagning.sql och
+ * 20261123_installd_kontrollrunda_vid_borttagning.sql) stryker provision i
+ * pending_invoice och ställer in ogenomförda kontrollrundor. Rapporter, bilder,
+ * kommentarer och besök rörs inte. Kontrollmeningen visas bara för avtalsärenden.
+ */
+export function taBortInfoText(caseTypes: DeleteableCaseType[]): string {
+  const kontroll = caseTypes.includes('contract')
+    ? ' Gäller det en kontroll ställs kontrollbesöket in om det inte är genomfört.'
+    : '';
+  return `Ärendet markeras som borttaget och döljs från alla vyer. Provision som väntar på faktura stryks.${kontroll} Rapporter, bilder och ärendets historik ligger kvar.`;
+}
+
 /** Anledningar när ett ärende tas bort (samma som Mina ärendens stängning) */
 export const ORSAKER_TA_BORT = [
   { value: 'kund_accepterade_inte_pris', label: 'Kund accepterade inte kostnadsförslaget' },

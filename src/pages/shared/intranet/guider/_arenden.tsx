@@ -412,7 +412,7 @@ export function TaBortArk({ titel, mk, tryck }: { titel: string; mk: Mk; tryck: 
         <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-red-500/20 text-red-400"><Icon name="rapport.avvikelse" size={16} /></span>
         <div>
           <p className="text-[13px] font-medium text-white">{titel}</p>
-          <p className="text-[11.5px] text-slate-400">Ärendet markeras som borttaget och döljs från alla vyer. All data behålls.</p>
+          <p className="text-[11.5px] text-slate-400">Ärendet markeras som borttaget och döljs från alla vyer. Provision som väntar på faktura stryks. Rapporter, bilder och ärendets historik ligger kvar.</p>
         </div>
       </div>
       <Knapprad>

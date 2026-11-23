@@ -4,7 +4,7 @@
 //
 // Efterbildning av EditCaseModal i nya vyn: Ärendets verktyg › Ta bort › Radera ärende
 // ("Frågar en gång till innan ärendet tas bort.") och DeleteCaseConfirmDialog (Ta bort
-// ärende, "Ärendet markeras som borttaget och döljs från alla vyer. All data behålls.",
+// ärende, taBortInfoText för privat- och företagsärenden,
 // Anledning * med Välj anledning... och valen ur ORSAKER_TA_BORT, Kommentar som är
 // obligatorisk vid Övrigt och annars valfri, Avbryt, Ta bort som är avstängd tills en
 // anledning är vald, toasten "Ärendet har tagits bort"). caseDeleteService sätter status
@@ -42,7 +42,7 @@ function TaBortRuta({ vy, mk, tryck }: { vy: Vy; mk: Mk; tryck: Tryck }) {
           <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-red-500/20 text-red-400"><Icon name="rapport.avvikelse" size={16} /></span>
           <div>
             <p className="text-[12.5px] font-medium text-white">{NR}</p>
-            <p className="text-[11px] leading-snug text-slate-400">Ärendet markeras som borttaget och döljs från alla vyer. All data behålls.</p>
+            <p className="text-[11px] leading-snug text-slate-400">Ärendet markeras som borttaget och döljs från alla vyer. Provision som väntar på faktura stryks. Rapporter, bilder och ärendets historik ligger kvar.</p>
           </div>
         </div>
         <div className="grid gap-1">
@@ -179,7 +179,7 @@ function Ovning() {
       case 'vald':
         if (id === 'ta-bort') {
           setVy('borta')
-          setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Ärendet fick status Borttaget med anledningen Kund avbokade och är borta ur Mina ärenden. All data finns kvar. Ett ärende som inte ska göras tas bort, det avslutas inte.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
+          setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Ärendet fick status Borttaget med anledningen Kund avbokade och är borta ur Mina ärenden. Rapporter, bilder och historiken finns kvar. Ett ärende som inte ska göras tas bort, det avslutas inte.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
         } else if (id === 'kommentar') setSvar({ typ: 'tips', titel: 'Kommentaren är valfri', text: 'Här kan du skriva till exempel vad kunden sa. Det behövs inte nu. Tryck Ta bort.' })
         else if (id === 'anledning') ga('lista', 'Byta anledning?', 'Kund avbokade var rätt. Välj den igen.')
         else annars(id, 'Tryck Ta bort.')
