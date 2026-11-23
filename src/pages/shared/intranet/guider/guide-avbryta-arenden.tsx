@@ -179,7 +179,7 @@ function Ovning() {
       case 'vald':
         if (id === 'ta-bort') {
           setVy('borta')
-          setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Ärendet fick status Borttaget med anledningen Kund avbokade och är borta ur Mina ärenden. All data finns kvar.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
+          setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Ärendet fick status Borttaget med anledningen Kund avbokade och är borta ur Mina ärenden. All data finns kvar. Ett ärende som inte ska göras tas bort, det avslutas inte.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
         } else if (id === 'kommentar') setSvar({ typ: 'tips', titel: 'Kommentaren är valfri', text: 'Här kan du skriva till exempel vad kunden sa. Det behövs inte nu. Tryck Ta bort.' })
         else if (id === 'anledning') ga('lista', 'Byta anledning?', 'Kund avbokade var rätt. Välj den igen.')
         else annars(id, 'Tryck Ta bort.')

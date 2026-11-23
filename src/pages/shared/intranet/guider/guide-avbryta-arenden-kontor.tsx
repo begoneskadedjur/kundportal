@@ -123,7 +123,7 @@ function Ovning() {
         setSvar({
           typ: 'ok',
           titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-          text: `Ärendet har status Borttaget och besöket är borta ur schemat direkt. Kommentaren och historiken finns kvar.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
+          text: `Ärendet har status Borttaget och besöket är borta ur schemat direkt. Kommentaren och historiken finns kvar. Ett ärende som inte ska göras tas bort, det avslutas inte.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
         })
       } else if (id === 'avbryt-tabort') { setL({ ...l, vy: 'arende' }); miss(TIPS[id]) }
       else miss('Tryck Ta bort i rutan.')

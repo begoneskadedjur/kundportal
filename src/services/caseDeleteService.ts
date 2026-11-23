@@ -86,6 +86,10 @@ function forstaSkickade(rader: FakturaRad[] | null): SkickadFaktura | null {
  *    samlade merförsäljningsfaktura har inget case_id, raderna pekar på den
  *    via invoice_id.
  * Kan kontrollen inte göras kastas ett fel, så att ärendet inte tas bort i blindo.
+ * Databasen har samma spärr (3.132.15): triggerfunktionen
+ * stoppa_borttagning_med_skickad_faktura i
+ * supabase/migrations/20261123_sparr_borttagning_skickad_faktura.sql.
+ * Ändras definitionen här ska den ändras där också.
  */
 export async function hittaSkickadFaktura(
   caseId: string,
@@ -354,6 +358,10 @@ export async function deleteCase(
       .select('id');
 
     if (error) {
+      // Databasens spärr (skickad faktura) har redan ett färdigt besked
+      if (error.message?.startsWith('Ärendet går inte att ta bort')) {
+        return { success: false, error: error.message };
+      }
       return { success: false, error: `Kunde inte markera ärendet som borttaget: ${error.message}` };
     }
     if (!data || data.length === 0) {

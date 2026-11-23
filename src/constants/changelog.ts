@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.15',
+    date: '2026-11-23',
+    title: 'Kontroller och etableringar avslutas bara den riktiga vägen',
+    items: [
+      { kind: 'andring', text: 'Admin och koordinator kan inte heller avsluta en kontroll eller etablering genom att välja Avslutat. Den avslutas med Klarmarkera kontrollen eller Färdig med etablering, och ska ärendet inte göras tar du bort det i stället.' },
+    ],
+  },
+  {
     version: '3.132.14',
     date: '2026-11-23',
     title: 'Avslut av kontroller och borttagning av fakturerade ärenden',

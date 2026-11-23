@@ -1235,7 +1235,7 @@ export default function EditContractCaseModal({
     // skrivningar (statusändring, ad-hoc-fakturering, provision, avtalstillägg).
     // Avtalstilläggsrader räknas inte som rabatt (exkluderas i servicen).
     if (formData.status === 'Avslutat' && localCaseData.status !== 'Avslutat') {
-      // SPÄRR: tekniker avslutar kontroller och etableringar bara den riktiga vägen
+      // SPÄRR: kontroller och etableringar avslutas bara den riktiga vägen (alla roller)
       const avslutsvag = statusAvslutSparr({ serviceType: localCaseData.service_type, profil: profile, nyArbetsvy })
       if (avslutsvag) {
         toast.error(avslutsvag, { id: 'avslut-via-status', duration: 8000 })
@@ -2470,7 +2470,7 @@ export default function EditContractCaseModal({
         status={formData.status}
         statuses={statusOptions}
         onChange={(s) => {
-          // Samma spärr som spara: beskedet direkt när teknikern väljer Avslutat
+          // Samma spärr som spara: beskedet direkt när Avslutat väljs
           const avslutsvag = s === 'Avslutat' && localCaseData?.status !== 'Avslutat'
             ? statusAvslutSparr({ serviceType: localCaseData?.service_type ?? caseData?.service_type, profil: profile, nyArbetsvy })
             : null

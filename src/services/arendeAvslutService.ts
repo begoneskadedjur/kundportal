@@ -87,29 +87,26 @@ export function kraverRapport(kalla: ArendeKalla, serviceType: string | null | u
 
 export const RAPPORT_SAKNAS_FEL = 'Skriv rapporten innan ärendet avslutas. Beskriv vad du gjorde.'
 
-/** Det ur profilen som avgör om spärren nedan gäller (AuthContext Profile) */
+/** Det ur profilen som styr beskedet nedan (AuthContext Profile) */
 export interface AvslutsProfil {
   role?: string | null
   is_admin?: boolean | null
-  is_koordinator?: boolean | null
-  extra_roles?: string[] | null
 }
 
-/** Tekniker utan admin- eller koordinatorrätt i någon form */
-function arBaraTekniker(profil: AvslutsProfil | null | undefined): boolean {
-  if (!profil || profil.role !== 'technician') return false
-  if (profil.is_admin || profil.is_koordinator) return false
-  return !(profil.extra_roles || []).some(r => r === 'admin' || r === 'koordinator')
-}
+const TA_BORT_I_STALLET = ' Ska ärendet inte göras tar du bort det i stället.'
 
 /**
- * Spärr för statusen Avslutat (2026-11-23). En tekniker avslutar kontroller
- * och etableringar bara den riktiga vägen: Klarmarkera kontrollen
- * (StationInspectionPanel/StationInspectionModule, kräver alla stationer och
- * skriver arbetsrapporten) och Färdig med etablering (useEtableringsflode,
- * kräver Kommentar från tekniker och skriver arbetsrapporten). De vägarna
- * skriver status direkt och går inte via modalens spara, så spärren stoppar
- * bara statusväljaren och spara. Admin och koordinator påverkas inte.
+ * Spärr för statusen Avslutat (2026-11-23, alla roller sedan 3.132.15).
+ * Kontroller och etableringar avslutas bara den riktiga vägen: Klarmarkera
+ * kontrollen (StationInspectionPanel/StationInspectionModule, kräver alla
+ * stationer och skriver arbetsrapporten) och Färdig med etablering
+ * (useEtableringsflode, kräver Kommentar från tekniker och skriver
+ * arbetsrapporten). De vägarna skriver status direkt och går inte via
+ * modalens spara, så spärren stoppar bara statusväljaren och spara.
+ * Ett ärende som inte ska göras tas bort, det avslutas inte.
+ * Beskedet hänvisar till det användaren ser i EditContractCaseModal:
+ * stegen bara i nya arbetsvyn, Gå till inspektion i sidfoten för tekniker
+ * och admin, Gå till utplacering i sidfoten bara för tekniker.
  * Returnerar beskedet som ska visas, eller null om statusen får väljas.
  */
 export function statusAvslutSparr(args: {
@@ -118,16 +115,23 @@ export function statusAvslutSparr(args: {
   nyArbetsvy: boolean
 }): string | null {
   const { serviceType, profil, nyArbetsvy } = args
-  if (!arBaraTekniker(profil)) return null
+  const tekniker = profil?.role === 'technician'
   if (serviceType === 'inspection') {
-    return nyArbetsvy
-      ? 'Kontrollen avslutas inte med statusen. Klarmarkera kontrollen i steget Arbetet.'
-      : 'Kontrollen avslutas inte med statusen. Tryck Gå till inspektion och sedan Klarmarkera kontrollen.'
+    const sidfotKnapp = tekniker || profil?.role === 'admin' || !!profil?.is_admin
+    const vag = nyArbetsvy
+      ? 'Klarmarkera kontrollen i steget Arbetet.'
+      : sidfotKnapp
+        ? 'Tryck Gå till inspektion och sedan Klarmarkera kontrollen.'
+        : 'Teknikern avslutar den med Klarmarkera kontrollen.'
+    return `Kontrollen avslutas inte med statusen. ${vag}${TA_BORT_I_STALLET}`
   }
   if (serviceType === 'establishment') {
-    return nyArbetsvy
-      ? 'Etableringen avslutas inte med statusen. Tryck Gå till utplacering i steget Arbetet och avsluta med Färdig med etablering.'
-      : 'Etableringen avslutas inte med statusen. Tryck Gå till utplacering och avsluta med Färdig med etablering.'
+    const vag = nyArbetsvy
+      ? 'Tryck Gå till utplacering i steget Arbetet och avsluta med Färdig med etablering.'
+      : tekniker
+        ? 'Tryck Gå till utplacering och avsluta med Färdig med etablering.'
+        : 'Teknikern avslutar den med Färdig med etablering i utplaceringen.'
+    return `Etableringen avslutas inte med statusen. ${vag}${TA_BORT_I_STALLET}`
   }
   return null
 }
