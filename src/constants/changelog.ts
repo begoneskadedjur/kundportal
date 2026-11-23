@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.20',
+    date: '2026-11-23',
+    title: 'Fakturanummer går alltid uppåt',
+    items: [
+      { kind: 'buggfix', text: 'En ny faktura får alltid nästa nummer i ordningen och ett nummer används aldrig två gånger. Tidigare kunde en ny faktura få ett lägre nummer som blivit ledigt när en faktura tagits bort.' },
+    ],
+  },
+  {
     version: '3.132.19',
     date: '2026-11-23',
     title: 'Delfakturan visar samma pris som ärendet',

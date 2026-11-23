@@ -357,6 +357,9 @@ async function loadCoveredPeriods(customerId: string): Promise<Covered> {
   return { perContract, consolidated, fortnoxRanges, ranges }
 }
 
+// Bara ett förslag med rätt prefix: databasens trigger trg_invoices_assign_free_number
+// sätter det slutliga numret ur invoice_number_counters (alltid uppåt, 3.132.20).
+// Läs numret från den sparade raden om det behövs.
 async function generateInvoiceNumber(): Promise<string> {
   const now = new Date()
   const prefix = `INV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`

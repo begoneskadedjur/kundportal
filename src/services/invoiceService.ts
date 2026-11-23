@@ -150,7 +150,10 @@ function assertRotRutInvoiceable(
 
 export class InvoiceService {
   /**
-   * Generera nästa fakturanummer
+   * Förslag till nästa fakturanummer. Bara prefixet (INV-ÅÅÅÅMM) spelar roll:
+   * databasens trigger trg_invoices_assign_free_number sätter det slutliga numret
+   * ur invoice_number_counters (alltid uppåt, aldrig återanvänt, 3.132.20).
+   * Använd numret från den sparade raden, inte förslaget.
    */
   static async generateInvoiceNumber(): Promise<string> {
     const now = new Date()

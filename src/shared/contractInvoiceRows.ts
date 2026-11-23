@@ -432,7 +432,11 @@ export function invoiceTotals(rows: InvoiceRowSpec[]): { subtotal: number; vat: 
   return { subtotal, vat, total: Math.round((subtotal + vat) * 100) / 100 }
 }
 
-/** Fakturanumret efter den högsta sekvensen i månaden (INV-ÅÅÅÅMM-NNNN) */
+/**
+ * Förslag till fakturanummer efter den högsta sekvensen i månaden (INV-ÅÅÅÅMM-NNNN).
+ * Databasens trigger trg_invoices_assign_free_number sätter det slutliga numret ur
+ * invoice_number_counters (alltid uppåt, 3.132.20). Läs numret från den sparade raden.
+ */
 export function nextInvoiceNumber(prefix: string, highest: string | null | undefined): string {
   let next = 1
   const match = highest ? /-(\d+)$/.exec(highest) : null

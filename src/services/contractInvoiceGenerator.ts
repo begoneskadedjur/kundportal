@@ -2113,6 +2113,9 @@ export class ContractInvoiceGenerator {
     if (itemErr) throw new Error(`Kunde inte skapa fakturarad: ${itemErr.message}`)
   }
 
+  // Bara ett förslag med rätt prefix: databasens trigger trg_invoices_assign_free_number
+  // sätter det slutliga numret ur invoice_number_counters (alltid uppåt, 3.132.20).
+  // Läs numret från den sparade raden om det behövs.
   private static async generateInvoiceNumber(): Promise<string> {
     const now = new Date()
     const year = now.getFullYear()
