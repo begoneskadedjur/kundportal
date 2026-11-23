@@ -92,7 +92,7 @@ export function ArendeVerktygArk({ oppen, onStang, grupper, rubrik = 'Ärendets 
   const synligaGrupper = grupper.filter(g => g.val.length > 0)
 
   // Värdmodalen (Modal med usePortal) ligger i #modal-root, en fast container
-  // med z-index 2147483647 direkt under body. Ett ark i body hamnar därför
+  // med z-index 2147483646 direkt under body. Ett ark i body hamnar därför
   // alltid bakom modalen oavsett eget z-index. Arket renderas i samma container
   // så att z-[10020] jämförs med modalens 9999. Containern ägs av Portal och
   // rensas inte här (samma mönster som DuplicateCaseDialog).

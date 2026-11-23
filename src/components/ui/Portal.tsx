@@ -30,7 +30,10 @@ const Portal: React.FC<PortalProps> = ({ children, containerId = 'modal-root' })
       modalContainer.style.left = '0';
       modalContainer.style.width = '100vw';        // FIX: Use vw instead of %
       modalContainer.style.height = '100vh';       // FIX: Use vh instead of %
-      modalContainer.style.zIndex = '2147483647'; // Max z-index value
+      // Ett steg under max: beskeden (ThemedToaster, z-index 2147483647 i #root)
+      // ska ritas ovanpå modalerna. Med samma z-index vann #modal-root, som
+      // ligger senare i DOM:en, och beskeden hamnade bakom ärendefönstret (3.132.18).
+      modalContainer.style.zIndex = '2147483646';
       modalContainer.style.pointerEvents = 'none'; // Låt klick passera genom
       modalContainer.style.display = 'flex';       // FIX: Establish flex context
       modalContainer.style.alignItems = 'center';  // FIX: Center alignment

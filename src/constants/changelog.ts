@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.18',
+    date: '2026-11-23',
+    title: 'Besked syns ovanpå ärendet',
+    items: [
+      { kind: 'buggfix', text: 'Bekräftelser och felmeddelanden syns nu när ett ärende eller en annan ruta är öppen. Tidigare hamnade de bakom, och i telefonen syntes de inte alls.' },
+    ],
+  },
+  {
     version: '3.132.17',
     date: '2026-11-23',
     title: 'Ta bort ärende säger vad som händer',
