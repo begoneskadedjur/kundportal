@@ -259,7 +259,7 @@ const SHORT_SUFFIXES = ['', 'n', 'en', 'na', 's', 'ens', 'ar', 'arna', 'or', 'or
 /** Efterled som gör att ett kort nyckelord först i ett ord ändå gäller (myggbekämpning) */
 const PEST_HEADS = /^(bekämp|sanering|säkr|fäll|kontroll|problem|angrepp|förekomst)/
 /** Vanliga ord som innehåller ett kort nyckelord men betyder något annat */
-const FALSE_FRIENDS = /möss(a|an|or|orna)$/
+const FALSE_FRIENDS = /(möss(a|an|or|orna)|fladdermöss(en|na)?)$/
 
 function keywordMatches(hay: string, keyword: string): boolean {
   const k = keyword.toLowerCase()

@@ -743,6 +743,38 @@ export class EquipmentService {
         })
       })
 
+      // Senaste avslutade kontroll och närmast kommande utlagda kontroll per kund,
+      // oavsett tekniker. Felar anropet visas listan ändå, utan datumen.
+      type KundoversiktRad = {
+        customer_id: string
+        senaste_kontroll: string | null
+        nasta_kontroll: string | null
+        nasta_tekniker_id: string | null
+        nasta_tekniker_namn: string | null
+        nasta_frekvens: string | null
+      }
+      const oversiktPerKund = new Map<string, KundoversiktRad>()
+      const kundIds = Array.from(customerMap.keys())
+      let oversiktHamtad = kundIds.length === 0
+      if (kundIds.length > 0) {
+        try {
+          const { data: oversikt, error: oversiktError } = await supabase.rpc(
+            'stationer_kundoversikt' as never,
+            { p_customer_ids: kundIds } as never
+          )
+          if (oversiktError) {
+            console.error('Fel vid hämtning av kontrolldatum per kund:', oversiktError)
+          } else if (Array.isArray(oversikt)) {
+            for (const rad of oversikt as KundoversiktRad[]) {
+              oversiktPerKund.set(rad.customer_id, rad)
+            }
+            oversiktHamtad = true
+          }
+        } catch (oversiktFel) {
+          console.error('Fel vid hämtning av kontrolldatum per kund:', oversiktFel)
+        }
+      }
+
       // Beräkna hälsostatus och senaste aktivitet för varje kund
       const summaries: CustomerStationSummary[] = Array.from(customerMap.values()).map(customer => {
         const allStations = [...customer.outdoor_stations, ...customer.indoor_stations]
@@ -761,11 +793,7 @@ export class EquipmentService {
         else if (ratio < 0.3) health_status = 'fair'
         else health_status = 'poor'
 
-        // Hitta senaste placering
-        const allDates = allStations.map(s => new Date(s.placed_at))
-        const latestDate = allDates.length > 0
-          ? new Date(Math.max(...allDates.map(d => d.getTime())))
-          : null
+        const oversikt = oversiktPerKund.get(customer.customer_id)
 
         const technicianNames = Array.from(new Set(
           allStations.map(s => s.technician_name).filter((n): n is string => !!n)
@@ -782,8 +810,16 @@ export class EquipmentService {
           own_indoor_count: customer.indoor_stations.filter(s => s.placed_by === technicianId).length,
           technician_names: technicianNames,
           health_status,
-          latest_inspection_date: latestDate?.toISOString() || null,
+          latest_inspection_date: oversikt?.senaste_kontroll ?? null,
           latest_inspector_name: null, // Kräver separat query om vi vill ha detta
+          // Lämnas odefinierade om anropet felade, så att vyn inte påstår att
+          // inga kontroller är utlagda när den bara saknar uppgiften.
+          ...(oversiktHamtad ? {
+            next_session_at: oversikt?.nasta_kontroll ?? null,
+            next_session_technician_id: oversikt?.nasta_tekniker_id ?? null,
+            next_session_technician_name: oversikt?.nasta_tekniker_namn ?? null,
+            next_session_frequency: oversikt?.nasta_frekvens ?? null,
+          } : {}),
           organization_id: customer.organization_id,
           parent_customer_id: customer.parent_customer_id,
           is_multisite: customer.is_multisite,
@@ -981,6 +1017,11 @@ export interface CustomerStationSummary {
   health_status: 'excellent' | 'good' | 'fair' | 'poor'
   latest_inspection_date: string | null
   latest_inspector_name: string | null
+  // Kundens närmast kommande utlagda kontroll, oavsett tekniker
+  next_session_at?: string | null
+  next_session_technician_id?: string | null
+  next_session_technician_name?: string | null
+  next_session_frequency?: string | null
   // Multisite-fält
   organization_id: string | null
   parent_customer_id: string | null

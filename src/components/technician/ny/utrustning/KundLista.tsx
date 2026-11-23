@@ -75,6 +75,28 @@ function senasteKontroll(iso: string | null): string {
   return dag
 }
 
+/** Det Nästa kontroll-kolumnen och telefonens statusrad behöver */
+interface Kontrollvisning {
+  forsenad: { scheduled_at: string } | null
+  nasta: { scheduled_at: string; frequency: string | null } | null
+  /** Kunden har inga kommande kontroller utlagda alls, oavsett tekniker */
+  ingaUtlagda: boolean
+}
+
+/**
+ * Teknikerns egna bokningar (useKontrollData) går först. Saknas en egen bokning
+ * inom horisonten men kundens närmast kommande kontroll ligger på den inloggade
+ * teknikern visas den i stället. ingaUtlagda bara när uppgiften faktiskt hämtats.
+ */
+function kontrollvisning(kund: CustomerStationSummary, kontroll: KontrollPerKund | undefined, technicianId: string | undefined): Kontrollvisning {
+  const forsenad = kontroll?.forsenad ?? null
+  if (kontroll?.nasta) return { forsenad, nasta: kontroll.nasta, ingaUtlagda: false }
+  if (kund.next_session_at && technicianId && kund.next_session_technician_id === technicianId) {
+    return { forsenad, nasta: { scheduled_at: kund.next_session_at, frequency: kund.next_session_frequency ?? null }, ingaUtlagda: false }
+  }
+  return { forsenad, nasta: null, ingaUtlagda: kund.next_session_at === null }
+}
+
 function samreHalsa(enheter: CustomerStationSummary[]): HealthStatus {
   return enheter.reduce<HealthStatus>((v, s) => HALSA_ORDNING[s.health_status] < HALSA_ORDNING[v] ? s.health_status : v, 'excellent')
 }
@@ -97,6 +119,8 @@ interface Props {
   kontrollPerKund: Map<string, KontrollPerKund>
   /** Kunder med aktivt schema, null medan det hämtas */
   medSchema: Set<string> | null
+  /** Inloggad tekniker, för att visa kundens nästa kontroll när den ligger på dig */
+  technicianId?: string
   sok: string
   onSok: (v: string) => void
   sortering: Sortering
@@ -108,7 +132,7 @@ interface Props {
 }
 
 export function KundLista({
-  kunder, typerPerKund, kontrollPerKund, medSchema, sok, onSok, sortering, onSortering, omfang, onSchemapanel, onSchemalagg,
+  kunder, typerPerKund, kontrollPerKund, medSchema, technicianId, sok, onSok, sortering, onSortering, omfang, onSchemapanel, onSchemalagg,
 }: Props) {
   const [oppenOrg, setOppenOrg] = useState<string | null>(null)
   const [antalVisade, setAntalVisade] = useState(SIDA)
@@ -242,7 +266,7 @@ export function KundLista({
                 key={p.kund.customer_id}
                 kund={p.kund}
                 typer={typerPerKund.get(p.kund.customer_id)}
-                kontroll={kontrollPerKund.get(p.kund.customer_id)}
+                kontroll={kontrollvisning(p.kund, kontrollPerKund.get(p.kund.customer_id), technicianId)}
                 utanSchema={utanSchema(p.kund)}
                 schemaKant={!!medSchema}
                 onSchemapanel={() => onSchemapanel(p.kund.customer_id, p.kund.customer_name)}
@@ -256,6 +280,7 @@ export function KundLista({
                 typerPerKund={typerPerKund}
                 kontrollPerKund={kontrollPerKund}
                 medSchema={medSchema}
+                technicianId={technicianId}
                 oppen={oppenOrg === p.orgId}
                 onVaxla={() => setOppenOrg(o => o === p.orgId ? null : p.orgId)}
                 onSchemapanel={() => onSchemapanel(
@@ -298,9 +323,9 @@ function TypRutor({ typer }: { typer?: TypRad[] }) {
   )
 }
 
-/** Nästa kontroll: försenad (orange), datum med frekvens, Inget schema eller schema utan bokning hos dig */
+/** Nästa kontroll: försenad (orange), datum med frekvens, Inget schema, schema utan utlagda kontroller eller schema utan bokning hos dig */
 function NastaKontroll({ kontroll, utanSchema, schemaKant, enheter, enhet }: {
-  kontroll?: KontrollPerKund
+  kontroll: Kontrollvisning
   utanSchema: boolean
   schemaKant: boolean
   /** Antal enheter, för organisationsraden */
@@ -338,14 +363,14 @@ function NastaKontroll({ kontroll, utanSchema, schemaKant, enheter, enhet }: {
   return (
     <span className="flex flex-col gap-0.5">
       <span className="text-[13px] text-slate-300">Schema finns</span>
-      <span className="text-[12px] text-slate-400">ingen bokning på dig</span>
+      <span className="text-[12px] text-slate-400">{kontroll.ingaUtlagda ? 'inga kontroller utlagda än' : 'ingen bokning på dig'}</span>
     </span>
   )
 }
 
 /** Telefonens statusrad: det viktigaste först */
 function KortStatus({ kontroll, utanSchema, halsaStatus, harStationer }: {
-  kontroll?: KontrollPerKund; utanSchema: boolean; halsaStatus: HealthStatus; harStationer: boolean
+  kontroll: Kontrollvisning; utanSchema: boolean; halsaStatus: HealthStatus; harStationer: boolean
 }) {
   if (kontroll?.forsenad) {
     return (
@@ -380,7 +405,7 @@ function SchemaKnapp({ utanSchema, namn, onSchemapanel, onSchemalagg, enheter }:
 function KundRad({ kund, typer, kontroll, utanSchema, schemaKant, onSchemapanel, onSchemalagg, inskjuten = false, vald, onVald }: {
   kund: CustomerStationSummary
   typer?: TypRad[]
-  kontroll?: KontrollPerKund
+  kontroll: Kontrollvisning
   utanSchema: boolean
   schemaKant: boolean
   onSchemapanel: () => void
@@ -453,12 +478,13 @@ function KundRad({ kund, typer, kontroll, utanSchema, schemaKant, onSchemapanel,
   )
 }
 
-function OrgRad({ namn, enheter, typerPerKund, kontrollPerKund, medSchema, oppen, onVaxla, onSchemapanel, onSchemalagg, onSchemapanelEnhet }: {
+function OrgRad({ namn, enheter, typerPerKund, kontrollPerKund, medSchema, technicianId, oppen, onVaxla, onSchemapanel, onSchemalagg, onSchemapanelEnhet }: {
   namn: string
   enheter: CustomerStationSummary[]
   typerPerKund: Map<string, TypRad[]>
   kontrollPerKund: Map<string, KontrollPerKund>
   medSchema: Set<string> | null
+  technicianId?: string
   oppen: boolean
   onVaxla: () => void
   onSchemapanel: () => void
@@ -474,17 +500,25 @@ function OrgRad({ namn, enheter, typerPerKund, kontrollPerKund, medSchema, oppen
   const utan = medSchema ? enheter.filter(e => !medSchema.has(e.customer_id)).length : 0
   const allaUtan = !!medSchema && utan === enheter.length
 
-  // Organisationens kontroll: äldsta försenade, annars tidigaste nästa bland enheterna
-  const kontroll = useMemo<KontrollPerKund>(() => {
-    let forsenad: KontrollPerKund['forsenad'] = null
-    let nasta: KontrollPerKund['nasta'] = null
-    for (const e of enheter) {
-      const k = kontrollPerKund.get(e.customer_id)
-      if (k?.forsenad && (!forsenad || k.forsenad.scheduled_at < forsenad.scheduled_at)) forsenad = k.forsenad
-      if (k?.nasta && (!nasta || k.nasta.scheduled_at < nasta.scheduled_at)) nasta = k.nasta
+  // Varje enhets kontroll, med kundens nästa kontroll när den ligger på dig
+  const perEnhet = useMemo(
+    () => new Map(enheter.map(e => [e.customer_id, kontrollvisning(e, kontrollPerKund.get(e.customer_id), technicianId)])),
+    [enheter, kontrollPerKund, technicianId]
+  )
+
+  // Organisationens kontroll: äldsta försenade, annars tidigaste nästa bland enheterna.
+  // Inga utlagda bara när ingen enhet har någon kommande kontroll.
+  const kontroll = useMemo<Kontrollvisning>(() => {
+    let forsenad: Kontrollvisning['forsenad'] = null
+    let nasta: Kontrollvisning['nasta'] = null
+    let ingaUtlagda = true
+    for (const k of perEnhet.values()) {
+      if (k.forsenad && (!forsenad || k.forsenad.scheduled_at < forsenad.scheduled_at)) forsenad = k.forsenad
+      if (k.nasta && (!nasta || k.nasta.scheduled_at < nasta.scheduled_at)) nasta = k.nasta
+      if (!k.ingaUtlagda) ingaUtlagda = false
     }
-    return { forsenad, nasta }
-  }, [enheter, kontrollPerKund])
+    return { forsenad, nasta, ingaUtlagda }
+  }, [perEnhet])
 
   const vaxlaVald = (id: string) => setValda(prev => {
     const n = new Set(prev)
@@ -547,7 +581,7 @@ function OrgRad({ namn, enheter, typerPerKund, kontrollPerKund, medSchema, oppen
               key={e.customer_id}
               kund={e}
               typer={typerPerKund.get(e.customer_id)}
-              kontroll={kontrollPerKund.get(e.customer_id)}
+              kontroll={perEnhet.get(e.customer_id) ?? kontrollvisning(e, kontrollPerKund.get(e.customer_id), technicianId)}
               utanSchema={!!medSchema && !medSchema.has(e.customer_id)}
               schemaKant={!!medSchema}
               inskjuten

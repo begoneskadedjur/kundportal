@@ -3,19 +3,22 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { format, addMonths } from 'date-fns'
+import { format, addMonths, addDays, parseISO, startOfDay } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import {
   X, Repeat, Clock, CalendarDays, Loader2, Check, AlertTriangle, ChevronLeft, Trash2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Select from '../ui/Select'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   getRecurringSchedule,
   getFutureSessionsForSchedule,
   previewScheduleDates,
-  rescheduleExistingSessions
+  rescheduleExistingSessions,
+  resolveScheduleHorizon
 } from '../../services/recurringScheduleService'
+import { currentPeriodSegment } from '../../utils/inspectionDateGenerator'
 import {
   FREQUENCY_CONFIG,
   STANDARD_FREQUENCIES,
@@ -60,6 +63,8 @@ export function EditScheduleModal({
   const [step, setStep] = useState<Step>('edit')
   const [existingCount, setExistingCount] = useState(0)
   const [previewDates, setPreviewDates] = useState<GeneratedInspectionDate[]>([])
+  // Schemahorisontens slut, blir schemats generated_until efter ändringen
+  const [generatedUntil, setGeneratedUntil] = useState<string | null>(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
 
   // Execution state
@@ -93,6 +98,12 @@ export function EditScheduleModal({
     }
   }
 
+  // Spärr: tekniker ändrar bara egna scheman. Kollegans schema byter tekniker via koordinator.
+  const { profile, isAdmin, isKoordinator } = useAuth()
+  const isStaff = isAdmin || isKoordinator || profile?.is_koordinator === true
+  const ownerName = schedule?.technician?.name ?? 'en annan tekniker'
+  const lockedToColleague = !!schedule && !isStaff && profile?.technician_id !== schedule.technician_id
+
   const hasChanges = schedule && (
     frequency !== schedule.frequency ||
     dayPattern !== schedule.day_pattern ||
@@ -109,8 +120,25 @@ export function EditScheduleModal({
       const existingSessions = await getFutureSessionsForSchedule(schedule.id)
       setExistingCount(existingSessions.length)
 
-      // Generate new dates with updated settings
-      const previewEnd = addMonths(new Date(), 14)
+      // Samma horisont och rytm som guiden Nytt schema: besöken läggs ut till
+      // schemahorisonten (hela avtalsperioden), och perioderna räknas från
+      // schemats start, inte från dagens datum.
+      const horizon = await resolveScheduleHorizon(schedule.customer_id, schedule.contract_end_date, schedule.contract_id)
+      const today = startOfDay(new Date())
+      const anchor = parseISO(schedule.schedule_start_date) // lokal dag
+      // Nya besök läggs tidigast i morgon: i dag kan klockslaget redan ha passerat.
+      const tomorrow = addDays(today, 1)
+      const windowStart = anchor > today ? anchor : tomorrow
+      const previewEnd = horizon.planEnd ? new Date(horizon.planEnd) : addMonths(new Date(), 14)
+      const customConfig = frequency === 'custom' ? schedule.custom_frequency_config ?? undefined : undefined
+
+      // Pågående period: ett kommande, ej utfört besök i den period som redan
+      // börjat raderas av ändringen och måste då läggas ut igen (från i morgon).
+      const pagaende = anchor <= today ? currentPeriodSegment(frequency, anchor, today, customConfig) : null
+      const includeCurrentPeriod = !!pagaende && pagaende.end >= windowStart && existingSessions.some(s =>
+        s.status === 'scheduled' && new Date(s.scheduled_at) < addDays(pagaende.end, 1)
+      )
+
       const newDates = await previewScheduleDates({
         technicianId: schedule.technician_id,
         frequency,
@@ -118,11 +146,16 @@ export function EditScheduleModal({
         preferredDayOfMonth: dayPattern === 'specific_day' ? preferredDayOfMonth : undefined,
         preferredTime,
         estimatedDurationMinutes: durationMinutes,
-        startDate: new Date(),
+        startDate: windowStart,
         endDate: previewEnd,
-        technicianWorkSchedule: schedule.technician?.work_schedule || null
+        periodAnchor: anchor,
+        hardEndDate: horizon.terminated && horizon.planEnd ? new Date(horizon.planEnd) : null,
+        includeCurrentPeriod,
+        technicianWorkSchedule: schedule.technician?.work_schedule || null,
+        customFrequencyConfig: customConfig
       })
       setPreviewDates(newDates)
+      setGeneratedUntil(horizon.planEnd ?? null)
       setStep('preview')
     } catch (err) {
       console.error('Error generating preview:', err)
@@ -147,7 +180,8 @@ export function EditScheduleModal({
       const result = await rescheduleExistingSessions(
         schedule.id,
         updates,
-        previewDates
+        previewDates,
+        generatedUntil
       )
 
       if (result.errors.length > 0) {
@@ -221,6 +255,19 @@ export function EditScheduleModal({
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-6 h-6 text-[#20c58f] animate-spin" />
                 </div>
+              ) : step === 'edit' && lockedToColleague ? (
+                <div className="p-4 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-sm text-white font-medium">Schemat ligger på {ownerName}</p>
+                  </div>
+                  <p className="text-sm text-slate-300">
+                    Bara {ownerName} eller en koordinator kan ändra det här schemat.
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Ska du ta över kunden ber du en koordinator byta tekniker på schemat. Lägg inte upp ett nytt schema, det dubblerar kontrollerna.
+                  </p>
+                </div>
               ) : step === 'edit' ? (
                 <EditStep
                   frequency={frequency}
@@ -259,7 +306,7 @@ export function EditScheduleModal({
                   </button>
                   <button
                     onClick={handlePreview}
-                    disabled={!hasChanges || loadingPreview}
+                    disabled={!hasChanges || loadingPreview || lockedToColleague}
                     className="flex-1 py-2 text-sm font-medium text-[#0a1328] bg-[#20c58f] rounded-xl hover:bg-[#1ab37e] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                   >
                     {loadingPreview ? (

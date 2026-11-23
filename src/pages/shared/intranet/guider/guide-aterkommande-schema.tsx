@@ -5,7 +5,9 @@
 // tekniker, Välj tekniker..., Fortsätt till schemaläggning) och RecurringScheduleWizard
 // (Återkommande kontroller, Steg N av 5: Startdatum / Tid per besök / Frekvens & dag /
 // Klockslag / Förhandsvisning, Enligt avtalet, Kvartalsvis, Första helgfria vardagen,
-// Nästa, Tillbaka, Skapa N kontrolltillfällen, N kontrolltillfällen skapade). Påhittad kund.
+// Alla datum är med. Tryck bara på ett datum som ska tas bort., N datum är borttagna,
+// Ta tillbaka alla, Nästa, Tillbaka, Skapa N kontrolltillfällen, N kontrolltillfällen
+// skapade). Påhittad kund.
 
 import { useState, type ReactNode } from 'react'
 import {
@@ -31,6 +33,8 @@ interface Lage {
 const MENY = ['Öppna schema', 'Ärenden', 'Rondering & Schema', 'Befintliga kunder']
 const STEG = ['Startdatum', 'Tid per besök', 'Frekvens & dag', 'Klockslag', 'Förhandsvisning']
 const DATUM = ['måndag 2 november 2026', 'tisdag 2 februari 2027', 'måndag 3 maj 2027', 'måndag 2 augusti 2027']
+// Som i guidens gula ruta när datum tagits bort
+const DATUM_KORT = ['2 nov. 2026', '2 feb. 2027', '3 maj 2027', '2 aug. 2027']
 const LANGDER: [number, string][] = [[30, '30 min'], [45, '45 min'], [60, '1 timme'], [90, '1,5 timmar']]
 const FREKVENSER: { id: Lage['frekvens']; namn: string; text: string }[] = [
   { id: 'manad', namn: 'Månadsvis', text: '1 besök per månad' },
@@ -147,6 +151,9 @@ function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void
                 {steg === 5 && (
                   <>
                     <p className="text-[12px] text-slate-300">{antal} kontrolltillfällen</p>
+                    <p className="text-[11px] text-slate-400">
+                      {l.bort.length ? 'Tryck på ett borttaget datum för att ta tillbaka det.' : 'Alla datum är med. Tryck bara på ett datum som ska tas bort.'}
+                    </p>
                     {DATUM.map((d, i) => {
                       const bort = l.bort.includes(i)
                       return (
@@ -158,6 +165,12 @@ function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void
                         </button>
                       )
                     })}
+                    {l.bort.length > 0 && (
+                      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-400">
+                        {l.bort.length === 1 ? '1 datum är borttaget' : `${l.bort.length} datum är borttagna`}: {[...l.bort].sort((a, b) => a - b).map(i => DATUM_KORT[i]).join(', ')}.
+                        <button type="button" onClick={() => tryck('ta-tillbaka')} className="mt-0.5 block font-semibold text-amber-300 underline">Ta tillbaka alla</button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -261,8 +274,11 @@ function Ovning() {
           const i = Number(id.slice(6))
           const bort = l.bort.includes(i) ? l.bort.filter(x => x !== i) : [...l.bort, i]
           setL({ ...l, bort })
-          if (bort.length) miss('Ett tryck på ett datum tar bort det. Alla fyra skulle vara med, tryck igen för att ta tillbaka det.')
+          if (bort.length) miss('Ett tryck på ett datum tar bort det. Alla fyra skulle vara med, tryck igen eller på Ta tillbaka alla.')
           else tips('Alla fyra är med', 'Tryck Skapa 4 kontrolltillfällen.')
+        } else if (id === 'ta-tillbaka') {
+          setL({ ...l, bort: [] })
+          tips('Alla fyra är med', 'Tryck Skapa 4 kontrolltillfällen.')
         } else if (id === 'skapa') {
           if (l.bort.length) miss('Ett datum är bortvalt. Ta tillbaka det först.')
           else {

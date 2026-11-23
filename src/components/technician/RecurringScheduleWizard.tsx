@@ -22,7 +22,8 @@ import {
   previewScheduleDates,
   createScheduleWithSessions,
   resolveScheduleHorizon,
-  findActiveScheduleForCustomer
+  findActiveScheduleForCustomer,
+  misslyckadeDatum
 } from '../../services/recurringScheduleService'
 import type { ScheduleHorizon } from '../../shared/scheduleHorizon'
 import type {
@@ -103,6 +104,49 @@ function parseServiceFrequency(sf: string | null | undefined): RecurringFrequenc
   if (lower.includes('halvar') || lower.includes('semi')) return 'semi_annual'
   if (lower.includes('arsv') || lower.includes('annual') || lower.includes('årsvis')) return 'annual'
   return null
+}
+
+/** Kontrolltillfällen som inte gick att skapa ska synas, inte sväljas. */
+function visaMisslyckadeTillfallen(antalFel: number, totalt: number, detaljer: string) {
+  toast.error(
+    `${antalFel} av ${totalt} kontrolltillfällen kunde inte skapas: ${detaljer}. Lägg in dem för hand eller kontakta kontoret.`,
+    { duration: 20000 }
+  )
+}
+
+/** Gul sammanfattning under datumlistan när datum valts bort */
+function BorttagnaDatum({ datum, onTaTillbaka }: { datum: Date[]; onTaTillbaka: () => void }) {
+  if (datum.length === 0) return null
+  const visa = datum.slice(0, 6).map(d => format(d, 'd MMM yyyy', { locale: sv })).join(', ')
+  const fler = datum.length - 6
+  return (
+    <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2">
+      <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-amber-400">
+          {datum.length === 1 ? '1 datum är borttaget' : `${datum.length} datum är borttagna`}: {visa}{fler > 0 ? ` och ${fler} till` : ''}.
+        </p>
+        <button
+          type="button"
+          onClick={onTaTillbaka}
+          className="mt-1 text-xs font-semibold text-amber-300 underline hover:text-amber-200"
+        >
+          Ta tillbaka alla
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** Raden ovanför datumlistan */
+function DatumlistansHjalp({ nagotBorttaget }: { nagotBorttaget: boolean }) {
+  return (
+    <p className="text-xs text-slate-400">
+      {nagotBorttaget
+        ? 'Tryck på ett borttaget datum för att ta tillbaka det.'
+        : 'Alla datum är med. Tryck bara på ett datum som ska tas bort.'}
+    </p>
+  )
 }
 
 function formatTotalDuration(minutes: number): string {
@@ -535,6 +579,9 @@ export function RecurringScheduleWizard({
       if (isBatch) {
         // Batch mode: create schedule + sessions for each unit
         let totalSessions = 0
+        let totaltForsokta = 0
+        let totaltFel = 0
+        const felPerEnhet: string[] = []
         for (const result of batchPreviewResults) {
           const includedDates = result.dates.filter(d => {
             const dateKey = format(d.date, 'yyyy-MM-dd')
@@ -566,9 +613,20 @@ export function RecurringScheduleWizard({
           const res = await createScheduleWithSessions(input, includedDates)
           if (res.schedule) {
             totalSessions += res.sessionsCreated
+            totaltForsokta += includedDates.length
+            if (res.errors.length > 0) {
+              const datum = misslyckadeDatum(res.errors)
+              totaltFel += datum.length || res.errors.length
+              felPerEnhet.push(`${result.unit.customerName} ${datum.length > 0 ? datum.join(', ') : 'okänt datum'}`)
+            }
           } else {
             toast.error(`Misslyckades: ${result.unit.customerName}`)
           }
+        }
+
+        if (totaltFel > 0) {
+          console.error('Kontrolltillfällen som inte kunde skapas:', felPerEnhet)
+          visaMisslyckadeTillfallen(totaltFel, totaltForsokta, felPerEnhet.join('; '))
         }
 
         onComplete(totalSessions)
@@ -600,6 +658,15 @@ export function RecurringScheduleWizard({
 
         if (result.schedule) {
           toast.success(`${result.sessionsCreated} kontrolltillfällen skapade`)
+          if (result.errors.length > 0) {
+            console.error('Kontrolltillfällen som inte kunde skapas:', result.errors)
+            const datum = misslyckadeDatum(result.errors)
+            visaMisslyckadeTillfallen(
+              datum.length || result.errors.length,
+              filteredDates.length,
+              datum.length > 0 ? datum.join(', ') : result.errors.join('; ')
+            )
+          }
           onComplete(result.sessionsCreated)
           onClose()
         } else {
@@ -813,7 +880,9 @@ export function RecurringScheduleWizard({
                         </p>
                         {horizonText() && <p className="text-sm text-slate-400">{horizonText()}</p>}
                         <p className="text-xs text-slate-500">
-                          Ett nytt schema skulle dubblera kontrollerna. Behöver takten, tiden eller teknikern ändras gör du det i det befintliga schemat.
+                          {existingSchedule.technician_id && profile?.technician_id && existingSchedule.technician_id !== profile.technician_id
+                            ? `Ett nytt schema skulle dubblera kontrollerna. Schemat ligger på ${existingSchedule.technician_name ?? 'en annan tekniker'}. Ska du ta över kunden ber du en koordinator byta tekniker på schemat.`
+                            : 'Ett nytt schema skulle dubblera kontrollerna. Behöver takten eller tiden ändras gör du det i det befintliga schemat. Teknikern byts av en koordinator.'}
                         </p>
                       </div>
                     ) : isBatch && effectiveUnits.length === 0 ? (
@@ -1325,6 +1394,8 @@ export function RecurringScheduleWizard({
                           </div>
                         )}
 
+                        {groupedDates.length > 0 && <DatumlistansHjalp nagotBorttaget={batchExcludedDates.size > 0} />}
+
                         <div className="space-y-2 max-h-64 overflow-y-auto">
                           {groupedDates.map(({ dateKey, displayDate, unitSlots, hasWarnings }) => {
                             const excluded = batchExcludedDates.has(dateKey)
@@ -1374,6 +1445,11 @@ export function RecurringScheduleWizard({
                           })}
                         </div>
 
+                        <BorttagnaDatum
+                          datum={groupedDates.filter(g => batchExcludedDates.has(g.dateKey)).map(g => g.displayDate)}
+                          onTaTillbaka={() => setBatchExcludedDates(new Set())}
+                        />
+
                         {groupedDates.length === 0 && (
                           <div className="text-center py-6 text-slate-500 text-sm">
                             {startAfterHorizon && resolvedEndDate
@@ -1395,6 +1471,8 @@ export function RecurringScheduleWizard({
                             </p>
                           )}
                         </div>
+
+                        {previewDates.length > 0 && <DatumlistansHjalp nagotBorttaget={excludedIndices.size > 0} />}
 
                         <div className="space-y-1.5 max-h-64 overflow-y-auto">
                           {previewDates.map((d, i) => {
@@ -1441,6 +1519,11 @@ export function RecurringScheduleWizard({
                             )
                           })}
                         </div>
+
+                        <BorttagnaDatum
+                          datum={previewDates.filter((_, i) => excludedIndices.has(i)).map(d => d.date)}
+                          onTaTillbaka={() => setExcludedIndices(new Set())}
+                        />
 
                         {previewDates.length === 0 && (startAfterHorizon && resolvedEndDate ? (
                           <div className="text-center py-6 text-slate-400 text-sm">

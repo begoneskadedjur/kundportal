@@ -81,10 +81,7 @@ export function generateInspectionDates(params: DateGenerationParams): Generated
   const hardEnd = params.hardEndDate ?? null
 
   // Determine how many visits per period
-  const visitsPerPeriod = frequency === 'twice_monthly' ? 2
-    : (frequency === 'custom' && customFrequencyConfig?.visits_per_period)
-      ? customFrequencyConfig.visits_per_period
-      : 1
+  const visitsPerPeriod = visitsPerPeriodFor(frequency, customFrequencyConfig)
 
   const inSeason = (date: Date): boolean => {
     if (frequency !== 'custom' || customFrequencyConfig?.active_months_start == null || customFrequencyConfig?.active_months_end == null) {
@@ -98,20 +95,18 @@ export function generateInspectionDates(params: DateGenerationParams): Generated
   }
 
   for (const period of periods) {
-    // Multi-visit: dela perioden i lika delar, en kontroll per del
-    const totalDays = Math.max(1, Math.round(
-      (period.end.getTime() - period.start.getTime()) / 86400000
-    ))
-    const segmentDays = visitsPerPeriod > 1 ? Math.floor(totalDays / visitsPerPeriod) : totalDays
+    for (const seg of periodSegments(period, visitsPerPeriod)) {
+      let segStart = seg.start
+      let segEnd = seg.end
 
-    for (let v = 0; v < visitsPerPeriod; v++) {
-      const segStart = addDays(period.start, v * segmentDays)
-      let segEnd = v < visitsPerPeriod - 1
-        ? subDays(addDays(period.start, (v + 1) * segmentDays), 1)
-        : period.end
-
-      // Delen hör till ett tidigare eller senare fönster
-      if (segStart < startDate || segStart >= endDate) continue
+      // Delen hör till ett senare fönster
+      if (segStart >= endDate) continue
+      // Delen har redan börjat: hör till ett tidigare fönster, utom när den
+      // pågående delen uttryckligen ska tas med (sök då från fönstrets start)
+      if (segStart < startDate) {
+        if (!params.includeCurrentPeriod || startDate > segEnd) continue
+        segStart = startDate
+      }
       // Season filter (custom frequency only)
       if (!inSeason(segStart)) continue
       // Uppsagt avtal: inget efter sista giltiga dag
@@ -138,6 +133,53 @@ export function generateInspectionDates(params: DateGenerationParams): Generated
 interface Period {
   start: Date
   end: Date
+}
+
+function visitsPerPeriodFor(frequency: RecurringFrequency, customFrequencyConfig?: CustomFrequencyConfig): number {
+  if (frequency === 'twice_monthly') return 2
+  if (frequency === 'custom' && customFrequencyConfig?.visits_per_period) return customFrequencyConfig.visits_per_period
+  return 1
+}
+
+/** Multi-visit: perioden delas i lika delar, en kontroll per del */
+function periodSegments(period: Period, visitsPerPeriod: number): Period[] {
+  const totalDays = Math.max(1, Math.round(
+    (period.end.getTime() - period.start.getTime()) / 86400000
+  ))
+  const segmentDays = visitsPerPeriod > 1 ? Math.floor(totalDays / visitsPerPeriod) : totalDays
+  const segments: Period[] = []
+  for (let v = 0; v < visitsPerPeriod; v++) {
+    segments.push({
+      start: addDays(period.start, v * segmentDays),
+      end: v < visitsPerPeriod - 1
+        ? subDays(addDays(period.start, (v + 1) * segmentDays), 1)
+        : period.end
+    })
+  }
+  return segments
+}
+
+/**
+ * Den del av schemats period (räknad från periodAnchor) som pågår på `date`,
+ * eller null om schemat inte har börjat. För frekvenser med flera besök per
+ * period är det delen, inte hela perioden. Slutet är delens sista dag.
+ */
+export function currentPeriodSegment(
+  frequency: RecurringFrequency,
+  periodAnchor: Date,
+  date: Date,
+  customFrequencyConfig?: CustomFrequencyConfig
+): { start: Date; end: Date } | null {
+  if (date < periodAnchor) return null
+  // Perioderna fram till och med den som innehåller date (längsta perioden är ett år)
+  const periods = calculatePeriods(frequency, periodAnchor, addDays(date, 1), customFrequencyConfig)
+  const visits = visitsPerPeriodFor(frequency, customFrequencyConfig)
+  for (const period of periods) {
+    for (const seg of periodSegments(period, visits)) {
+      if (seg.start <= date && date < addDays(seg.end, 1)) return seg
+    }
+  }
+  return null
 }
 
 function calculatePeriods(

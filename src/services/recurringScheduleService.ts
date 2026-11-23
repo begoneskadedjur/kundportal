@@ -21,10 +21,22 @@ import { PaymentBlockService } from './paymentBlockService'
 import { resolveContractForCustomer } from './contractResolver'
 import { ContractScopeService } from './contractScopeService'
 import { scheduleHorizon, type HorizonContract, type ScheduleHorizon } from '../shared/scheduleHorizon'
+import { svenskDag } from './teknikerDagService'
 
 // ============================================
 // HELPERS
 // ============================================
+
+/**
+ * Datumen (ÅÅÅÅ-MM-DD) för de kontrolltillfällen som inte kunde skapas.
+ * createScheduleWithSessions och rescheduleExistingSessions lägger datumet
+ * först i varje sådan felsträng.
+ */
+export function misslyckadeDatum(errors: string[]): string[] {
+  return errors
+    .map(e => /^(\d{4}-\d{2}-\d{2}):/.exec(e)?.[1])
+    .filter((d): d is string => !!d)
+}
 
 /**
  * Löser upp avtalsslutdatum för en kund, med arv från huvudkontoret.
@@ -175,12 +187,13 @@ export async function findActiveScheduleForCustomer(
   custom_frequency_config: CustomFrequencyConfig | null
   generated_until: string | null
   contract_id: string | null
+  technician_id: string | null
   technician_name: string | null
   next_session: string | null
 } | null> {
   const { data, error } = await supabase
     .from('recurring_schedules')
-    .select('id, frequency, custom_frequency_config, generated_until, contract_id, technician:technicians(name)')
+    .select('id, frequency, custom_frequency_config, generated_until, contract_id, technician_id, technician:technicians(name)')
     .eq('customer_id', customerId)
     .eq('status', 'active')
   if (error || !data || data.length === 0) return null
@@ -206,6 +219,7 @@ export async function findActiveScheduleForCustomer(
     custom_frequency_config: (match.custom_frequency_config ?? null) as CustomFrequencyConfig | null,
     generated_until: match.generated_until ?? null,
     contract_id: match.contract_id ?? null,
+    technician_id: match.technician_id ?? null,
     technician_name: (Array.isArray(tech) ? tech[0]?.name : tech?.name) ?? null,
     next_session: next?.scheduled_at ?? null,
   }
@@ -906,11 +920,11 @@ export async function createScheduleWithSessions(
       if (result.success) {
         sessionsCreated++
       } else if (result.error) {
-        errors.push(result.error)
+        errors.push(`${svenskDag(d.date)}: ${result.error}`)
       }
     } catch (err) {
       console.error('Error in createScheduleWithSessions loop:', err)
-      errors.push(`Oväntat fel: ${err instanceof Error ? err.message : String(err)}`)
+      errors.push(`${svenskDag(d.date)}: Oväntat fel: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -921,6 +935,59 @@ export async function createScheduleWithSessions(
 // RESCHEDULE EXISTING SESSIONS
 // ============================================
 
+/** PostgREST hittar inte funktionen (PGRST202) eller Postgres saknar den (42883). */
+function isMissingFunction(error: { code?: string; message?: string }): boolean {
+  return error.code === 'PGRST202' || error.code === '42883' || /could not find the function/i.test(error.message ?? '')
+}
+
+/**
+ * Reserv när rensa_schemats_framtida_besok saknas i databasen: samma radering
+ * som före 3.132.11, direkt från klienten. Ärenden på en kollega kan bli kvar
+ * (RLS), vilket serverfunktionen löser när den finns.
+ */
+async function clearFutureSessionsFromClient(
+  scheduleId: string
+): Promise<{ deleted: number; fatal?: string; warning?: string }> {
+  const { data: futureSessions, error: fetchError } = await supabase
+    .from('station_inspection_sessions')
+    .select('id, case_id')
+    .eq('recurring_schedule_id', scheduleId)
+    .eq('status', 'scheduled')
+    .gt('scheduled_at', new Date().toISOString())
+  if (fetchError) {
+    console.error('Error fetching future sessions:', fetchError)
+    return { deleted: 0, fatal: `Kunde inte hämta kommande besök: ${fetchError.message}` }
+  }
+
+  const sessionIds = (futureSessions || []).map(s => s.id)
+  const caseIds = (futureSessions || []).map(s => s.case_id).filter((id): id is string => !!id)
+
+  if (sessionIds.length > 0) {
+    const { error: delSessionErr } = await supabase
+      .from('station_inspection_sessions')
+      .delete()
+      .in('id', sessionIds)
+    if (delSessionErr) {
+      console.error('Error deleting sessions:', delSessionErr)
+      return { deleted: 0, fatal: `Kunde inte ta bort kommande besök: ${delSessionErr.message}` }
+    }
+  }
+
+  if (caseIds.length > 0) {
+    const { error: delCaseErr } = await supabase
+      .from('cases')
+      .delete()
+      .in('id', caseIds)
+      .neq('status', 'Avslutat')
+    if (delCaseErr) {
+      console.error('Error deleting cases:', delCaseErr)
+      return { deleted: sessionIds.length, warning: `Besöken togs bort men ärendena kunde inte tas bort: ${delCaseErr.message}` }
+    }
+  }
+
+  return { deleted: sessionIds.length }
+}
+
 /**
  * Delete all future scheduled sessions (and their cases), update the schedule,
  * and create new sessions + cases with the updated settings.
@@ -928,53 +995,32 @@ export async function createScheduleWithSessions(
 export async function rescheduleExistingSessions(
   scheduleId: string,
   updates: UpdateRecurringScheduleInput,
-  generatedDates: GeneratedInspectionDate[]
+  generatedDates: GeneratedInspectionDate[],
+  /** Schemahorisontens slut (ÅÅÅÅ-MM-DD). Satt: blir generated_until, så cron-jobbet fortsätter därifrån. */
+  generatedUntil?: string | null
 ): Promise<{ deleted: number; created: number; errors: string[] }> {
   const errors: string[] = []
 
-  // 1. Fetch future sessions with case_id
-  const { data: futureSessions, error: fetchError } = await supabase
-    .from('station_inspection_sessions')
-    .select('id, case_id')
-    .eq('recurring_schedule_id', scheduleId)
-    .eq('status', 'scheduled')
-    .gt('scheduled_at', new Date().toISOString())
+  // 1–3. Radera framtida sessioner + deras ärenden i ett svep på servern.
+  // Klientradering föll tyst bort för ärenden på en kollega (RLS), så ärendena blev kvar utan session.
+  const { data: cleared, error: clearError } = await supabase
+    .rpc('rensa_schemats_framtida_besok', { p_schedule_id: scheduleId })
 
-  if (fetchError) {
-    console.error('Error fetching future sessions:', fetchError)
-    return { deleted: 0, created: 0, errors: [`Kunde inte hämta sessioner: ${fetchError.message}`] }
+  let deleted: number
+  if (clearError && isMissingFunction(clearError)) {
+    // Funktionen finns inte i databasen än (migration 20261116 ej körd):
+    // radera från klienten som tidigare, så att Ändra schema fungerar ändå.
+    console.warn('rensa_schemats_framtida_besok saknas, raderar från klienten:', clearError.message)
+    const fallback = await clearFutureSessionsFromClient(scheduleId)
+    if (fallback.fatal) return { deleted: 0, created: 0, errors: [fallback.fatal] }
+    if (fallback.warning) errors.push(fallback.warning)
+    deleted = fallback.deleted
+  } else if (clearError) {
+    console.error('Error clearing future sessions:', clearError)
+    return { deleted: 0, created: 0, errors: [`Kunde inte ta bort kommande besök: ${clearError.message}`] }
+  } else {
+    deleted = (Array.isArray(cleared) ? cleared[0]?.deleted_sessions : 0) ?? 0
   }
-
-  const sessionIds = (futureSessions || []).map(s => s.id)
-  const caseIds = (futureSessions || []).filter(s => s.case_id).map(s => s.case_id)
-
-  // 2. DELETE sessions
-  if (sessionIds.length > 0) {
-    const { error: delSessionErr } = await supabase
-      .from('station_inspection_sessions')
-      .delete()
-      .in('id', sessionIds)
-
-    if (delSessionErr) {
-      console.error('Error deleting sessions:', delSessionErr)
-      return { deleted: 0, created: 0, errors: [`Kunde inte radera sessioner: ${delSessionErr.message}`] }
-    }
-  }
-
-  // 3. DELETE linked cases
-  if (caseIds.length > 0) {
-    const { error: delCaseErr } = await supabase
-      .from('cases')
-      .delete()
-      .in('id', caseIds)
-
-    if (delCaseErr) {
-      console.error('Error deleting cases:', delCaseErr)
-      errors.push(`Sessioner raderade men ärenden kunde inte tas bort: ${delCaseErr.message}`)
-    }
-  }
-
-  const deleted = sessionIds.length
 
   // 4. Update the schedule
   const updatedSchedule = await updateRecurringSchedule(scheduleId, updates)
@@ -996,22 +1042,23 @@ export async function rescheduleExistingSessions(
       if (result.success) {
         created++
       } else if (result.error) {
-        errors.push(result.error)
+        errors.push(`${svenskDag(d.date)}: ${result.error}`)
       }
     } catch (err) {
       console.error('Error in rescheduleExistingSessions loop:', err)
-      errors.push(`Oväntat fel: ${err instanceof Error ? err.message : String(err)}`)
+      errors.push(`${svenskDag(d.date)}: Oväntat fel: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
-  // 6. Update generated_until
+  // 6. Update generated_until: horisontens slut när den finns (som
+  // createRecurringSchedule), annars sista genererade datumet
   const latestDate = generatedDates.length > 0
     ? generatedDates[generatedDates.length - 1].date
     : new Date()
   await supabase
     .from('recurring_schedules')
     .update({
-      generated_until: format(latestDate, 'yyyy-MM-dd'),
+      generated_until: generatedUntil ? generatedUntil.slice(0, 10) : format(latestDate, 'yyyy-MM-dd'),
       last_generated_at: new Date().toISOString()
     })
     .eq('id', scheduleId)

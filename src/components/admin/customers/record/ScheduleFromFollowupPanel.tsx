@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'react-hot-toast'
 import { supabase } from '../../../../lib/supabase'
-import { createScheduleWithSessions, previewScheduleDates } from '../../../../services/recurringScheduleService'
+import { createScheduleWithSessions, misslyckadeDatum, previewScheduleDates } from '../../../../services/recurringScheduleService'
 import type { RecurringFrequency, GeneratedInspectionDate } from '../../../../types/recurringSchedule'
 import { VISIT_FREQUENCY_LABEL, formatDateSv, type RecordContract } from '../../../../hooks/useCustomerRecord'
 import { PANEL_INPUT_CLASS } from './paperInk'
@@ -99,6 +99,7 @@ export default function ScheduleFromFollowupPanel({
       const skip = await alreadyScheduled()
       const targets = needing.filter((u) => !skip.has(u.unitId))
       let created = 0
+      let forsokta = 0
       const errors: string[] = []
       for (const u of targets) {
         const res = await createScheduleWithSessions(
@@ -116,11 +117,25 @@ export default function ScheduleFromFollowupPanel({
           },
           preview.dates
         )
-        if (res.schedule) created += 1
+        if (res.schedule) {
+          created += 1
+          forsokta += preview.dates.length
+        }
         errors.push(...res.errors)
       }
-      toast.success(`Schema skapat för ${created} enhet${created === 1 ? '' : 'er'} · ${created * preview.dates.length} besök`)
-      if (errors.length > 0) toast.error(`${errors.length} fel vid skapandet, se konsolen`)
+      // Felen bär datumet först; tillfällen som inte skapades ska synas
+      const felDatum = misslyckadeDatum(errors)
+      const besok = forsokta - felDatum.length
+      toast.success(`Schema skapat för ${created} enhet${created === 1 ? '' : 'er'} · ${besok} besök`)
+      if (felDatum.length > 0) {
+        const unika = Array.from(new Set(felDatum)).sort()
+        toast.error(
+          `${felDatum.length} av ${forsokta} kontrolltillfällen kunde inte skapas: ${unika.join(', ')}. Lägg in dem för hand eller kontakta kontoret.`,
+          { duration: 20000 }
+        )
+      } else if (errors.length > 0) {
+        toast.error(errors.join('; '), { duration: 20000 })
+      }
       if (errors.length > 0) console.warn('[Schema ur § 3]', errors)
       setPreview(null)
       setOpen(false)

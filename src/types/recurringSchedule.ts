@@ -303,6 +303,13 @@ export interface DateGenerationParams {
   periodAnchor?: Date
   /** Uppsagt avtal: sista giltiga dag är dagen före. Inget läggs ut därefter. */
   hardEndDate?: Date | null
+  /**
+   * Ta med den del av perioden som redan börjat (segStart < startDate <= segEnd)
+   * och sök då ett datum i [startDate, delens slut]. Utelämnad = sådana delar
+   * hoppas över (guiden och cron-jobbet). Används av Ändra schema när det
+   * pågående periodens kommande besök raderas och måste läggas ut igen.
+   */
+  includeCurrentPeriod?: boolean
   technicianWorkSchedule?: WorkSchedule | null
   technicianAbsences?: { start_date: string; end_date: string }[]
   existingBookings?: { start: Date; end: Date; title?: string }[]

@@ -369,6 +369,7 @@ export default function NyUtrustning() {
                     typerPerKund={typerPerKund}
                     kontrollPerKund={kontroll.perKund}
                     medSchema={kontroll.medSchema}
+                    technicianId={technicianId}
                     sok={sok}
                     onSok={setSok}
                     sortering={sortering}

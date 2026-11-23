@@ -45,12 +45,33 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.13',
+    date: '2026-11-23',
+    title: 'Rätt kontrolldatum och säkrare schemaändringar',
+    items: [
+      { kind: 'buggfix', text: 'Senaste kontroll på Stationer visar nu den senast avslutade kontrollen hos kunden. Tidigare visades dagen då en station senast placerades.' },
+      { kind: 'buggfix', text: 'Nästa kontroll visar datumet även när din nästa kontroll ligger mer än ett år fram. Finns ett schema utan utlagda kontroller står det inga kontroller utlagda än.' },
+      { kind: 'andring', text: 'Guiden Nytt schema säger att alla datum är med och visar vilka datum du tagit bort, med en knapp för att ta tillbaka alla. Kunde ett kontrolltillfälle inte skapas visas vilka datum det gäller.' },
+      { kind: 'buggfix', text: 'Ändra schema lägger ut kontroller för hela avtalsperioden och behåller schemats rytm. Tidigare blev schemat bara 14 månader och perioderna räknades från dagens datum.' },
+    ],
+  },
+  {
     version: '3.132.12',
     date: '2026-11-20',
     title: 'Offerter till privatpersoner visar priset inkl. moms',
     items: [
       { kind: 'buggfix', text: 'En offert på mallen Inkl moms (Privatperson) visar nu priserna inkl. moms i Oneflow. Tidigare stod priset exkl. moms under rubriken inkl. moms, så priset blev 20 % för lågt. Priset behöver inte längre rättas för hand i Oneflow.' },
       { kind: 'andring', text: 'Sidokortet i guiden visar både summan exkl. moms och det kunden ser inkl. moms.' },
+    ],
+  },
+  {
+    version: '3.132.11',
+    date: '2026-11-18',
+    title: 'Tydligt vems schemat är',
+    items: [
+      { kind: 'andring', text: 'Ett kontrollschema som ligger på en kollega går inte längre att ändra. Rutan säger vems schemat är och att en koordinator byter tekniker.' },
+      { kind: 'andring', text: 'När kunden redan har ett schema visar guiden Nytt schema vem det ligger på och att en koordinator byter tekniker.' },
+      { kind: 'buggfix', text: 'När ett schema ändras tas de gamla kommande besöken bort helt, även de som låg på en kollega. Tidigare kunde ett bokat ärende bli kvar utan kontroll.' },
     ],
   },
   {
