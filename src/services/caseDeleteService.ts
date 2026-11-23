@@ -69,8 +69,9 @@ export interface SkickadFaktura {
 type FakturaRad = { invoice_number: string | null; status: string; fortnox_document_number: string | null };
 
 function forstaSkickade(rader: FakturaRad[] | null): SkickadFaktura | null {
+  // En makulerad faktura räknas inte som skickad, även om den har ett Fortnox-nummer
   const rad = (rader || []).find(
-    r => !!r.fortnox_document_number || SKICKADE_FAKTURASTATUSAR.includes(r.status)
+    r => r.status !== 'cancelled' && (!!r.fortnox_document_number || SKICKADE_FAKTURASTATUSAR.includes(r.status))
   );
   return rad ? { nummer: rad.invoice_number || rad.fortnox_document_number || null, status: rad.status } : null;
 }
