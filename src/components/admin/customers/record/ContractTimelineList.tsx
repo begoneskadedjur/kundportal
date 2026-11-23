@@ -231,6 +231,8 @@ export function buildInspectionEvents(
   tag?: string
 ): RecordTimelineEvent[] {
   return sessions
+    // Inställda besök (t.ex. borttaget ärende) visas inte som bokade
+    .filter((s) => s.status !== 'cancelled')
     .filter((s) => s.completed_at || s.scheduled_at)
     .map((s) => {
       const done = !!s.completed_at

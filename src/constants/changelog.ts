@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.16',
+    date: '2026-11-23',
+    title: 'Borttagna ärenden lämnar ingen provision eller kontroll kvar',
+    items: [
+      { kind: 'buggfix', text: 'När ett ärende tas bort försvinner provisionen som väntade på faktura. Provision på fakturerade ärenden påverkas inte, de ärendena går inte att ta bort.' },
+      { kind: 'buggfix', text: 'När ett kontrollärende tas bort ställs dess kontrollbesök in och syns inte längre som bokat eller försenat hos kunden eller i Stationer. Kundens schema och övriga besök ligger kvar.' },
+    ],
+  },
+  {
     version: '3.132.15',
     date: '2026-11-23',
     title: 'Kontroller och etableringar avslutas bara den riktiga vägen',

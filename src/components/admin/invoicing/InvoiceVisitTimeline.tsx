@@ -77,6 +77,8 @@ export default function InvoiceVisitTimeline({ customerId, periodStart, periodEn
           .from('station_inspection_sessions')
           .select('id, case_id, scheduled_at, completed_at, status')
           .eq('customer_id', customerId)
+          // Inställda besök (t.ex. borttaget ärende) är inga besök
+          .neq('status', 'cancelled')
           .gte('scheduled_at', start)
           .lte('scheduled_at', `${end}T23:59:59`),
         supabase
@@ -84,6 +86,7 @@ export default function InvoiceVisitTimeline({ customerId, periodStart, periodEn
           .select('id, title, status, scheduled_start, completed_date')
           .eq('customer_id', customerId)
           .not('scheduled_start', 'is', null)
+          .neq('status', 'Borttaget')
           .gte('scheduled_start', start)
           .lte('scheduled_start', `${end}T23:59:59`),
       ])
