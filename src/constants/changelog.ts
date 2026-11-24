@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.22',
+    date: '2026-11-24',
+    title: 'Avloppsfällor som egna stationstyper',
+    items: [
+      { kind: 'nyhet', text: 'Två nya stationstyper finns att välja när du placerar en station: Avloppsfälla Trap-X och Avloppsfälla RAT-EXX. För RAT-EXX väljer du dimension som produkt (110, 160, 200, 250 eller 315).' },
+      { kind: 'nyhet', text: 'En avloppsfälla som tidigare lagts upp som Mekanisk fälla byter du till rätt typ med Byt typ i stationsarket.' },
+      { kind: 'buggfix', text: 'Kunden ser stationstypens namn på utplacerade stationer i sitt ärende, också för nyare typer som tidigare visades med en intern kod.' },
+    ],
+  },
+  {
     version: '3.132.21',
     date: '2026-11-24',
     title: 'Tydligare text om Boka återbesök',

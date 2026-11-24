@@ -563,12 +563,25 @@ export default function CaseDetailsModal({
         // Utomhusstationer
         let outdoorQuery = supabase
           .from('equipment_placements')
-          .select('id, equipment_type, placed_at, comment, serial_number, photo_path')
+          .select('id, equipment_type, placed_at, comment, serial_number, photo_path, station_type_data:station_types(name)')
           .eq('customer_id', fallbackData.customer_id)
           .eq('status', 'active')
           .gte('placed_at', caseCreatedAt)
         if (upperBound) outdoorQuery = outdoorQuery.lt('placed_at', upperBound)
-        const { data: outdoorStations } = await outdoorQuery.order('placed_at', { ascending: true })
+        const { data: outdoorRaw } = await outdoorQuery.order('placed_at', { ascending: true })
+
+        // Kunden ska se stationstypens namn, aldrig den interna koden
+        // (avloppsfalla_ratexx). Koden är reserv för äldre rader utan typ.
+        type TypNamn = { name?: string | null } | { name?: string | null }[] | null | undefined
+        const typNamn = (t: TypNamn): string | null => (Array.isArray(t) ? t[0]?.name : t?.name) ?? null
+        const outdoorStations = (outdoorRaw ?? []).map(s => ({
+          id: s.id,
+          equipment_type: typNamn(s.station_type_data as TypNamn) ?? s.equipment_type,
+          placed_at: s.placed_at,
+          comment: s.comment,
+          serial_number: s.serial_number,
+          photo_path: s.photo_path,
+        }))
 
         // Inomhusstationer via floor_plans
         const { data: floorPlans } = await supabase
@@ -582,7 +595,7 @@ export default function CaseDetailsModal({
         if (floorPlanIds.length > 0) {
           let indoorQuery = supabase
             .from('indoor_stations')
-            .select('id, station_type, placed_at, comment, photo_path')
+            .select('id, station_type, placed_at, comment, photo_path, station_type_data:station_types(name)')
             .in('floor_plan_id', floorPlanIds)
             .eq('status', 'active')
             .gte('placed_at', caseCreatedAt)
@@ -590,7 +603,7 @@ export default function CaseDetailsModal({
           const { data: indoor } = await indoorQuery.order('placed_at', { ascending: true })
           indoorStations = (indoor ?? []).map(s => ({
             id: s.id,
-            equipment_type: s.station_type,
+            equipment_type: typNamn(s.station_type_data as TypNamn) ?? s.station_type,
             placed_at: s.placed_at,
             comment: s.comment,
             serial_number: null,
@@ -599,7 +612,7 @@ export default function CaseDetailsModal({
           }))
         }
 
-        const allStations: StationRow[] = [...(outdoorStations ?? []), ...indoorStations]
+        const allStations: StationRow[] = [...outdoorStations, ...indoorStations]
           .sort((a, b) => new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime())
 
         if (allStations.length > 0) {

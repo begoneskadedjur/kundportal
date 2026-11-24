@@ -93,6 +93,9 @@ function typkod(ord: string): string | null {
   if (o.includes('betes') || o.includes('betad') || o.includes('betestation') || o.includes('betesl')) return 'betesstation'
   if (o.includes('plåt')) return 'platstation'
   if (o.includes('ljus')) return 'ljusfalla'
+  // Avloppsfällor är egna typer sedan 2026-11-24. "Avloppsfälla" utan märke går inte att avgöra.
+  if (o.includes('trap-x') || o.includes('trapx') || o.includes('trap x')) return 'avloppsfalla_trapx'
+  if (o.includes('rat-exx') || o.includes('ratexx') || o.includes('råttstopp')) return 'avloppsfalla_ratexx'
   if (o.includes('mekanisk') || o.includes('aurotrap') || o.includes('slagfäll') || o.includes('råttfäll')) return 'mekanisk_falla'
   return null
 }
