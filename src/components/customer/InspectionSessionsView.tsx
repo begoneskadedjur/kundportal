@@ -75,12 +75,16 @@ import { normalizeInspectionLevel } from '../../shared/inspectionStatusLevels'
  * innan stationen hämtades upp. Saknas tidpunkten för upphämtningen krävs en kontroll.
  */
 function stationBelongsToSession(
-  station: { status?: string | null; status_updated_at?: string | null },
+  station: { status?: string | null; status_updated_at?: string | null; placed_at?: string | null },
   inspectedInSession: boolean,
   sessionCompletedAt: string | null | undefined
 ): boolean {
-  if (station.status !== 'removed') return true
   if (inspectedInSession) return true
+  // En station som placerades efter kontrollen fanns inte då, och ska inte
+  // stå som okontrollerad i en äldre kontroll
+  if (station.placed_at && sessionCompletedAt
+    && new Date(station.placed_at).getTime() > new Date(sessionCompletedAt).getTime()) return false
+  if (station.status !== 'removed') return true
   if (!station.status_updated_at || !sessionCompletedAt) return false
   return new Date(sessionCompletedAt).getTime() < new Date(station.status_updated_at).getTime()
 }

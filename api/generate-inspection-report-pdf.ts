@@ -41,7 +41,9 @@ const beGoneColors = {
 
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return '-'
+  // Servern kör UTC: utan timeZone blev datum och klockslag en eller två timmar fel
   return new Date(dateStr).toLocaleDateString('sv-SE', {
+    timeZone: 'Europe/Stockholm',
     year: 'numeric', month: 'long', day: 'numeric'
   })
 }
@@ -49,6 +51,7 @@ const formatDate = (dateStr: string | null) => {
 const formatDateTime = (dateStr: string | null) => {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleDateString('sv-SE', {
+    timeZone: 'Europe/Stockholm',
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
   })
 }

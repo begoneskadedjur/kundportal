@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.25',
+    date: '2026-11-25',
+    title: 'Äldre kontroller visar bara stationer som fanns då',
+    items: [
+      { kind: 'buggfix', text: 'En äldre kontroll i Genomförda kontroller listar inte längre stationer som placerades efter kontrollen. Tidigare stod de som Ej kontrollerad.' },
+      { kind: 'buggfix', text: 'Kontrollrapporten visar klockslagen i svensk tid. Tidigare låg de en eller två timmar fel.' },
+    ],
+  },
+  {
     version: '3.132.24',
     date: '2026-11-25',
     title: 'Samma statusord överallt och upphämtade stationer',
