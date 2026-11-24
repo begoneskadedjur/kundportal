@@ -94,32 +94,32 @@ export const INSPECTION_STATUS_CONFIG: Record<InspectionStatus, {
     icon: '✓'
   },
   low: {
-    label: 'Lite aktivitet',
+    label: 'Låg aktivitet',
     color: 'yellow-500',
     bgColor: 'bg-yellow-500/20',
     icon: '↑'
   },
   medium: {
-    label: 'Medelhög aktivitet',
+    label: 'Måttlig aktivitet',
     color: 'orange-500',
     bgColor: 'bg-orange-500/20',
     icon: '!'
   },
   high: {
-    label: 'Betydande aktivitet',
+    label: 'Hög aktivitet',
     color: 'red-500',
     bgColor: 'bg-red-500/20',
     icon: '!!'
   },
   // Legacy-statusar (bakåtkompatibilitet)
   ok: {
-    label: 'OK - Inga fynd',
+    label: 'Ingen aktivitet',
     color: 'green-500',
     bgColor: 'bg-green-500/20',
     icon: '✓'
   },
   activity: {
-    label: 'Aktivitet upptäckt',
+    label: 'Måttlig aktivitet',
     color: 'amber-500',
     bgColor: 'bg-amber-500/20',
     icon: '!'

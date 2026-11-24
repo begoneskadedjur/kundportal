@@ -164,7 +164,8 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   const typeStats = useMemo(() => {
     const stats = new Map<string, { label: string; color: string; icon: string | null; count: number }>()
 
-    equipment.forEach(item => {
+    // Upphämtade stationer räknas inte (de ligger kvar sist i tabellen)
+    equipment.filter(item => item.status !== 'removed').forEach(item => {
       const typeName = item.station_type_data?.name || item.equipment_type || 'Okänd'
       const typeColor = item.station_type_data?.color || '#6b7280'
 
@@ -178,10 +179,13 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
     return stats
   }, [equipment])
 
-  // Total inomhusstationer
+  // Total inomhusstationer (bara aktiva, upphämtade räknas inte)
   const totalIndoorStations = useMemo(() => {
-    return Object.values(indoorStationsByPlan).reduce((sum, stations) => sum + stations.length, 0)
+    return Object.values(indoorStationsByPlan).reduce((sum, stations) => sum + stations.filter(s => s.status !== 'removed').length, 0)
   }, [indoorStationsByPlan])
+
+  // Antal aktiva utomhusstationer (upphämtade räknas inte)
+  const activeOutdoorCount = useMemo(() => equipment.filter(e => e.status !== 'removed').length, [equipment])
 
   // Unika utomhustyper för filter-dropdown
   const outdoorTypes = useMemo(() => {
@@ -337,11 +341,11 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 bg-slate-800/50 border border-slate-700 rounded-xl divide-y divide-slate-700 sm:divide-y-0 sm:divide-x divide-slate-700">
           <div className="px-5 py-3">
             <p className="text-xs text-slate-500 mb-1">Totalt</p>
-            <p className="text-2xl font-semibold text-white">{equipment.length + totalIndoorStations}</p>
+            <p className="text-2xl font-semibold text-white">{activeOutdoorCount + totalIndoorStations}</p>
           </div>
           <div className="px-5 py-3">
             <p className="text-xs text-slate-500 mb-1">Utomhus</p>
-            <p className="text-2xl font-semibold text-white">{equipment.length}</p>
+            <p className="text-2xl font-semibold text-white">{activeOutdoorCount}</p>
           </div>
           <div className="px-5 py-3">
             <p className="text-xs text-slate-500 mb-1">Inomhus</p>
@@ -360,7 +364,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-emerald-400" />
                 Utomhus
-                <span className="text-sm font-normal text-slate-400">({equipment.length} stationer)</span>
+                <span className="text-sm font-normal text-slate-400">({activeOutdoorCount} stationer)</span>
               </h2>
             </div>
 
@@ -491,7 +495,9 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                             </td>
                             <td className="px-4 py-2">
                               <span className={`px-2 py-0.5 rounded text-xs ${statusConfig.bgColor}`} style={{ color: statusConfig.color }}>
-                                {getEquipmentStatusLabel(item.status)}
+                                {item.status === 'removed'
+                                  ? `Upphämtad${item.status_updated_at ? ` ${formatDate(item.status_updated_at)}` : ''}`
+                                  : getEquipmentStatusLabel(item.status)}
                               </span>
                             </td>
                             <td className="px-4 py-2 text-slate-400 text-sm">{formatDate(item.placed_at)}</td>
@@ -542,7 +548,9 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
 
           // Räkna stationstyper för denna planritning
           const planTypeStats = new Map<string, { label: string; color: string; count: number }>()
-          stations.forEach(station => {
+          // Antal och typräkning gäller bara aktiva stationer
+          const activeStations = stations.filter(s => s.status !== 'removed')
+          activeStations.forEach(station => {
             const typeName = station.station_type_data?.name || station.station_type || 'Okänd'
             const typeColor = station.station_type_data?.color || '#6b7280'
             if (planTypeStats.has(typeName)) {
@@ -560,7 +568,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                   <h2 className="text-lg font-semibold text-white">
                     {plan.building_name ? `${plan.building_name} - ` : ''}{plan.name}
                   </h2>
-                  <span className="text-sm text-slate-400">({stations.length} stationer)</span>
+                  <span className="text-sm text-slate-400">({activeStations.length} stationer)</span>
                 </div>
                 {/* Typräkning för planritningen */}
                 <div className="flex items-center gap-3">
@@ -636,7 +644,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                         <option value="active">Aktiv</option>
                         <option value="inactive">Inaktiv</option>
                         <option value="needs_service">Behöver service</option>
-                        <option value="removed">Borttagen</option>
+                        <option value="removed">Upphämtad</option>
                       </select>
                     </div>
 
@@ -664,7 +672,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                                   active: { bgColor: 'bg-emerald-500/10', color: '#10b981', label: 'Aktiv' },
                                   inactive: { bgColor: 'bg-slate-500/20', color: '#6b7280', label: 'Inaktiv' },
                                   needs_service: { bgColor: 'bg-amber-500/10', color: '#f59e0b', label: 'Service' },
-                                  removed: { bgColor: 'bg-red-500/10', color: '#ef4444', label: 'Borttagen' }
+                                  removed: { bgColor: 'bg-red-500/10', color: '#ef4444', label: `Upphämtad${station.status_updated_at ? ` ${formatDate(station.status_updated_at)}` : ''}` }
                                 }[station.status] || { bgColor: 'bg-slate-500/20', color: '#6b7280', label: station.status }
                                 return (
                                   <tr key={station.id} className="hover:bg-slate-700/20 transition-colors cursor-pointer" onClick={() => handleIndoorStationClick(station)}>

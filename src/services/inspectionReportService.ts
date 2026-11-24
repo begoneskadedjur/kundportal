@@ -15,6 +15,8 @@ import type { OutdoorInspectionWithRelations } from '../types/inspectionSession'
 import type { IndoorStationInspectionWithRelations } from '../types/indoor'
 import { INSPECTION_STATUS_CONFIG } from '../types/indoor'
 import type { InspectionStatus } from '../types/indoor'
+import { inspectionStatusLabel, loadInspectionStatusLabels } from '../hooks/useInspectionStatusLabels'
+import { countInspectionLevels, normalizeInspectionLevel } from '../shared/inspectionStatusLevels'
 
 // ============================================
 // TYPES
@@ -62,18 +64,11 @@ function formatDateTime(dateStr: string | null): string {
   })
 }
 
+// Ordet kommer från inspection_status_labels (läses in innan exporten byggs),
+// med samma reservord som övriga vyer. ok visas som none-nivåns ord.
 function getStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    none: 'Ingen aktivitet',
-    low: 'Lite aktivitet',
-    medium: 'Medelhög aktivitet',
-    high: 'Betydande aktivitet',
-    ok: 'Ingen aktivitet',
-    activity: 'Aktivitet',
-    needs_service: 'Behöver service',
-    replaced: 'Utbytt',
-  }
-  return labels[status] || INSPECTION_STATUS_CONFIG[status as InspectionStatus]?.label || status || '-'
+  if (!status) return '-'
+  return inspectionStatusLabel(status) || INSPECTION_STATUS_CONFIG[status as InspectionStatus]?.label || status
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -201,16 +196,16 @@ const STATUS_ERROR = 'EF4444'
 const STATUS_REPLACED = '3B82F6'
 const ROW_ALT = 'F8FAFC'
 
+// Färgen väljs på status, inte på ordet, så att den inte beror på vad
+// nivåerna heter under Inspektionsstatus.
 function statusFill(status: string): string {
-  switch (status) {
-    case 'Ingen aktivitet':
-    case 'OK': return STATUS_OK
-    case 'Lite aktivitet': return '86EFAC'
-    case 'Medelhög aktivitet':
-    case 'Aktivitet': return STATUS_WARNING
-    case 'Betydande aktivitet':
-    case 'Behöver service': return STATUS_ERROR
-    case 'Utbytt': return STATUS_REPLACED
+  switch (normalizeInspectionLevel(status) ?? status) {
+    case 'none': return STATUS_OK
+    case 'low': return '86EFAC'
+    case 'medium': return STATUS_WARNING
+    case 'high':
+    case 'needs_service': return STATUS_ERROR
+    case 'replaced': return STATUS_REPLACED
     default: return TEXT_MUTED
   }
 }
@@ -249,7 +244,8 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
   ])
   if (!data) throw new Error('Kunde inte hämta sessionsdata')
 
-  const { session, outdoorInspections, indoorInspections, summary } = data
+  const { session, outdoorInspections, indoorInspections } = data
+  await loadInspectionStatusLabels()
   const wb = new ExcelJS.Workbook()
   wb.creator = 'BeGone Kundportal'
   wb.created = new Date()
@@ -289,12 +285,14 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
   statsHeaderRow.getCell(1).alignment = { indent: 1 }
   statsHeaderRow.height = 20
 
-  const statsColHeader = wsSummary.addRow(['', 'Totalt', 'Ingen/Låg aktivitet', 'Med/Hög aktivitet'])
+  const statsColHeader = wsSummary.addRow(['', 'Totalt', 'Ingen/Låg aktivitet', 'Måttlig/Hög aktivitet'])
   applyHeaderRow(statsColHeader, 4)
 
-  const okCount = summary.none + summary.low
-  const issueCount = summary.medium + summary.high
-  const statsRow = wsSummary.addRow(['Inspekterade stationer', summary.total, okCount, issueCount])
+  // Samma räkning som kontrollrapportens PDF: ok räknas som none, activity som medium
+  const levelCounts = countInspectionLevels([...outdoorInspections, ...indoorInspections].map(i => i.status))
+  const okCount = levelCounts.none + levelCounts.low
+  const issueCount = levelCounts.medium + levelCounts.high
+  const statsRow = wsSummary.addRow(['Inspekterade stationer', outdoorInspections.length + indoorInspections.length, okCount, issueCount])
   statsRow.height = 20
   statsRow.getCell(1).font = { size: 9, color: { argb: 'FF' + TEXT_DARK } }
   statsRow.getCell(2).font = { bold: true, size: 11 }
@@ -401,7 +399,7 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
       ])
       applyDataRow(row, index % 2 === 1)
       row.getCell(1).font = { bold: true, size: 9 }
-      row.getCell(3).font = { bold: true, size: 9, color: { argb: 'FF' + statusFill(statusLabel) } }
+      row.getCell(3).font = { bold: true, size: 9, color: { argb: 'FF' + statusFill(insp.status) } }
       row.getCell(5).font = { bold: true, size: 10 }
       row.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' }
       row.getCell(7).alignment = { wrapText: true, vertical: 'top' }
@@ -494,7 +492,7 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
       ])
       applyDataRow(row, rowIdx % 2 === 1)
       row.getCell(1).font = { bold: true, size: 9 }
-      row.getCell(5).font = { bold: true, size: 9, color: { argb: 'FF' + statusFill(statusLabel) } }
+      row.getCell(5).font = { bold: true, size: 9, color: { argb: 'FF' + statusFill(insp.status) } }
       row.getCell(7).font = { bold: true, size: 10 }
       row.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' }
       row.getCell(9).alignment = { wrapText: true, vertical: 'top' }

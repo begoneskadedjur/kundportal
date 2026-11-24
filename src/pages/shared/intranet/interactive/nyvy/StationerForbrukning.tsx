@@ -2,10 +2,11 @@
 // Guiden Gör en stationskontroll: prova förbrukningen i stationsarket. Läsaren väljer
 // stationstyp och trycker − och + (5 gram för gram, annars 1) och ser rutans färg och
 // statusen som sparas. Gränserna är station_types 2026-10-24, statusen räknas med
-// portalens egen calculateInspectionStatus och INSPECTION_STATUS_CONFIG.
+// portalens egen calculateInspectionStatus och orden under Inspektionsstatus.
 
 import { useState } from 'react'
-import { calculateInspectionStatus, INSPECTION_STATUS_CONFIG } from '../../../../../types/indoor'
+import { calculateInspectionStatus } from '../../../../../types/indoor'
+import { inspectionStatusLabel, useInspectionStatusLabels } from '../../../../../hooks/useInspectionStatusLabels'
 import { MATNING, TYPER, TypRutaLiten, matFarg, type TypNyckel } from '../../guider/_nyvy_stationer'
 
 const VAL: TypNyckel[] = ['betong', 'mekanisk', 'ljus']
@@ -19,7 +20,8 @@ export default function StationerForbrukning() {
   const m = MATNING[typ]!
   const farg = matFarg(varde, m)
   const status = calculateInspectionStatus(varde, m.varning, m.kritisk, 'above')
-  const statusText = INSPECTION_STATUS_CONFIG[status]?.label ?? status
+  useInspectionStatusLabels()
+  const statusText = inspectionStatusLabel(status) || status
 
   return (
     <div className="my-5 rounded-xl border border-slate-700 bg-slate-800/30 p-4">

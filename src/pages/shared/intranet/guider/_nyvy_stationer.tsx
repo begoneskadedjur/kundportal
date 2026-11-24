@@ -11,6 +11,7 @@ import { Icon, type IconName } from '../../../../components/icons/Icon'
 import { StationIcon } from '../../../../components/shared/stationIcons'
 import { Markor, type MarkorProps } from '../skarmkit'
 import { useGuideEnhet } from '../skarmkit/nyvy'
+import { inspectionStatusLabel, useInspectionStatusLabels } from '../../../../hooks/useInspectionStatusLabels'
 import { Dubbelknapp, LokalIkon, TYPER, TypRuta, type StationTyp, type TypNyckel } from './_stationer'
 
 export { TYPER, type StationTyp, type TypNyckel }
@@ -406,6 +407,8 @@ export function StationsArk({ s, varde, tryck, markera, nr, typLast, hamtaUpp }:
 
 /** Bekräftelsen för snabb-OK: Markera Station N som OK? */
 export function SnabbOk({ stn, tryck, markera, nr }: { stn: number; tryck: (id: string) => void; markera?: string; nr: number }) {
+  // Samma rad som i portalen, med none-nivåns ord från Inspektionsstatus
+  useInspectionStatusLabels()
   return (
     <Fraga knappar={<>
       <NyKnapp liten block onClick={() => tryck('ok-avbryt')}>Avbryt</NyKnapp>
@@ -414,6 +417,7 @@ export function SnabbOk({ stn, tryck, markera, nr }: { stn: number; tryck: (id: 
       </Markor>
     </>}>
       <p className="text-center text-[12px] text-white">Markera <span className="font-bold text-green-400">Station {stn}</span> som OK?</p>
+      <p className="mt-1 text-center text-[10.5px] text-slate-400">Kunden ser stationen som {inspectionStatusLabel('none')}, utan mätvärde.</p>
     </Fraga>
   )
 }

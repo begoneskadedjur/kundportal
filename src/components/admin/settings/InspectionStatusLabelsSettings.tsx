@@ -6,6 +6,7 @@ import { Activity, Save, Loader2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
+import { resetInspectionStatusLabelsCache } from '../../../hooks/useInspectionStatusLabels'
 
 interface StatusLabelRow {
   id: string
@@ -53,6 +54,7 @@ export function InspectionStatusLabelsSettings() {
     if (error) {
       toast.error('Kunde inte spara: ' + error.message)
     } else {
+      resetInspectionStatusLabelsCache()
       toast.success('Sparat!')
     }
   }

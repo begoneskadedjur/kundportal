@@ -35,6 +35,7 @@ import { StationIcon } from '../stationIcons'
 import { typeDisplayName } from '../../../utils/stationTaxonomy'
 import type { OutdoorInspectionWithRelations } from '../../../types/inspectionSession'
 import { INSPECTION_STATUS_CONFIG } from '../../../types/indoor'
+import { inspectionStatusLabel, useInspectionStatusLabels } from '../../../hooks/useInspectionStatusLabels'
 import type { InspectionStatus } from '../../../types/indoor'
 
 // Hjälpfunktion för att hämta typkonfiguration med fallback för dynamiska typer
@@ -94,6 +95,8 @@ export function EquipmentDetailSheet({
   const [isMobile, setIsMobile] = useState(false)
   const [showAllInspections, setShowAllInspections] = useState(false)
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  // Kontrollernas ord från Inspektionsstatus, ritar om när tabellen lästs
+  useInspectionStatusLabels()
 
   useEffect(() => {
     if (!equipment?.photo_path) { setPhotoUrl(null); return }
@@ -322,7 +325,7 @@ export function EquipmentDetailSheet({
                           <span className="text-xs">{inspStatusConfig.icon}</span>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-white">{inspStatusConfig.label}</p>
+                          <p className="text-sm font-medium text-white">{INSPECTION_STATUS_CONFIG[inspection.status as InspectionStatus] ? inspectionStatusLabel(inspection.status) : inspStatusConfig.label}</p>
                           {inspection.findings && (
                             <p className="text-xs text-slate-400 mt-0.5">{inspection.findings}</p>
                           )}

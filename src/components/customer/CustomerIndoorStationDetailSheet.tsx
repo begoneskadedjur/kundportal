@@ -34,6 +34,7 @@ import {
   INSPECTION_STATUS_CONFIG
 } from '../../types/indoor'
 import { IndoorStationService } from '../../services/indoorStationService'
+import { inspectionStatusLabel, useInspectionStatusLabels } from '../../hooks/useInspectionStatusLabels'
 import { StationIcon } from '../shared/stationIcons'
 import { formatMeasurement } from '../../utils/stationTaxonomy'
 
@@ -155,7 +156,9 @@ export function CustomerIndoorStationDetailSheet({
                 {/* Status badge */}
                 <div className="mt-3 flex items-center gap-2">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.textColor}`}>
-                    {statusConfig.label}
+                    {station.status === 'removed'
+                      ? `Upphämtad${station.status_updated_at ? ` ${format(new Date(station.status_updated_at), "d MMMM yyyy", { locale: sv })}` : ''}`
+                      : statusConfig.label}
                   </span>
                 </div>
               </div>
@@ -323,10 +326,12 @@ function InspectionCard({
   isLatest?: boolean
   onPhotoClick?: (url: string) => void
 }) {
-  const statusConfig = INSPECTION_STATUS_CONFIG[inspection.status] || {
-    label: inspection.status || 'Okänd',
-    bgColor: 'bg-slate-500/20'
-  }
+  // Ordet från Inspektionsstatus (inspection_status_labels), listan är reserv
+  useInspectionStatusLabels()
+  const baseConfig = INSPECTION_STATUS_CONFIG[inspection.status]
+  const statusConfig = baseConfig
+    ? { ...baseConfig, label: inspectionStatusLabel(inspection.status) }
+    : { label: inspection.status || 'Okänd', bgColor: 'bg-slate-500/20' }
 
   // Ikon baserat på status
   const getStatusIcon = () => {

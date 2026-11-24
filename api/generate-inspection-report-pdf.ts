@@ -6,6 +6,7 @@ import puppeteer, { type Browser, type Page } from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 import { createClient } from '@supabase/supabase-js'
 import { numberStations } from '../src/shared/stationNumbering'
+import { countInspectionLevels, inspectionLevelLabel, normalizeInspectionLevel } from '../src/shared/inspectionStatusLevels'
 import nodemailer from 'nodemailer'
 import { requireAuth, requireAuthenticated } from './_lib/auth'
 import { canonicalTypeCode } from '../src/utils/stationTaxonomy'
@@ -53,6 +54,9 @@ const formatDateTime = (dateStr: string | null) => {
 }
 
 const getStatusColor = (status: string, dynamicColors?: Record<string, string>) => {
+  // ok och activity får sin nivås färg (samma mappning som orden)
+  const level = normalizeInspectionLevel(status)
+  if (level && dynamicColors?.[level]) return dynamicColors[level]
   if (dynamicColors?.[status]) return dynamicColors[status]
   switch (status) {
     case 'none':
@@ -68,14 +72,11 @@ const getStatusColor = (status: string, dynamicColors?: Record<string, string>) 
 }
 
 const getStatusLabel = (status: string, dynamicLabels?: Record<string, string>) => {
+  // Nivåerna (och ok/activity) tar ordet från inspection_status_labels, med reservord
+  const levelLabel = inspectionLevelLabel(status, dynamicLabels)
+  if (levelLabel) return levelLabel
   if (dynamicLabels?.[status]) return dynamicLabels[status]
   const labels: Record<string, string> = {
-    none: 'Ingen aktivitet',
-    low: 'Lite aktivitet',
-    medium: 'Medelhög aktivitet',
-    high: 'Betydande aktivitet',
-    ok: 'Ingen aktivitet',
-    activity: 'Aktivitet',
     needs_service: 'Behöver service',
     replaced: 'Utbytt',
     not_inspected: 'Ej kontrollerad'
@@ -100,10 +101,10 @@ async function loadReportStationTypes(): Promise<ReportTypeRow[]> {
 }
 
 interface ResolvedStation extends LegendStation {
-  number: number
+  number: number | string
 }
 
-function resolveReportStation(insp: any, number: number, types: ReportTypeRow[]): ResolvedStation {
+function resolveReportStation(insp: any, number: number | string, types: ReportTypeRow[]): ResolvedStation {
   const st = insp.station || {}
   const legacy: string | null = st.equipment_type || st.station_type || null
   const inspRow = insp.station_type_id ? types.find(t => t.id === insp.station_type_id) : undefined
@@ -286,7 +287,7 @@ async function fetchImageAsBase64(url: string): Promise<string | null> {
  * inspektionsraden), som rutnät under stationstabellen. Bildtexten bär samma
  * nummer och typ som tabellraden.
  */
-async function stationPhotosHtml(items: Array<{ no: number; typeName: string; url?: string | null }>): Promise<string> {
+async function stationPhotosHtml(items: Array<{ no: number | string; typeName: string; url?: string | null }>): Promise<string> {
   const withUrl = items.filter(it => it.url)
   if (withUrl.length === 0) return ''
   const photos = await Promise.all(withUrl.map(async it => ({ ...it, base64: await fetchImageAsBase64(it.url!) })))
@@ -363,7 +364,7 @@ async function generateInspectionReportHTML(data: {
   const { session, customer, technician, outdoorInspections, indoorInspections, dynamicLabels, dynamicColors, sessionPhotos } = data
 
   // Numren är samma som i kundportalen (se loadPortalNumbers)
-  type StationRef = { station?: { id?: string; floor_plan?: { id?: string } | null } | null }
+  type StationRef = { station?: { id?: string; status?: string | null; floor_plan?: { id?: string } | null } | null }
   const floorPlanIds = [...new Set((indoorInspections as StationRef[]).map((i) => i.station?.floor_plan?.id).filter(Boolean))] as string[]
   const portalNumbers = await loadPortalNumbers(customer?.id, floorPlanIds)
 
@@ -372,8 +373,11 @@ async function generateInspectionReportHTML(data: {
     (portalNumbers.outdoor.get(a.station?.id) ?? 1e9) - (portalNumbers.outdoor.get(b.station?.id) ?? 1e9) ||
     new Date(a.station?.placed_at || 0).getTime() - new Date(b.station?.placed_at || 0).getTime()
   )
-  const outdoorNo = (insp: StationRef, i: number) => portalNumbers.outdoor.get(insp.station?.id ?? '') ?? i + 1
-  const indoorNo = (insp: StationRef, i: number) => portalNumbers.indoor.get(insp.station?.id ?? '') ?? i + 1
+  // En upphämtad station som kontrollerades i rundan får inget nummer (som i portalen)
+  const outdoorNo = (insp: StationRef, i: number): number | string =>
+    insp.station?.status === 'removed' ? '—' : portalNumbers.outdoor.get(insp.station?.id ?? '') ?? i + 1
+  const indoorNo = (insp: StationRef, i: number): number | string =>
+    insp.station?.status === 'removed' ? '—' : portalNumbers.indoor.get(insp.station?.id ?? '') ?? i + 1
 
   // Hämta sessionsbilder som base64
   let sessionPhotosHtml = ''
@@ -423,11 +427,9 @@ async function generateInspectionReportHTML(data: {
 
   // Räkna per aktivitetsnivå för sammanfattningsfältet
   const allInspections = [...outdoorInspections, ...indoorInspections]
-  const levelCounts = { none: 0, low: 0, medium: 0, high: 0 }
-  for (const insp of allInspections) {
-    const lvl = insp.status as keyof typeof levelCounts
-    if (lvl in levelCounts) levelCounts[lvl]++
-  }
+  // ok (snabb-OK) räknas som none och activity som medium, så att nivåerna
+  // summerar till totalen (src/shared/inspectionStatusLevels.ts)
+  const levelCounts = countInspectionLevels(allInspections.map((insp) => insp.status))
 
   // Bygg nummermappning för utomhus (1, 2, 3... baserat på placed_at-order)
   const outdoorTableRows = sortedOutdoor.map((insp: any, index: number) => {

@@ -91,6 +91,8 @@
     // Stationsmarkörer (typens färg och ikon, tillägg, status) i kundrapporterna
     "src/shared/stationMarkers.ts",
     "src/shared/reportStationMarkers.ts", "src/shared/stationNumbering.ts",
+    // Kontrollernas aktivitetsnivåer: ord och räkning (generate-inspection-report-pdf)
+    "src/shared/inspectionStatusLevels.ts",
     // Rapportkartornas marginal och utspridning (api/_lib/satelliteMapShot.ts)
     "src/shared/satelliteMapLayout.ts"
 

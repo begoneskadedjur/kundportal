@@ -40,6 +40,7 @@ import {
 } from '../../../types/indoor'
 import { MeasurementStatusSection } from '../CalculatedStatusBadge'
 import { IndoorStationService } from '../../../services/indoorStationService'
+import { inspectionStatusLabel, useInspectionStatusLabels } from '../../../hooks/useInspectionStatusLabels'
 import { StationIcon } from '../stationIcons'
 
 interface IndoorStationDetailSheetProps {
@@ -322,6 +323,8 @@ function StationTypeIcon({ type, stationTypeData, productIcon }: { type: string;
 // Inspektionsrad
 function InspectionItem({ inspection }: { inspection: IndoorStationInspectionWithRelations }) {
   const statusConfig = INSPECTION_STATUS_CONFIG[inspection.status]
+  // Kontrollernas ord från Inspektionsstatus, ritar om när tabellen lästs
+  useInspectionStatusLabels()
 
   return (
     <div className="p-3 bg-slate-900/50 rounded-lg">
@@ -331,7 +334,7 @@ function InspectionItem({ inspection }: { inspection: IndoorStationInspectionWit
             <span className="text-xs">{statusConfig.icon}</span>
           </div>
           <div>
-            <p className="text-sm font-medium text-white">{statusConfig.label}</p>
+            <p className="text-sm font-medium text-white">{inspectionStatusLabel(inspection.status) || statusConfig.label}</p>
             {inspection.findings && (
               <p className="text-xs text-slate-400 mt-0.5">{inspection.findings}</p>
             )}

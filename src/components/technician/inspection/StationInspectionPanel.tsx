@@ -86,7 +86,8 @@ import type {
   InspectionSessionPhoto
 } from '../../../types/inspectionSession'
 import type { InspectionStatus } from '../../../types/indoor'
-import { INSPECTION_STATUS_CONFIG, calculateInspectionStatus } from '../../../types/indoor'
+import { calculateInspectionStatus } from '../../../types/indoor'
+import { inspectionStatusLabel, useInspectionStatusLabels } from '../../../hooks/useInspectionStatusLabels'
 import type { EquipmentPlacementWithRelations } from '../../../types/database'
 import type { IndoorStationWithRelations } from '../../../types/indoor'
 import { useAddonRemovalGuard, useAddonPaidLock } from '../../../hooks/useAddonRemovalGuard'
@@ -132,7 +133,7 @@ function unitShort(unit: string | null | undefined): string {
 
 // Statusens etikett i gemener för löptext ("ingen aktivitet")
 function statusText(status: string): string {
-  const label = INSPECTION_STATUS_CONFIG[status as InspectionStatus]?.label || status
+  const label = inspectionStatusLabel(status) || status
   // Förkortningar som OK behåller versalerna
   if (/^[A-ZÅÄÖ]{2}/.test(label)) return label
   return label.charAt(0).toLowerCase() + label.slice(1)
@@ -265,6 +266,8 @@ export default function StationInspectionPanel({
   hideHeader = false
 }: StationInspectionPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Kontrollernas ord från Inspektionsstatus, ritar om när tabellen lästs
+  useInspectionStatusLabels()
 
   // Överläggens z-index och placering: oförändrat i fristående läge,
   // ovanför värdmodalen och via portal i inbäddat läge
@@ -2283,9 +2286,9 @@ export default function StationInspectionPanel({
                   <div className="mt-3 pt-3 border-t border-slate-700/50 grid grid-cols-3 gap-3 text-center">
                     <div>
                       <p className="text-lg font-bold text-green-400">
-                        {Object.values(inspectionResults).filter(r => r.status === 'ok').length}
+                        {Object.values(inspectionResults).filter(r => r.status === 'ok' || r.status === 'none').length}
                       </p>
-                      <p className="text-xs text-slate-500">OK</p>
+                      <p className="text-xs text-slate-500">{inspectionStatusLabel('none')}</p>
                     </div>
                     <div>
                       <p className="text-lg font-bold text-amber-400">
@@ -2295,7 +2298,7 @@ export default function StationInspectionPanel({
                     </div>
                     <div>
                       <p className="text-lg font-bold text-red-400">
-                        {Object.values(inspectionResults).filter(r => r.status !== 'ok' && r.status !== 'activity').length}
+                        {Object.values(inspectionResults).filter(r => r.status !== 'ok' && r.status !== 'none' && r.status !== 'activity').length}
                       </p>
                       <p className="text-xs text-slate-500">Övrigt</p>
                     </div>
@@ -2633,6 +2636,9 @@ export default function StationInspectionPanel({
             >
               <p className="text-white text-center mb-4">
                 Markera <span className="font-bold text-green-400">Station {outdoorNumberMap[quickOkStation.id] || indoorNumberMap[quickOkStation.id] || '?'}</span> som OK?
+              </p>
+              <p className="text-xs text-slate-400 text-center -mt-2 mb-4">
+                Kunden ser stationen som {inspectionStatusLabel('none')}, utan mätvärde.
               </p>
               <div className="flex gap-3">
                 <button
@@ -3016,7 +3022,7 @@ export default function StationInspectionPanel({
                                   >
                                     <StatusDot status={item.status} />
                                     <span className="flex-1 min-w-0 truncate text-slate-200">
-                                      {INSPECTION_STATUS_CONFIG[item.status]?.label || item.status}
+                                      {inspectionStatusLabel(item.status) || item.status}
                                       {item.measurement_value !== null && (() => {
                                         const histColor = getMeasurementColor(
                                           item.measurement_value,

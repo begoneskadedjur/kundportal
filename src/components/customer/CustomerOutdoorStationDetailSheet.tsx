@@ -32,6 +32,7 @@ import {
   getEquipmentStatusLabel
 } from '../../types/database'
 import { INSPECTION_STATUS_CONFIG } from '../../types/indoor'
+import { inspectionStatusLabel, useInspectionStatusLabels } from '../../hooks/useInspectionStatusLabels'
 import { formatCoordinates, openInMapsApp } from '../../utils/equipmentMapUtils'
 import { EquipmentService } from '../../services/equipmentService'
 import { StationIcon } from '../shared/stationIcons'
@@ -175,7 +176,9 @@ export function CustomerOutdoorStationDetailSheet({
                 {/* Status badge */}
                 <div className="mt-3 flex items-center gap-2">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusConfig.bgColor} text-${statusConfig.color}`}>
-                    {getEquipmentStatusLabel(station.status)}
+                    {station.status === 'removed'
+                      ? `Upphämtad${station.status_updated_at ? ` ${formatDate(station.status_updated_at)}` : ''}`
+                      : getEquipmentStatusLabel(station.status)}
                   </span>
                   {station.is_addon === true && (
                     <span className="flex items-center gap-1.5 text-xs text-violet-400">
@@ -356,10 +359,12 @@ function OutdoorInspectionCard({
   isLatest?: boolean
   onPhotoClick?: (url: string) => void
 }) {
-  const statusConfig = INSPECTION_STATUS_CONFIG[inspection.status as InspectionStatus] || {
-    label: inspection.status || 'Okänd',
-    bgColor: 'bg-slate-500/20'
-  }
+  // Ordet från Inspektionsstatus (inspection_status_labels), listan är reserv
+  useInspectionStatusLabels()
+  const baseConfig = INSPECTION_STATUS_CONFIG[inspection.status as InspectionStatus]
+  const statusConfig = baseConfig
+    ? { ...baseConfig, label: inspectionStatusLabel(inspection.status) }
+    : { label: inspection.status || 'Okänd', bgColor: 'bg-slate-500/20' }
 
   // Ikon baserat på status
   const getStatusIcon = () => {

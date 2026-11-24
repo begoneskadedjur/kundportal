@@ -45,6 +45,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.24',
+    date: '2026-11-25',
+    title: 'Samma statusord överallt och upphämtade stationer',
+    items: [
+      { kind: 'andring', text: 'Stationskontrollens status heter samma sak i alla vyer och rapporter, för kunden, teknikern och kontoret: Ingen aktivitet, Låg aktivitet, Måttlig aktivitet och Hög aktivitet. Orden ändras under Inspektionsstatus.' },
+      { kind: 'andring', text: 'En station du markerar med snabb-OK visas som Ingen aktivitet, aldrig som OK. Bekräftelsen för snabb-OK säger nu vad kunden ser.' },
+      { kind: 'buggfix', text: 'Kontrollrapportens summering räknar alla kontrollerade stationer, även de som gjorts med snabb-OK, så att siffrorna går ihop med Totalt.' },
+      { kind: 'buggfix', text: 'Upphämtade stationer får inget nummer och visas som Upphämtad med datum i Genomförda kontroller, Fällor & stationer och stationskortet. De räknas inte som okontrollerade och inte i antalet stationer.' },
+      { kind: 'andring', text: 'Plåtstationer har nu Förbrukning (g) med samma gränser som betesstationer.' },
+    ],
+  },
+  {
     version: '3.132.23',
     date: '2026-11-25',
     title: 'Stationskorten visar rätt typ och ikon',

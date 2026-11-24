@@ -20,6 +20,7 @@ import type { StegId } from '../../../../components/technician/ny/steg/stegKonfi
 import type { GuideModul } from './registry'
 import { RapportKlarRuta } from './_rapporter'
 import { ingenMk } from './_nyvy_salja'
+import { inspectionStatusLabel, useInspectionStatusLabels } from '../../../../hooks/useInspectionStatusLabels'
 import {
   FrammeSteg, Hjalp, KlartAvslutat, Klarmarkera, KontrollRunda, SEX, SnabbOk, StationsArk, TYPER, Toast,
   matningFor, type Stn,
@@ -123,6 +124,7 @@ function nastaOkontrollerad(stationer: Stn[], klara: Set<number>): number | null
 }
 
 function Ovning() {
+  useInspectionStatusLabels()
   const enhet = useGuideEnhet()
   const [l, setL] = useState<Lage>(OVNING_START)
   const [svar, setSvar] = useState<OvningSvar>(BORJA)
@@ -156,7 +158,7 @@ function Ovning() {
       if (id === 'klar-ja') {
         if (l.kontrollerade.size < l.stationer.length) { miss('Ja, klarmarkera går inte att trycka på förrän alla stationer är kontrollerade. Tryck Avbryt och kontrollera resten.'); return }
         setL({ ...l, steg: 'klart', fraga: null, toast: 'Inspektion avslutad!' })
-        setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Besöket är klarmarkerat och har status Avslutat. Station 2 sparades med 15 gram, de andra som OK. Rutan Rapporten är klar i steget Klart skickar kontrollrapporten till kunden när du väljer det.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
+        setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Besöket är klarmarkerat och har status Avslutat. Station 2 sparades med 15 gram, de andra med snabb-OK, som kunden ser som ${inspectionStatusLabel('none')}. Rutan Rapporten är klar i steget Klart skickar kontrollrapporten till kunden när du väljer det.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
       } else if (id === 'klar-avbryt') setL({ ...l, fraga: null })
       return
     }

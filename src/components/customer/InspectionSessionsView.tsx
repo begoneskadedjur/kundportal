@@ -66,6 +66,24 @@ import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailS
 import LoadingSpinner from '../shared/LoadingSpinner'
 import Select, { type SelectOptionGroup } from '../ui/Select'
 import { generateInspectionPDF, generateInspectionExcel } from '../../services/inspectionReportService'
+import { numberStations } from '../../shared/stationNumbering'
+import { normalizeInspectionLevel } from '../../shared/inspectionStatusLevels'
+
+/**
+ * Ska en station vara med i listan för en kontroll? Aktiva alltid. En upphämtad
+ * station bara om den kontrollerades i kontrollen, eller om kontrollen avslutades
+ * innan stationen hämtades upp. Saknas tidpunkten för upphämtningen krävs en kontroll.
+ */
+function stationBelongsToSession(
+  station: { status?: string | null; status_updated_at?: string | null },
+  inspectedInSession: boolean,
+  sessionCompletedAt: string | null | undefined
+): boolean {
+  if (station.status !== 'removed') return true
+  if (inspectedInSession) return true
+  if (!station.status_updated_at || !sessionCompletedAt) return false
+  return new Date(sessionCompletedAt).getTime() < new Date(station.status_updated_at).getTime()
+}
 
 function calcTrend(
   current: number | null,
@@ -117,6 +135,9 @@ interface StationWithLatestInspection {
   originalIndoorStation?: IndoorStationWithRelations
   floorPlanId?: string
   floorPlanName?: string
+  // Upphämtad station: visas utan nummer och med datumet den hämtades upp
+  isRemoved?: boolean
+  removedAt?: string | null
   // Jämförelsevärden mot senaste kontrollen
   comparisonValue?: number | null
   comparisonStatus?: 'ok' | 'warning' | 'critical'
@@ -289,19 +310,17 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           : Promise.resolve(new Map<string, number | null>())
       ])
 
-      // Skapa nummermappning baserat på placed_at
-      const outdoorNumberMap = new Map<string, number>()
-      const sortedOutdoor = [...outdoor].sort((a, b) =>
-        new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
-      )
-      sortedOutdoor.forEach((station, index) => {
-        outdoorNumberMap.set(station.id, index + 1)
-      })
+      // Samma nummer som Fällor & stationer och rapporterna: aktiva stationer
+      // från 1 efter placed_at, upphämtade får inget nummer
+      const outdoorNumberMap = numberStations(outdoor)
+      const sessionCompletedAt = sessionList.find(s => s.id === sessionId)?.completed_at ?? null
 
       // Mappa inspektioner till stationer
       const inspByStation = new Map(sessionOutdoor.map(i => [(i.station as any)?.id || i.id, i]))
 
-      const outdoorWithInspections = outdoor.map(station => {
+      const outdoorWithInspections = outdoor
+        .filter(station => stationBelongsToSession(station, inspByStation.has(station.id), sessionCompletedAt))
+        .map(station => {
         const insp = inspByStation.get(station.id)
         const stationType = station.station_type_data
         const measurementValue = insp?.measurement_value ?? null
@@ -340,6 +359,8 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           } : null,
           calculatedStatus,
           originalOutdoorStation: station,
+          isRemoved: station.status === 'removed',
+          removedAt: station.status === 'removed' ? station.status_updated_at ?? null : null,
           ...calcTrend(insp?.measurement_value ?? null, previousValues.get(station.id) ?? null)
         } as StationWithLatestInspection
       })
@@ -356,18 +377,15 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
 
       for (const plan of plans) {
         const stations = await IndoorStationService.getStationsByFloorPlan(plan.id)
-        const indoorNumberMap = new Map<string, number>()
-        const sortedIndoor = [...stations].sort((a, b) =>
-          new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
-        )
-        sortedIndoor.forEach((station, index) => {
-          indoorNumberMap.set(station.id, index + 1)
-        })
+        // En serie per planritning, upphämtade får inget nummer
+        const indoorNumberMap = numberStations(stations)
 
         const planInspections = indoorByFloorPlan.get(plan.id) || []
         const inspByIndoorStation = new Map(planInspections.map(i => [(i.station as any)?.id || i.id, i]))
 
-        const stationsWithInspections = stations.map(station => {
+        const stationsWithInspections = stations
+          .filter(station => stationBelongsToSession(station, inspByIndoorStation.has(station.id), sessionCompletedAt))
+          .map(station => {
           const insp = inspByIndoorStation.get(station.id)
           const stationType = station.station_type_data
           const measurementValue = insp?.measurement_value ?? null
@@ -408,6 +426,8 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
             originalIndoorStation: station,
             floorPlanId: plan.id,
             floorPlanName: plan.name,
+            isRemoved: station.status === 'removed',
+            removedAt: station.status === 'removed' ? station.status_updated_at ?? null : null,
             ...calcTrend(insp?.measurement_value ?? null, previousValues.get(station.id) ?? null)
           } as StationWithLatestInspection
         })
@@ -438,14 +458,11 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
       const counts = { none: 0, low: 0, medium: 0, high: 0, noInspection: 0 }
       allStationsList.forEach(station => {
         if (!station.latestInspection) {
-          counts.noInspection++
+          // Upphämtade räknas aldrig som okontrollerade
+          if (!station.isRemoved) counts.noInspection++
         } else {
-          const status = station.latestInspection.status as keyof typeof counts
-          if (status in counts) {
-            counts[status]++
-          } else {
-            counts.none++
-          }
+          // ok räknas som none och activity som medium (samma regel som rapporten)
+          counts[normalizeInspectionLevel(station.latestInspection.status) ?? 'none']++
         }
       })
       setStatusCounts(counts)
@@ -608,27 +625,14 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
       setLatestComparisonData(comparisonData)
       setLatestSessionDate(comparisonResult.sessionDate)
 
-      // Skapa nummermappning för outdoor-stationer baserat på placed_at (samma som kartan)
-      const outdoorNumberMap = new Map<string, number>()
-      const sortedOutdoor = [...allOutdoorStations].sort((a, b) =>
-        new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
-      )
-      sortedOutdoor.forEach((station, index) => {
-        outdoorNumberMap.set(station.id, index + 1)
-      })
+      // Samma nummer som kartan och Fällor & stationer (upphämtade utan nummer)
+      const outdoorNumberMap = numberStations(allOutdoorStations)
 
-      // Skapa nummermappning för indoor-stationer per planritning
+      // En serie per planritning
       const indoorNumberMaps = new Map<string, Map<string, number>>()
       for (const plan of allFloorPlans) {
         const stations = await IndoorStationService.getStationsByFloorPlan(plan.id)
-        const indoorNumberMap = new Map<string, number>()
-        const sortedIndoor = [...stations].sort((a, b) =>
-          new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
-        )
-        sortedIndoor.forEach((station, index) => {
-          indoorNumberMap.set(station.id, index + 1)
-        })
-        indoorNumberMaps.set(plan.id, indoorNumberMap)
+        indoorNumberMaps.set(plan.id, numberStations(stations))
       }
 
       // Omvandla till StationSection-format
@@ -681,6 +685,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               technicianName: insp.technician?.name || null
             },
             calculatedStatus,
+            isRemoved: station?.status === 'removed',
             comparisonValue: comparison?.value ?? null,
             comparisonStatus: comparison?.status
           }
@@ -762,6 +767,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               calculatedStatus,
               floorPlanId: floorPlan?.id,
               floorPlanName: floorPlan?.name,
+              isRemoved: station?.status === 'removed',
               comparisonValue: comparison?.value ?? null,
               comparisonStatus: comparison?.status
             }
@@ -1062,7 +1068,8 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                           url: p.url || '',
                           stationNumber: '',
                           stationType: 'outdoor' as const,
-                          status: 'ok',
+                          // Besöksbild, ingen kontrollstatus att visa
+                          status: '',
                           inspectedAt: p.uploaded_at,
                           findings: p.caption || undefined
                         }))
@@ -1150,7 +1157,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
             </h3>
             <p className="text-slate-400">
               {showOnlyIssues
-                ? 'Alla stationer har OK-status.'
+                ? 'Ingen station har en avvikelse.'
                 : 'Servicebesök och inspektioner kommer att visas här när de utförs.'}
             </p>
           </div>
@@ -1235,7 +1242,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                                   onClick={() => handleStationClick(station)}
                                 >
                                   <td className="px-4 py-2 text-white font-medium">
-                                    {station.stationNumber || `#${index + 1}`}
+                                    {station.isRemoved ? '—' : (station.stationNumber || `#${index + 1}`)}
                                   </td>
                                   <td className="px-4 py-2">
                                     <div className="flex items-center gap-2">
@@ -1245,12 +1252,23 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                                   </td>
                                   <td className="px-4 py-2">
                                     {station.latestInspection ? (
-                                      <div className="flex items-center gap-1.5">
-                                        {getStatusIcon(station.latestInspection.status)}
-                                        <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${inspStatusColor}20`, color: inspStatusColor }}>
-                                          {inspStatusLabel}
-                                        </span>
-                                      </div>
+                                      <>
+                                        <div className="flex items-center gap-1.5">
+                                          {getStatusIcon(station.latestInspection.status)}
+                                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${inspStatusColor}20`, color: inspStatusColor }}>
+                                            {inspStatusLabel}
+                                          </span>
+                                        </div>
+                                        {station.isRemoved && (
+                                          <p className="text-xs text-slate-500 mt-0.5">
+                                            Upphämtad{station.removedAt ? ` ${formatDate(station.removedAt)}` : ''}
+                                          </p>
+                                        )}
+                                      </>
+                                    ) : station.isRemoved ? (
+                                      <span className="text-xs text-slate-500">
+                                        Upphämtad{station.removedAt ? ` ${formatDate(station.removedAt)}` : ''}
+                                      </span>
                                     ) : (
                                       <span className="text-xs text-slate-500 px-1.5 py-0.5 bg-slate-700/50 rounded">Ej kontrollerad</span>
                                     )}
@@ -1586,7 +1604,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
                                   return (
                                     <tr key={station.id} className="hover:bg-slate-800/30 transition-colors">
                                       <td className="px-4 py-2.5 text-white font-medium">
-                                        {station.stationNumber || `#${index + 1}`}
+                                        {station.isRemoved ? '—' : (station.stationNumber || `#${index + 1}`)}
                                       </td>
                                       <td className="px-4 py-2.5">
                                         <div className="flex items-center gap-2">

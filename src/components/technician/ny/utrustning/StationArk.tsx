@@ -26,6 +26,7 @@ import StationTypeTile from '../../../shared/stations/StationTypeTile'
 import StationToolbar from '../../../shared/stations/StationToolbar'
 import AddonRemovalNotice, { AddonPaidLockNotice } from '../../../shared/equipment/AddonRemovalNotice'
 import { useAddonPaidLock, useAddonRemovalGuard } from '../../../../hooks/useAddonRemovalGuard'
+import { inspectionStatusLabel, useInspectionStatusLabels } from '../../../../hooks/useInspectionStatusLabels'
 import { EquipmentService } from '../../../../services/equipmentService'
 import { IndoorStationService } from '../../../../services/indoorStationService'
 import { AddonStationBillingService } from '../../../../services/addonStationBillingService'
@@ -88,6 +89,8 @@ function ArkInnehall({ vald, nummer, antalPaPlatsen, inline = false, planNamn, c
   const guardStation = { id: s.id, indoor: inne, is_addon: s.is_addon, addon_billing_model: s.addon_billing_model, addon_contract_mode: s.addon_contract_mode }
   const lock = useAddonPaidLock(guardStation)
   const guard = useAddonRemovalGuard(guardStation)
+  // Kontrollernas ord från Inspektionsstatus, ritar om när tabellen lästs
+  useInspectionStatusLabels()
 
   const [visaHistorik, setVisaHistorik] = useState(false)
   const [historik, setHistorik] = useState<Historik[] | null>(null)
@@ -276,7 +279,7 @@ function ArkInnehall({ vald, nummer, antalPaPlatsen, inline = false, planNamn, c
                 <dd className="mt-0.5 text-slate-200">
                   {datum(senaste.nar)}
                   {INSPECTION_STATUS_CONFIG[senaste.status as InspectionStatus] && (
-                    <span className="block"><StatusPunkt ton={KONTROLL_TON[senaste.status as InspectionStatus] ?? 'gra'}>{INSPECTION_STATUS_CONFIG[senaste.status as InspectionStatus].label}</StatusPunkt></span>
+                    <span className="block"><StatusPunkt ton={KONTROLL_TON[senaste.status as InspectionStatus] ?? 'gra'}>{inspectionStatusLabel(senaste.status)}</StatusPunkt></span>
                   )}
                 </dd>
               </div>
@@ -318,7 +321,7 @@ function ArkInnehall({ vald, nummer, antalPaPlatsen, inline = false, planNamn, c
                     return (
                       <li key={h.id} className="px-3 py-2.5 space-y-0.5">
                         <div className="flex items-center justify-between gap-2">
-                          <StatusPunkt ton={KONTROLL_TON[h.status as InspectionStatus] ?? 'gra'}>{cfg?.label ?? h.status}</StatusPunkt>
+                          <StatusPunkt ton={KONTROLL_TON[h.status as InspectionStatus] ?? 'gra'}>{cfg ? inspectionStatusLabel(h.status) : h.status}</StatusPunkt>
                           <span className="text-[12px] text-slate-400 tabular-nums">{datum(h.nar)}</span>
                         </div>
                         {(h.tekniker || h.matning) && (

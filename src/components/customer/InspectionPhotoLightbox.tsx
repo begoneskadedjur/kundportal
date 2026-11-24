@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, Maximize2 } from 'lucide-react'
+import { inspectionStatusLabel, useInspectionStatusLabels } from '../../hooks/useInspectionStatusLabels'
 
 export interface Photo {
   url: string
@@ -29,6 +30,7 @@ export function InspectionPhotoLightbox({
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [zoom, setZoom] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
+  useInspectionStatusLabels()
 
   // Reset state when opening
   useEffect(() => {
@@ -155,20 +157,8 @@ export function InspectionPhotoLightbox({
     }
   }
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'ok':
-        return 'OK'
-      case 'activity':
-        return 'Aktivitet'
-      case 'needs_service':
-        return 'Behöver service'
-      case 'replaced':
-        return 'Utbytt'
-      default:
-        return status
-    }
-  }
+  // Ordet från Inspektionsstatus (ok visas som none-nivåns ord, aldrig OK)
+  const getStatusLabel = (status: string) => inspectionStatusLabel(status) || status
 
   return (
     <div
@@ -194,6 +184,7 @@ export function InspectionPhotoLightbox({
           <span className="text-slate-400 text-sm">
             {formatDate(currentPhoto.inspectedAt)}
           </span>
+          {currentPhoto.status && (
           <span className={`px-2 py-0.5 rounded text-xs font-medium ${
             currentPhoto.status === 'ok' ? 'bg-emerald-500/20 text-emerald-400' :
             currentPhoto.status === 'activity' ? 'bg-amber-500/20 text-amber-400' :
@@ -202,6 +193,7 @@ export function InspectionPhotoLightbox({
           }`}>
             {getStatusLabel(currentPhoto.status)}
           </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

@@ -32,6 +32,7 @@ import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import type { OutdoorInspectionWithRelations } from '../../../types/inspectionSession'
 import { INSPECTION_STATUS_CONFIG } from '../../../types/indoor'
+import { inspectionStatusLabel, useInspectionStatusLabels } from '../../../hooks/useInspectionStatusLabels'
 import type { InspectionStatus } from '../../../types/indoor'
 import {
   MapPin,
@@ -1322,6 +1323,8 @@ export function EquipmentPlacementForm({
 function OutdoorInspectionHistory({ inspections }: { inspections: OutdoorInspectionWithRelations[] }) {
   const [showAll, setShowAll] = useState(false)
   const displayed = showAll ? inspections : inspections.slice(0, 3)
+  // Kontrollernas ord från Inspektionsstatus, ritar om när tabellen lästs
+  useInspectionStatusLabels()
 
   return (
     <div>
@@ -1358,7 +1361,7 @@ function OutdoorInspectionHistory({ inspections }: { inspections: OutdoorInspect
                   <span className="text-xs">{statusConfig.icon}</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">{statusConfig.label}</p>
+                  <p className="text-sm font-medium text-white">{INSPECTION_STATUS_CONFIG[inspection.status as InspectionStatus] ? inspectionStatusLabel(inspection.status) : statusConfig.label}</p>
                   {inspection.findings && (
                     <p className="text-xs text-slate-400 mt-0.5">{inspection.findings}</p>
                   )}

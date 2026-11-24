@@ -32,6 +32,7 @@ import {
   generateStationNumber
 } from '../../../types/indoor'
 import { MAX_STATION_PHOTO_SIZE, ALLOWED_PHOTO_TYPES } from '../../../services/indoorStationService'
+import { inspectionStatusLabel, useInspectionStatusLabels } from '../../../hooks/useInspectionStatusLabels'
 import { StationTypeService, type ChangeStationTypeResult } from '../../../services/stationTypeService'
 import { StationTypeTile, ChangeStationTypeModal, type ChangeStationTypeChoice } from '../stations'
 import { Icon as SvgIcon } from '../../icons/Icon'
@@ -1062,6 +1063,8 @@ export function StationTypeSelector({
 function InspectionHistory({ inspections }: { inspections: IndoorStationInspectionWithRelations[] }) {
   const [showAll, setShowAll] = useState(false)
   const displayed = showAll ? inspections : inspections.slice(0, 3)
+  // Kontrollernas ord från Inspektionsstatus, ritar om när tabellen lästs
+  useInspectionStatusLabels()
 
   return (
     <div>
@@ -1094,7 +1097,7 @@ function InspectionHistory({ inspections }: { inspections: IndoorStationInspecti
                   <span className="text-xs">{statusConfig.icon}</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">{statusConfig.label}</p>
+                  <p className="text-sm font-medium text-white">{inspectionStatusLabel(inspection.status) || statusConfig.label}</p>
                   {inspection.findings && (
                     <p className="text-xs text-slate-400 mt-0.5">{inspection.findings}</p>
                   )}
