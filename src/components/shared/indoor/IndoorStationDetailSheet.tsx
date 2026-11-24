@@ -40,6 +40,7 @@ import {
 } from '../../../types/indoor'
 import { MeasurementStatusSection } from '../CalculatedStatusBadge'
 import { IndoorStationService } from '../../../services/indoorStationService'
+import { StationIcon } from '../stationIcons'
 
 interface IndoorStationDetailSheetProps {
   station: IndoorStationWithRelations
@@ -309,7 +310,10 @@ const STATION_TYPE_ICONS: Record<string, React.ElementType> = {
   bait_station: Target
 }
 
-function StationTypeIcon({ type, stationTypeData }: { type: string; stationTypeData?: { icon: string } | null }) {
+function StationTypeIcon({ type, stationTypeData, productIcon }: { type: string; stationTypeData?: { icon: string } | null; productIcon?: string | null }) {
+  // Stationens produktikon före typens ikon, gamla uppslaget som reserv
+  const iconName = productIcon || stationTypeData?.icon
+  if (iconName) return <StationIcon name={iconName} className="w-5 h-5 text-white" />
   const iconKey = stationTypeData?.icon || type
   const Icon = STATION_TYPE_ICONS[iconKey] || Box
   return <Icon className="w-5 h-5 text-white" />

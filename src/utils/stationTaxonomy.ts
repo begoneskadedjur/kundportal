@@ -42,17 +42,52 @@ export function typeDisplayName(raw: string | null | undefined): string {
  * Slår ihop stationer på kanonisk typ och räknar dem.
  * Löser att "Betongstation" och "betongstation" annars blir två poster.
  */
-export function countByCanonicalType<T extends { equipment_type?: string | null }>(
+export function countByCanonicalType<T extends {
+  equipment_type?: string | null
+  station_type_data?: { name?: string | null } | null
+}>(
   rows: T[]
 ): { code: string; label: string; count: number }[] {
-  const acc = new Map<string, { label: string; count: number }>()
+  const acc = new Map<string, { label: string; count: number; fromType: boolean }>()
   for (const r of rows) {
     const code = canonicalTypeCode(r.equipment_type)
+    // Stationstypens riktiga namn gäller före namnet som byggs ur koden
+    const typeName = r.station_type_data?.name || null
     const prev = acc.get(code)
-    if (prev) prev.count += 1
-    else acc.set(code, { label: typeDisplayName(r.equipment_type), count: 1 })
+    if (prev) {
+      prev.count += 1
+      if (!prev.fromType && typeName) {
+        prev.label = typeName
+        prev.fromType = true
+      }
+    } else {
+      acc.set(code, {
+        label: typeName ?? typeDisplayName(r.equipment_type),
+        count: 1,
+        fromType: !!typeName,
+      })
+    }
   }
   return [...acc.entries()]
-    .map(([code, v]) => ({ code, ...v }))
+    .map(([code, v]) => ({ code, label: v.label, count: v.count }))
     .sort((a, b) => b.count - a.count)
+}
+
+/**
+ * Mätvärde med etikett, där enheten bara skrivs en gång.
+ * Etiketten "Antal avdödade (st)" har redan enheten, så "3 st" blir bara "3".
+ */
+export function formatMeasurement(
+  label: string | null | undefined,
+  value: number | string,
+  unit: string | null | undefined
+): string {
+  const l = label || 'Mätvärde'
+  const u = unit || 'st'
+  // Etiketten skriver ofta enheten kort: "Förbrukning (g)" med enheten gram
+  const kort: Record<string, string> = { gram: 'g', procent: '%' }
+  const enhet = u.trim().toLowerCase()
+  const slut = l.trim().toLowerCase()
+  const hasUnit = slut.endsWith(`(${enhet})`) || (!!kort[enhet] && slut.endsWith(`(${kort[enhet]})`))
+  return hasUnit ? `${l}: ${value}` : `${l}: ${value} ${u}`
 }

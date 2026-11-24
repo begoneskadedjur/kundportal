@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.23',
+    date: '2026-11-25',
+    title: 'Stationskorten visar rätt typ och ikon',
+    items: [
+      { kind: 'buggfix', text: 'Stationskortet i kundportalen visar stationstypens egen ikon, till exempel avloppsfälla, i stället för en låda.' },
+      { kind: 'buggfix', text: 'Kortet som öppnas från kartan i ett ärende visar stationstypens namn och färg. Tidigare kunde nyare typer visas med en intern kod i grått.' },
+      { kind: 'buggfix', text: 'Mätvärdet i stationskortet skriver enheten en gång, till exempel Antal avdödade (st): 2.' },
+      { kind: 'buggfix', text: 'Kundkortet och ärendepanelen på kontoret visar stationstypens riktiga namn i summeringen per typ.' },
+    ],
+  },
+  {
     version: '3.132.22',
     date: '2026-11-24',
     title: 'Avloppsfällor som egna stationstyper',

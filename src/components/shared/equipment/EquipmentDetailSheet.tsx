@@ -31,24 +31,25 @@ import {
 import { formatCoordinates, openInMapsApp } from '../../../utils/equipmentMapUtils'
 import { EquipmentService } from '../../../services/equipmentService'
 import ImageLightbox from '../ImageLightbox'
+import { StationIcon } from '../stationIcons'
+import { typeDisplayName } from '../../../utils/stationTaxonomy'
 import type { OutdoorInspectionWithRelations } from '../../../types/inspectionSession'
 import { INSPECTION_STATUS_CONFIG } from '../../../types/indoor'
 import type { InspectionStatus } from '../../../types/indoor'
 
 // Hjälpfunktion för att hämta typkonfiguration med fallback för dynamiska typer
 function getTypeConfig(equipment: EquipmentPlacementWithRelations) {
-  // Försök hämta från legacy-config först
+  // Stationstypen (station_types) gäller först, den gamla listan är reserv
+  const typeData = equipment.station_type_data
   const legacyConfig = EQUIPMENT_TYPE_CONFIG[equipment.equipment_type]
-  if (legacyConfig) {
-    return {
-      color: legacyConfig.color,
-      label: legacyConfig.label
-    }
-  }
-  // Dynamisk typ - använd grå som standardfärg
+  // Rå kod med understreck får aldrig visas, typeDisplayName är sista reserv
+  const oldLabel = getEquipmentTypeLabel(equipment.equipment_type)
+  const legacyLabel = oldLabel && oldLabel !== equipment.equipment_type
+    ? oldLabel
+    : typeDisplayName(equipment.equipment_type)
   return {
-    color: '#6b7280', // slate-500 som fallback
-    label: equipment.equipment_type || 'Okänd typ'
+    color: typeData?.color || legacyConfig?.color || '#6b7280', // slate-500 som reserv
+    label: typeData?.name || legacyLabel
   }
 }
 
@@ -141,6 +142,8 @@ export function EquipmentDetailSheet({
   if (!equipment) return null
 
   const typeConfig = getTypeConfig(equipment)
+  // Stationens produktikon före typens ikon, gamla ikonen som reserv
+  const iconName = equipment.product_icon || equipment.station_type_data?.icon
   const statusConfig = EQUIPMENT_STATUS_CONFIG[equipment.status] || {
     bgColor: 'bg-slate-500/20',
     borderColor: 'border-slate-500/30',
@@ -164,15 +167,17 @@ export function EquipmentDetailSheet({
               className="w-10 h-10 rounded-xl flex items-center justify-center"
               style={{ backgroundColor: typeConfig.color + '30' }}
             >
-              <EquipmentIcon type={equipment.equipment_type} className="w-5 h-5 text-white" />
+              {iconName
+                ? <StationIcon name={iconName} className="w-5 h-5 text-white" />
+                : <EquipmentIcon type={equipment.equipment_type} className="w-5 h-5 text-white" />}
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white">
                 {equipment.serial_number
                   ? `#${equipment.serial_number.replace(/^#+/, '')}`
-                  : getEquipmentTypeLabel(equipment.equipment_type)}
+                  : typeConfig.label}
               </h3>
-              <p className="text-sm text-slate-400">{getEquipmentTypeLabel(equipment.equipment_type)}</p>
+              <p className="text-sm text-slate-400">{typeConfig.label}</p>
             </div>
           </div>
           <button

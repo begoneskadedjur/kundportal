@@ -349,6 +349,8 @@ interface Placement {
   longitude: number | null
   placed_at: string
   comment: string | null
+  /** Stationstypen ur station_types, för typens riktiga namn */
+  station_type_data?: { name?: string | null } | { name?: string | null }[] | null
 }
 
 export default function CaseDetailPanel({ caseRow, onClose }: Props) {
@@ -394,7 +396,7 @@ export default function CaseDetailPanel({ caseRow, onClose }: Props) {
     void (async () => {
       const { data } = await supabase
         .from('equipment_placements')
-        .select('id, serial_number, equipment_type, latitude, longitude, placed_at, comment')
+        .select('id, serial_number, equipment_type, latitude, longitude, placed_at, comment, station_type_data:station_types!station_type_id(name)')
         .eq('customer_id', caseRow.customer_id)
         .gte('placed_at', from)
         .lte('placed_at', to)
@@ -563,9 +565,11 @@ export default function CaseDetailPanel({ caseRow, onClose }: Props) {
                 <div className="flex flex-wrap gap-1.5">
                   {Object.entries(
                     placements.reduce<Record<string, number>>((acc, p) => {
+                      // Stationstypens namn i första hand
+                      const typ = Array.isArray(p.station_type_data) ? p.station_type_data[0] : p.station_type_data
                       // Legacy: samma typ finns med både versal och gemen
                       const t = (p.equipment_type ?? 'Okänd').toLowerCase()
-                      const label = t.charAt(0).toUpperCase() + t.slice(1).replace(/_/g, ' ')
+                      const label = typ?.name || t.charAt(0).toUpperCase() + t.slice(1).replace(/_/g, ' ')
                       acc[label] = (acc[label] ?? 0) + 1
                       return acc
                     }, {})

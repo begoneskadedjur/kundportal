@@ -34,6 +34,8 @@ import {
   INSPECTION_STATUS_CONFIG
 } from '../../types/indoor'
 import { IndoorStationService } from '../../services/indoorStationService'
+import { StationIcon } from '../shared/stationIcons'
+import { formatMeasurement } from '../../utils/stationTaxonomy'
 
 interface CustomerIndoorStationDetailSheetProps {
   station: IndoorStationWithRelations
@@ -80,6 +82,8 @@ export function CustomerIndoorStationDetailSheet({
     textColor: 'text-slate-400'
   }
 
+  // Stationens produktikon före typens ikon, gamla ikonen som reserv
+  const iconName = station.product_icon || station.station_type_data?.icon
   // Välj ikon baserat på stationstyp, med fallback till Box
   const TypeIcon = TYPE_ICONS[station.station_type as keyof typeof TYPE_ICONS] || Box
 
@@ -125,7 +129,13 @@ export function CustomerIndoorStationDetailSheet({
                       className="w-12 h-12 rounded-xl flex items-center justify-center"
                       style={{ backgroundColor: typeConfig.color + '30' }}
                     >
-                      <TypeIcon className="w-6 h-6" style={{ color: typeConfig.color }} />
+                      {iconName ? (
+                        <span className="flex" style={{ color: typeConfig.color }}>
+                          <StationIcon name={iconName} className="w-6 h-6" />
+                        </span>
+                      ) : (
+                        <TypeIcon className="w-6 h-6" style={{ color: typeConfig.color }} />
+                      )}
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-white">
@@ -349,7 +359,7 @@ function InspectionCard({
             )}
             {inspection.measurement_value !== null && inspection.measurement_value !== undefined && (
               <p className="text-xs text-slate-400 mt-0.5">
-                {inspection.station?.station_type_data?.measurement_label || 'Mätvärde'}: {inspection.measurement_value} {inspection.measurement_unit || 'st'}
+                {formatMeasurement(inspection.station?.station_type_data?.measurement_label, inspection.measurement_value, inspection.measurement_unit)}
               </p>
             )}
             {inspection.preparation && (
