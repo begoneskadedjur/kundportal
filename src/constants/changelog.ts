@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.21',
+    date: '2026-11-24',
+    title: 'Tydligare text om Boka återbesök',
+    items: [
+      { kind: 'andring', text: 'Boka återbesök beskrivs nu som det det är: du bokar nästa besök när du har varit på plats, och dagens besök sparas. Ett besök som inte blivit av flyttar du genom att ändra tiden i ärendet.' },
+    ],
+  },
+  {
     version: '3.132.20',
     date: '2026-11-23',
     title: 'Fakturanummer går alltid uppåt',

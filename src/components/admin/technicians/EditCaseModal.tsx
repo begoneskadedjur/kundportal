@@ -2098,7 +2098,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           id: 'boka-aterbesok',
           ikon: 'arende.aterbesok' as const,
           text: 'Boka återbesök',
-          beskrivning: 'Flytta ärendet till ett framtida datum. Delfakturering är en kryssruta i dialogen.',
+          beskrivning: 'Boka nästa besök när du har varit på plats. Dagens besök sparas. Delfakturering är en kryssruta i dialogen.',
           onClick: () => { void oppnaAterbesok() },
         },
         ...(canCreateFollowUp ? [{
@@ -2367,7 +2367,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   <RotateCcw className="w-5 h-5 text-teal-400 shrink-0" />
                   <div>
                     <p className="text-white font-medium">Boka återbesök</p>
-                    <p className="text-sm text-slate-400">Flytta ärendet till ett framtida datum för uppföljning av skadedjursstatus</p>
+                    <p className="text-sm text-slate-400">Boka nästa besök när du har varit på plats. Dagens besök sparas.</p>
                   </div>
                 </div>
               </button>

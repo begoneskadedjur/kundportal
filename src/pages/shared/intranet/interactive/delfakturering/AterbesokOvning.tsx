@@ -77,7 +77,7 @@ export default function AterbesokOvning() {
         <div className={SEKTION}>
           <p className="mb-2 text-sm font-semibold text-white">Vad vill du göra?</p>
           {[
-            { id: 'aterbesok', titel: 'Boka återbesök', text: 'Flytta ärendet till ett framtida datum för uppföljning av skadedjursstatus' },
+            { id: 'aterbesok', titel: 'Boka återbesök', text: 'Boka nästa besök när du har varit på plats. Dagens besök sparas.' },
             { id: 'nytt', titel: 'Skapa nytt ärende', text: 'Nytt problem hos samma kund (annat skadedjur)' },
             { id: 'duplicera', titel: 'Duplicera ärende', text: 'Skapa en kopia och välj vad som följer med' },
           ].map(v => (

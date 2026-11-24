@@ -427,7 +427,7 @@ export function TaBortArk({ titel, mk, tryck }: { titel: string; mk: Mk; tryck: 
 export function ValArk({ mk, tryck }: { mk: Mk; tryck: Tryck }) {
   return (
     <Ark titel="Vad vill du göra?">
-      <Val titel="Boka återbesök" text="Flytta ärendet till ett framtida datum för uppföljning av skadedjursstatus" onClick={() => tryck('val-aterbesok')} markor={mk('val-aterbesok')} />
+      <Val titel="Boka återbesök" text="Boka nästa besök när du har varit på plats. Dagens besök sparas." onClick={() => tryck('val-aterbesok')} markor={mk('val-aterbesok')} />
       <Val titel="Skapa nytt ärende" text="Nytt problem hos samma kund (annat skadedjur)" onClick={() => tryck('val-nytt')} markor={mk('val-nytt')} />
       <Val titel="Duplicera ärende" text="Skapa en kopia och välj vad som följer med" onClick={() => tryck('val-duplicera')} markor={mk('val-duplicera')} />
       <button type="button" onClick={() => tryck('val-avbryt')} className="py-1 text-[12px] text-slate-400 hover:text-white">Avbryt</button>

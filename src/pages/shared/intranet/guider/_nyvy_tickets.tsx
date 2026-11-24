@@ -131,7 +131,7 @@ export const VERKTYG_PRIVAT: VerktygGrupp[] = [
     { id: 'offert', ikon: 'dok.offert', text: 'Skapa offert' },
   ] },
   { id: 'aterbesok', rubrik: 'Återbesök och nytt ärende', val: [
-    { id: 'boka-aterbesok', ikon: 'arende.aterbesok', text: 'Boka återbesök', beskrivning: 'Flytta ärendet till ett framtida datum. Delfakturering är en kryssruta i dialogen.' },
+    { id: 'boka-aterbesok', ikon: 'arende.aterbesok', text: 'Boka återbesök', beskrivning: 'Boka nästa besök när du har varit på plats. Dagens besök sparas. Delfakturering är en kryssruta i dialogen.' },
     { id: 'nytt-arende', ikon: 'allman.plus', text: 'Skapa nytt ärende', beskrivning: 'Nytt problem hos samma kund (annat skadedjur).' },
     { id: 'duplicera', ikon: 'rapport.kopia', text: 'Duplicera ärende', beskrivning: 'Skapa en kopia och välj vad som följer med.' },
   ] },

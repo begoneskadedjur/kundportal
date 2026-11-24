@@ -51,7 +51,7 @@ export function ValArk({ avtal, tryck, markera, nr }: Bas & { avtal?: boolean })
     <Ark titel="Vad vill du göra?">
       <Val
         titel="Boka återbesök"
-        text={avtal ? 'Flytta ärendet till ett framtida datum för uppföljning' : 'Flytta ärendet till ett framtida datum för uppföljning av skadedjursstatus'}
+        text={avtal ? 'Flytta ärendet till ett framtida datum för uppföljning' : 'Boka nästa besök när du har varit på plats. Dagens besök sparas.'}
         onClick={() => tryck('val-aterbesok')}
         markor={mk(markera, 'val-aterbesok', nr)}
       />
