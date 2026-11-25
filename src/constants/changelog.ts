@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.27',
+    date: '2026-11-25',
+    title: 'Kundens frågor syns direkt i Dokumentsignering',
+    items: [
+      { kind: 'buggfix', text: 'Dokumentsignering hämtar kundernas kommentarer från Oneflow när sidan laddas och när du trycker Uppdatera. En kundfråga hamnar under Kunden har skrivit utan att någon först måste öppna dokumentet.' },
+    ],
+  },
+  {
     version: '3.132.26',
     date: '2026-11-25',
     title: 'Teknikern svarar kunden i Oneflow',

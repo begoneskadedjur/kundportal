@@ -30,7 +30,7 @@ import { Vaxel } from '../../../components/technician/ny/utrustning/Vaxel'
 import { DokumentLista } from '../../../components/technician/ny/dokument/DokumentLista'
 import { DokumentDetalj, type DokumentDetaljRef } from '../../../components/technician/ny/dokument/DokumentDetalj'
 import {
-  behorighet, gruppera, hamtaBokningar, hamtaSamtal, ordning, placera, statistik90, svTid,
+  behorighet, gruppera, hamtaBokningar, hamtaKundkommentarer, hamtaSamtal, ordning, placera, statistik90, svTid,
   type Bokning, type SamtalInfo,
 } from '../../../components/technician/ny/dokument/dokumentData'
 import { RADKNAPP } from '../../../components/technician/ny/dokument/dokumentUi'
@@ -82,6 +82,8 @@ export default function NyDokumentsignering() {
   const detaljRef = useRef<DokumentDetaljRef>(null)
 
   // ─── Hämta ───
+  const svaraKund = b.svaraKund
+  const hamtaIgen = useRef<(tyst?: boolean) => Promise<void>>(async () => {})
   const hamta = useCallback(async (tyst = false) => {
     if (tyst) setUppdaterar(true); else setLaddar(true)
     try {
@@ -95,6 +97,13 @@ export default function NyDokumentsignering() {
       setBokningar(bk)
       setUppdaterad(svTid(new Date().toISOString()))
       setFel(null)
+      // Kundkommentarer från Oneflow i bakgrunden (webhooken kommer inte alltid).
+      // Listan visas redan, och räknas om bara om något nytt kom in.
+      if (svaraKund) {
+        hamtaKundkommentarer(data.offers, { max: 40 })
+          .then(nytt => { if (nytt) hamtaIgen.current(true) })
+          .catch(() => {})
+      }
     } catch (err) {
       console.error('NyDokumentsignering:', err)
       if (!tyst) setFel('Kunde inte hämta dina dokument')
@@ -103,7 +112,8 @@ export default function NyDokumentsignering() {
       setLaddar(false)
       setUppdaterar(false)
     }
-  }, [ownDocsEmail, userId])
+  }, [ownDocsEmail, userId, svaraKund])
+  hamtaIgen.current = hamta
 
   useEffect(() => { hamta() }, [hamta])
   const uppdatera = useCallback(() => { hamta(true) }, [hamta])

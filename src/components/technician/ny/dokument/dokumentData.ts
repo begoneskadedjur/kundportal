@@ -245,6 +245,86 @@ export async function loggaSamtal(
   if (error) throw error
 }
 
+// ─── Kundkommentarer från Oneflow när listan laddas ───
+//
+// Oneflows webhook för kommentarer kommer inte alltid, och nattsynken hämtar inga
+// kommentarer. Därför hämtas tråden för de öppna dokumenten när Dokumentsignering
+// laddas, med samma väg som dokumentdetaljen (syncConversationFromOneflow, upsert
+// i oneflow_comments som inte rör befintliga rader, så läsmarkeringarna står kvar).
+// Spärrar: samma dokument hämtas högst var femte minut per webbläsarsession,
+// högst `max` dokument per laddning (senast skickade först), `samtidigt` åt gången.
+
+const KOMMENTARSPARR_MS = 5 * 60_000
+const KOMMENTARSPARR_NYCKEL = 'dokumentsignering.kommentarer.hamtade'
+
+function lasKommentarsparr(): Record<string, number> {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(KOMMENTARSPARR_NYCKEL) || '{}')
+    return v && typeof v === 'object' ? v as Record<string, number> : {}
+  } catch { return {} }
+}
+
+function skrivKommentarsparr(m: Record<string, number>): void {
+  try { sessionStorage.setItem(KOMMENTARSPARR_NYCKEL, JSON.stringify(m)) } catch { /* spärren är bara en bekvämlighet */ }
+}
+
+async function raknaKommentarer(oneflowIds: string[]): Promise<number> {
+  const { count, error } = await supabase
+    .from('oneflow_comments')
+    .select('id', { count: 'exact', head: true })
+    .in('oneflow_contract_id', oneflowIds)
+  if (error) throw error
+  return count ?? 0
+}
+
+/**
+ * Hämtar Oneflow-tråden för öppna dokument (skickade och inväntar signering:
+ * pending, och overdue som förföll för högst 30 dagar sedan). Signerade tas inte
+ * med: kön lägger dem under Signerade oavsett kommentarer. Fel för ett dokument
+ * (403, 404, nätfel) hoppas över tyst. Svarar true om något nytt kom in, så att
+ * listan kan räknas om.
+ */
+export async function hamtaKundkommentarer(
+  offers: FollowUpOffer[],
+  { max, samtidigt = 3 }: { max: number; samtidigt?: number },
+): Promise<boolean> {
+  const nu = Date.now()
+  const sparr = lasKommentarsparr()
+  for (const k of Object.keys(sparr)) if (!(nu - sparr[k] < KOMMENTARSPARR_MS)) delete sparr[k]
+
+  const ids = [...new Set(
+    offers
+      .filter(o => !!o.oneflow_contract_id && (o.status === 'pending' || (o.status === 'overdue' && (o.days_since_overdue ?? 0) <= FORFALLEN_TILL_KLARA_DAGAR)))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .map(o => o.oneflow_contract_id),
+  )].filter(id => !(id in sparr)).slice(0, max)
+
+  // Spärren sätts före hämtningen, så att en ny laddning under tiden inte hämtar samma igen
+  for (const id of ids) sparr[id] = nu
+  skrivKommentarsparr(sparr)
+  if (ids.length === 0) return false
+
+  let fore: number | null = null
+  try { fore = await raknaKommentarer(ids) } catch { fore = null }
+
+  let nasta = 0
+  const arbetare = async () => {
+    while (nasta < ids.length) {
+      const id = ids[nasta++]
+      try { await OfferFollowUpService.syncConversationFromOneflow(id) } catch { /* nästa dokument */ }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(samtidigt, ids.length) }, arbetare))
+
+  // Räkna om listan bara om antalet inlägg växte (eller om räkningen inte gick)
+  try {
+    const efter = await raknaKommentarer(ids)
+    return fore === null || efter > fore
+  } catch {
+    return true
+  }
+}
+
 // ─── Grupperna ───
 
 export type Grupp = 'attgora' | 'vantar' | 'signerade' | 'klara'

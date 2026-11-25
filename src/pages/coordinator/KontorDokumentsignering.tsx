@@ -32,7 +32,7 @@ import OppnaArende, { type ArendeRef } from '../../components/technician/ny/Oppn
 import { useArDator } from '../../components/technician/ny/arenden/useArDator'
 import { Laddar } from '../../components/technician/ny/arenden/ArendeSektion'
 import { Vaxel } from '../../components/technician/ny/utrustning/Vaxel'
-import { behorighet, hamtaBokningar, statistik90, svDatum, svTid, type Bokning } from '../../components/technician/ny/dokument/dokumentData'
+import { behorighet, hamtaBokningar, hamtaKundkommentarer, statistik90, svDatum, svTid, type Bokning } from '../../components/technician/ny/dokument/dokumentData'
 import { RADKNAPP } from '../../components/technician/ny/dokument/dokumentUi'
 import { KontorLista } from '../../components/coordinator/dokument/KontorLista'
 import { KontorDetalj, type KontorDetaljRef } from '../../components/coordinator/dokument/KontorDetalj'
@@ -79,6 +79,8 @@ export default function KontorDokumentsignering() {
   const detaljRef = useRef<KontorDetaljRef>(null)
 
   // ─── Hämta ───
+  const kanHamtaKommentarer = b.oneflow
+  const hamtaIgen = useRef<(tyst?: boolean) => Promise<void>>(async () => {})
   const hamta = useCallback(async (tyst = false) => {
     if (tyst) setUppdaterar(true); else setLaddar(true)
     try {
@@ -92,6 +94,13 @@ export default function KontorDokumentsignering() {
       setBokningar(bk)
       setUppdaterad(svTid(new Date().toISOString()))
       setFel(null)
+      // Kundkommentarer från Oneflow i bakgrunden (webhooken kommer inte alltid).
+      // Kontoret ser alla dokument: högst 30 öppna, senast skickade först, tre åt gången.
+      if (kanHamtaKommentarer) {
+        hamtaKundkommentarer(data.offers, { max: 30 })
+          .then(nytt => { if (nytt) hamtaIgen.current(true) })
+          .catch(() => {})
+      }
     } catch (err) {
       console.error('KontorDokumentsignering:', err)
       if (!tyst) setFel('Kunde inte hämta dokumenten')
@@ -100,7 +109,8 @@ export default function KontorDokumentsignering() {
       setLaddar(false)
       setUppdaterar(false)
     }
-  }, [userId])
+  }, [userId, kanHamtaKommentarer])
+  hamtaIgen.current = hamta
 
   useEffect(() => { hamta() }, [hamta])
   const uppdatera = useCallback(() => { hamta(true) }, [hamta])
