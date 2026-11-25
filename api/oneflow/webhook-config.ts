@@ -142,7 +142,12 @@ const RECOMMENDED_EVENT_FILTERS: OneFlowWebhookFilter[] = [
           "contract:lifecycle_state:end",
           "contract:lifecycle_state:terminate",
           "contract:signing_period_expire",
-          "contract:content_update"
+          "contract:content_update",
+          // Tillagda 2026-11-25: webhook.ts tar emot dem, men de var aldrig beställda,
+          // så kundens kommentar, "öppnad av kund" och "mejlet kom inte fram" kom aldrig in.
+          "comment:create",
+          "participant:first_visit",
+          "participant:delivery_failure"
         ]
       }
     ]

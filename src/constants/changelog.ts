@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.28',
+    date: '2026-11-25',
+    title: 'Öppnad av kund och mejl som inte kom fram',
+    items: [
+      { kind: 'buggfix', text: 'Dokumentsignering får nu veta när kunden har öppnat ett dokument, när mejlet inte kom fram och när kunden har skrivit en kommentar. Oneflow skickade aldrig de händelserna till portalen. Gäller dokument som skickas från och med nu.' },
+    ],
+  },
+  {
     version: '3.132.27',
     date: '2026-11-25',
     title: 'Kundens frågor syns direkt i Dokumentsignering',
