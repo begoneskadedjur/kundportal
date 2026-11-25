@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.132.26',
+    date: '2026-11-25',
+    title: 'Teknikern svarar kunden i Oneflow',
+    items: [
+      { kind: 'andring', text: 'Tekniker kan svara kunden i Oneflow från Dokumentsignering, på sina egna offerter och avtal. Välj Till kunden i Oneflow under Konversation. Intern anteckning finns kvar.' },
+    ],
+  },
+  {
     version: '3.132.25',
     date: '2026-11-25',
     title: 'Äldre kontroller visar bara stationer som fanns då',

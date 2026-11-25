@@ -92,6 +92,12 @@ export const DokumentDetalj = forwardRef<DokumentDetaljRef, Props>(function Doku
   const rabatt = useDokumentRabatt(o.status === 'draft' ? o.id : null)
   const menyRef = useRef<HTMLDivElement>(null)
 
+  const minEpost = (userEmail || '').toLowerCase()
+  const arMitt = !!minEpost && [o.created_by_email, o.begone_employee_email].some(e => (e || '').toLowerCase() === minEpost)
+  // Svara kunden i Oneflow: kontoret på alla dokument, teknikern på sina egna
+  // (servern gör samma kontroll i api/oneflow/comments)
+  const kanSvaraKund = b.oneflow || (b.svaraKund && arMitt)
+
   const { comments: interna, addComment, isLoading: internaLaddar } = useCaseComments({
     caseId: o.id,
     caseType: 'contract',
@@ -107,13 +113,13 @@ export const DokumentDetalj = forwardRef<DokumentDetaljRef, Props>(function Doku
     setMeny(false)
     setVisaPdf(false)
     setStationer(false)
-    setKanal(o.queue_category === 'svar' && b.oneflow ? 'oneflow' : 'internal')
+    setKanal(o.queue_category === 'svar' && kanSvaraKund ? 'oneflow' : 'internal')
 
     OfferFollowUpService.getOneflowConversation(o.oneflow_contract_id)
       .then(d => { if (!avbruten) setOneflow(d) })
       .catch(() => { if (!avbruten) setOneflow([]) })
-    // Synk från Oneflow kräver Oneflow-behörighet (api/oneflow/comments)
-    if (b.oneflow) {
+    // Synk från Oneflow kräver behörighet i api/oneflow/comments (kontoret, eller teknikern på eget dokument)
+    if (kanSvaraKund) {
       OfferFollowUpService.syncConversationFromOneflow(o.oneflow_contract_id)
         .then(nytt => {
           if (avbruten || !nytt) return
@@ -160,9 +166,6 @@ export const DokumentDetalj = forwardRef<DokumentDetaljRef, Props>(function Doku
     if (arDator || !panel) return
     document.querySelector('[data-genomgang="dok-nasta"]')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [panel, arDator])
-
-  const minEpost = (userEmail || '').toLowerCase()
-  const arMitt = !!minEpost && [o.created_by_email, o.begone_employee_email].some(e => (e || '').toLowerCase() === minEpost)
 
   const inlagg = useMemo<Inlagg[]>(() => {
     const lista: Inlagg[] = oneflow.map(c => ({
@@ -253,7 +256,7 @@ export const DokumentDetalj = forwardRef<DokumentDetaljRef, Props>(function Doku
 
   const svara = () => {
     setFlik('konversation')
-    setKanal(b.oneflow ? 'oneflow' : 'internal')
+    setKanal(kanSvaraKund ? 'oneflow' : 'internal')
     setTimeout(() => { skrivRef.current?.focus(); skrivRef.current?.scrollIntoView({ block: 'center' }) }, 50)
   }
 
@@ -509,7 +512,7 @@ export const DokumentDetalj = forwardRef<DokumentDetaljRef, Props>(function Doku
           laddar={internaLaddar}
           kanal={kanal}
           onKanal={setKanal}
-          kanOneflow={b.oneflow}
+          kanOneflow={kanSvaraKund}
           utkast={utkast}
           onUtkast={setUtkast}
           skickar={skickar}

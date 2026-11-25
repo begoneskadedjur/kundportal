@@ -16,6 +16,8 @@
 // Behörigheter (läst ur RLS och api/oneflow 2026-10-23):
 //   Oneflow-anrop (konversation, svar, förläng, radera) kräver admin, koordinator
 //   eller säljare i requireAuth (primärroll, is_admin eller extra_roles).
+//   Undantag sedan 2026-11-25: konversationen (api/oneflow/comments) släpper även in
+//   tekniker, men bara på dokument där teknikern är ansvarig eller skapare (svaraKund).
 //   coordinator_case_actions (Skriv av, ring åter, kontaktförsök) läses och skrivs
 //   bara av admin och koordinator (role eller is_admin).
 //   contracts.hidden_by (Dölj) uppdateras bara av admin, koordinator och säljare
@@ -97,6 +99,12 @@ export function kr(v: number | null | undefined): string | null {
 export interface Behorighet {
   /** Oneflow via api/oneflow: läs och svara i konversationen, förläng, radera */
   oneflow: boolean
+  /**
+   * Svara kunden i Oneflow-konversationen (läsa och skriva kommentarer), inget annat.
+   * Kontoret har det via oneflow, teknikern på egna dokument (api/oneflow/comments
+   * kontrollerar att teknikern är ansvarig eller skapare).
+   */
+  svaraKund: boolean
   /** coordinator_case_actions: Skriv av, ring åter */
   atgarder: boolean
   /** contracts.hidden_by: Dölj i min lista */
@@ -104,13 +112,15 @@ export interface Behorighet {
 }
 
 export function behorighet(profile: Profile | null): Behorighet {
-  if (!profile) return { oneflow: false, atgarder: false, dolja: false }
+  if (!profile) return { oneflow: false, svaraKund: false, atgarder: false, dolja: false }
   const roller = new Set<string>()
   if (profile.role) roller.add(profile.role)
   if (profile.is_admin) roller.add('admin')
   for (const r of profile.extra_roles || []) roller.add(r)
+  const oneflow = roller.has('admin') || roller.has('koordinator') || roller.has('säljare')
   return {
-    oneflow: roller.has('admin') || roller.has('koordinator') || roller.has('säljare'),
+    oneflow,
+    svaraKund: oneflow || roller.has('technician'),
     atgarder: profile.is_admin === true || profile.role === 'admin' || profile.role === 'koordinator',
     dolja: profile.is_admin === true || profile.role === 'admin' || profile.role === 'koordinator' || profile.role === 'säljare',
   }
@@ -477,8 +487,10 @@ export function nastaSteg(o: FollowUpOffer, p: Plats, b: Behorighet, bokning: Bo
           status: `Kunden har skrivit ${sedan(o.latest_customer_comment?.at, true)}`,
           text: b.oneflow
             ? 'svara på kundens fråga. Svaret syns för kunden i Oneflow.'
-            : `svara på kundens fråga. Ring ${kontakt} eller skriv en intern anteckning så svarar kontoret i Oneflow.`,
-          primar: b.oneflow ? 'svara' : harTel ? 'ring' : 'svara',
+            : b.svaraKund
+              ? `svara på kundens fråga under Konversation, eller ring ${kontakt}.`
+              : `svara på kundens fråga. Ring ${kontakt} eller skriv en intern anteckning så svarar kontoret i Oneflow.`,
+          primar: b.svaraKund ? 'svara' : harTel ? 'ring' : 'svara',
         }
       case 'forfallna':
         return {

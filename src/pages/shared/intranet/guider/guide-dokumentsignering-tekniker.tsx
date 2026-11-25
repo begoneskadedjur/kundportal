@@ -13,8 +13,9 @@
 //                   Anteckning, valfri, Avbryt, Spara samtalet. Ring igen visas bara för kontoret.
 //   utkastets ruta  Offert, <namn>, Stäng, Skicka offerten, frågan "Skicka offerten till ... från
 //                   info@begone.se?"
-// Teknikern har inte Oneflow-behörighet (behorighet().oneflow är falsk): Förläng och påminn och
-// svar till kunden i Oneflow gör kontoret. Teknikern ringer och loggar samtalet.
+// Teknikern har inte Oneflow-behörighet (behorighet().oneflow är falsk): Förläng och påminn gör
+// kontoret. Teknikern ringer och loggar samtalet. Sedan 2026-11-25 svarar teknikern själv kunden
+// i Oneflow under Konversation på sina egna dokument (behorighet().svaraKund).
 // Påhittade kunder, ingenting skickas.
 
 import { useState, type ReactNode } from 'react'
